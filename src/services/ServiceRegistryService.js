@@ -5,8 +5,48 @@
 // Polls health endpoints and tracks status.
 // ============================================================
 
+import os from "os";
 import { SERVICES, DEVICES, HEALTH_CHECK_TIMEOUT_MS } from "../config.js";
 import logger from "../utils/logger.js";
+
+/**
+ * Detect the device key that this API instance is running on.
+ * Matches the machine's LAN IPs against DEVICES hostnames.
+ */
+function detectLocalDevice() {
+  const interfaces = os.networkInterfaces();
+  const localIPs = new Set();
+  for (const iface of Object.values(interfaces)) {
+    for (const addr of iface) {
+      if (!addr.internal) localIPs.add(addr.address);
+    }
+  }
+  localIPs.add("localhost");
+  localIPs.add("127.0.0.1");
+
+  for (const [key, device] of Object.entries(DEVICES)) {
+    if (localIPs.has(device.hostname)) return key;
+  }
+  return null;
+}
+
+const LOCAL_DEVICE_KEY = detectLocalDevice();
+
+/**
+ * Rewrite a URL to use localhost when health-checking a service on
+ * the same device.  WSL2 can reach Windows apps via localhost but
+ * not always via the LAN IP (apps that bind to 127.0.0.1 only).
+ */
+function toLocalHealthUrl(url, svc) {
+  if (!LOCAL_DEVICE_KEY || svc.device !== LOCAL_DEVICE_KEY) return url;
+  try {
+    const parsed = new URL(url);
+    parsed.hostname = "localhost";
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return url;
+  }
+}
 
 /**
  * Service status snapshot.
@@ -111,7 +151,8 @@ export default class ServiceRegistryService {
         HEALTH_CHECK_TIMEOUT_MS,
       );
 
-      const healthUrl = `${svc.url}${svc.healthPath || "/"}`;
+      const publicHealthUrl = `${svc.url}${svc.healthPath || "/"}`;
+      const healthUrl = toLocalHealthUrl(publicHealthUrl, svc);
       const res = await fetch(healthUrl, {
         signal: controller.signal,
         headers: { Accept: "application/json" },
