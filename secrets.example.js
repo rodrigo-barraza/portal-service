@@ -14,14 +14,14 @@
 // API_MONGO_DB_NAME=portal
 // PORTAL_URL=http://localhost:5173
 // PORTAL_API_URL=http://localhost:4001
-// PRISM_URL=http://216.19.178.138:7777
+// PRISM_URL=http://192.168.86.2:7777
 // TOOLS_API_URL=http://localhost:5590
 // SESSIONS_URL=http://localhost:5557
 // RETINA_URL=http://localhost:3333
 // LIGHTS_URL=http://localhost:4444
 // LUPOS_URL=
 // VAULT_URL=http://192.168.86.2:5599
-// ROD_DEV_URL=http://216.19.178.138:3000
+// ROD_DEV_URL=http://192.168.86.2:3000
 // LM_STUDIO_URL=http://localhost:1234
 // LM_STUDIO_2_URL=
 // MINIO_ENDPOINT=http://<host>:9000

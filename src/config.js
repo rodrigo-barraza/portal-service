@@ -63,7 +63,7 @@ export const DEVICES = {
   synology: {
     name: "Synology NAS",
     type: "NAS",
-    hostname: "216.19.178.138",
+    hostname: "192.168.86.2",
     os: "DSM 7",
     sshAlias: "nas",
     dockerBin: "/usr/local/bin/docker",
