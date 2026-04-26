@@ -1,0 +1,113 @@
+// ============================================================
+// API Portal — Entry Point
+// ============================================================
+// Express 5 BFF aggregator for the Sun ecosystem developer portal.
+// Federates data from Prism, Tools API, Sessions, and other services.
+// ============================================================
+
+import express from "express";
+import cors from "cors";
+
+import { errorHandler } from "./utils/errors.js";
+import logger from "./utils/logger.js";
+import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.js";
+import MongoWrapper from "./wrappers/MongoWrapper.js";
+import { PORT, MONGO_URI, MONGO_DB_NAME } from "./config.js";
+import { COLLECTIONS } from "./constants.js";
+import ServiceRegistryService from "./services/ServiceRegistryService.js";
+
+// Routes
+import healthRouter from "./routes/health.js";
+import servicesRouter from "./routes/services.js";
+import statsRouter from "./routes/stats.js";
+import portfolioRouter from "./routes/portfolio.js";
+
+// ─── Express App ───────────────────────────────────────────────────
+
+const app = express();
+
+app.use(cors());
+app.use(express.json({ limit: "5mb" }));
+app.use(requestLoggerMiddleware);
+
+// ─── Endpoint Registry ────────────────────────────────────────────
+
+const ENDPOINTS = {
+  rest: ["/health", "/services", "/stats", "/portfolio"],
+};
+
+// ─── Root Health Check ─────────────────────────────────────────────
+
+app.get("/", (_req, res) => {
+  res.json({
+    name: "API API",
+    version: "1.0.0",
+    status: "ok",
+    uptime: process.uptime(),
+    endpoints: ENDPOINTS,
+  });
+});
+
+// ─── Mount Routes ──────────────────────────────────────────────────
+
+app.use("/health", healthRouter);
+app.use("/services", servicesRouter);
+app.use("/stats", statsRouter);
+app.use("/portfolio", portfolioRouter);
+
+// ─── Error Handler (must be last) ──────────────────────────────────
+
+app.use(errorHandler);
+
+// ─── Startup ───────────────────────────────────────────────────────
+
+(async () => {
+  // Connect to MongoDB
+  await MongoWrapper.createClient(MONGO_DB_NAME, MONGO_URI);
+
+  // Ensure indexes for query performance
+  try {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (db) {
+      await Promise.all([
+        db
+          .collection(COLLECTIONS.PORTFOLIO_PROJECTS)
+          .createIndex({ id: 1 }, { unique: true }),
+        db
+          .collection(COLLECTIONS.PORTFOLIO_PROJECTS)
+          .createIndex({ order: 1 }),
+        db
+          .collection(COLLECTIONS.PORTFOLIO_CONTENT)
+          .createIndex({ type: 1 }, { unique: true }),
+      ]);
+      logger.success("Database indexes ensured");
+    }
+  } catch (err) {
+    logger.error(`Failed to ensure indexes: ${err.message}`);
+  }
+
+  // Initial health check of all services (fire-and-forget)
+  ServiceRegistryService.checkAll()
+    .then((results) => {
+      const healthy = results.filter((s) => s.healthy).length;
+      logger.info(
+        `[ServiceRegistry] ${healthy}/${results.length} services healthy`,
+      );
+    })
+    .catch((err) => {
+      logger.warn(`[ServiceRegistry] Initial check failed: ${err.message}`);
+    });
+
+  // Periodic health checks every 60 seconds
+  setInterval(() => {
+    ServiceRegistryService.checkAll().catch(() => {});
+  }, 60_000);
+
+  // Start server
+  app.listen(PORT, () => {
+    logger.success(`API API is running on port ${PORT}`);
+    ENDPOINTS.rest.forEach((ep) =>
+      logger.info(`  REST  →  http://localhost:${PORT}${ep}`),
+    );
+  });
+})();

@@ -1,0 +1,6 @@
+node_modules/
+secrets.js
+.env
+.vscode/settings.json
+
+*:Zone.Identifier
