@@ -19,6 +19,7 @@ export const SESSIONS_URL = "http://localhost:5557";
 export const RETINA_URL = "http://localhost:3333";
 export const LIGHTS_URL = "http://localhost:4444";
 export const LUPOS_URL = "";
+export const VAULT_URL = "";
 
 // LM Studio instances
 export const LM_STUDIO_URL = "http://localhost:1234";

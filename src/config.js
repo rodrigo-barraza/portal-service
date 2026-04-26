@@ -14,6 +14,7 @@ import {
   RETINA_URL,
   LIGHTS_URL,
   LUPOS_URL,
+  VAULT_URL,
   LM_STUDIO_URL,
   LM_STUDIO_2_URL,
   MINIO_ENDPOINT,
@@ -62,15 +63,16 @@ export const DEVICES = {
 // Portal API acts as a BFF: aggregates data from all Sun services.
 // Each entry includes a `device` key referencing the host it runs on.
 export const SERVICES = {
-  prism:      { name: "Prism",         url: PRISM_URL       || "http://localhost:7777",          healthPath: "/",          stage: "Production",   visibility: "external",  device: "workstation" },
-  toolsApi:   { name: "Tools API",     url: TOOLS_API_URL   || "http://localhost:5590",          healthPath: "/health",    stage: "Production",   visibility: "internal",  device: "workstation" },
-  sessions:   { name: "Sessions",      url: SESSIONS_URL    || "http://localhost:5557",          healthPath: "/",          stage: "Development",  visibility: "internal",  device: "workstation" },
-  retina:     { name: "Retina",        url: RETINA_URL      || "http://localhost:3333",          healthPath: "/",          stage: "Development",  visibility: "external",  device: "workstation" },
-  lights:     { name: "Lights",        url: LIGHTS_URL      || "http://localhost:4444",          healthPath: "/",          stage: "Development",  visibility: "internal",  device: "workstation" },
+  prism:      { name: "Prism",         url: PRISM_URL       || "http://localhost:7777",          healthPath: "/",          stage: "Production",   visibility: "external",  device: "workstation",  repo: "https://github.com/rodrigo-barraza/prism" },
+  toolsApi:   { name: "Tools API",     url: TOOLS_API_URL   || "http://localhost:5590",          healthPath: "/health",    stage: "Production",   visibility: "internal",  device: "workstation",  repo: "https://github.com/rodrigo-barraza/tools-api" },
+  sessions:   { name: "Sessions",      url: SESSIONS_URL    || "http://localhost:5557",          healthPath: "/",          stage: "Development",  visibility: "internal",  device: "workstation",  repo: "https://github.com/rodrigo-barraza/sessions" },
+  retina:     { name: "Retina",        url: RETINA_URL      || "http://localhost:3333",          healthPath: "/",          stage: "Development",  visibility: "external",  device: "workstation",  repo: "https://github.com/rodrigo-barraza/retina" },
+  lights:     { name: "Lights",        url: LIGHTS_URL      || "http://localhost:4444",          healthPath: "/",          stage: "Development",  visibility: "internal",  device: "workstation",  repo: "https://github.com/rodrigo-barraza/lights" },
   lmStudio:   { name: "LM Studio",     url: LM_STUDIO_URL   || "http://localhost:1234",          healthPath: "/v1/models", stage: "Production",  visibility: "internal",  device: "workstation" },
   lmStudio2:  { name: "LM Studio 2",   url: LM_STUDIO_2_URL || "http://192.168.86.178:1234",    healthPath: "/v1/models", stage: "Production",  visibility: "internal",  device: "workstation2" },
-  lupos:      { name: "Lupos",         url: LUPOS_URL       || "http://192.168.86.247:1337",    healthPath: "/health",    stage: "Production",   visibility: "internal",  device: "raspi" },
-  rodDev:     { name: "Rod.dev",       url: "http://216.19.178.138:3000",                        healthPath: "/",          stage: "Production",   visibility: "external",  device: "synology" },
+  lupos:      { name: "Lupos",         url: LUPOS_URL       || "http://192.168.86.247:1337",    healthPath: "/health",    stage: "Production",   visibility: "internal",  device: "raspi",        repo: "https://github.com/rodrigo-barraza/lupos" },
+  vault:      { name: "Vault",         url: VAULT_URL       || "http://192.168.86.2:5599",      healthPath: "/health",    stage: "Production",   visibility: "internal",  device: "synology",     repo: "https://github.com/rodrigo-barraza/vault" },
+  rodDev:     { name: "Rod.dev",       url: "http://216.19.178.138:3000",                        healthPath: "/",          stage: "Production",   visibility: "external",  device: "synology",     repo: "https://github.com/rodrigo-barraza/rod.dev" },
 };
 
 // ── Infrastructure Services ────────────────────────────────────────

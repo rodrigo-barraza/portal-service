@@ -16,6 +16,7 @@ import logger from "../utils/logger.js";
  * @property {string} url
  * @property {"Production"|"Development"} stage
  * @property {string} host - Resolved device name (e.g. "Workstation", "Raspberry Pi")
+ * @property {string|null} repo - GitHub repository URL
  * @property {boolean} healthy
  * @property {number|null} responseTimeMs
  * @property {object|null} metadata - Root endpoint JSON (version, endpoints, etc.)
@@ -40,6 +41,7 @@ export default class ServiceRegistryService {
         url: svc.url,
         stage: svc.stage,
         visibility: svc.visibility,
+        repo: svc.repo || null,
         host: DEVICES[svc.device]?.name || svc.device || "Unknown",
         healthy: false,
         responseTimeMs: null,
@@ -82,6 +84,7 @@ export default class ServiceRegistryService {
         url: "",
         stage: svc.stage,
         visibility: svc.visibility,
+        repo: svc.repo || null,
         host: DEVICES[svc.device]?.name || svc.device || "Unknown",
         healthy: false,
         responseTimeMs: null,
@@ -122,6 +125,7 @@ export default class ServiceRegistryService {
         url: svc.url,
         stage: svc.stage,
         visibility: svc.visibility,
+        repo: svc.repo || null,
         host: DEVICES[svc.device]?.name || svc.device || "Unknown",
         healthy: res.ok,
         responseTimeMs,
@@ -137,6 +141,7 @@ export default class ServiceRegistryService {
         url: svc.url,
         stage: svc.stage,
         visibility: svc.visibility,
+        repo: svc.repo || null,
         host: DEVICES[svc.device]?.name || svc.device || "Unknown",
         healthy: false,
         responseTimeMs: Date.now() - start,
