@@ -26,7 +26,7 @@ import logger from "../utils/logger.js";
  * @property {string} type       - "database" | "object-store"
  * @property {string} url
  * @property {number|null} port
- * @property {"Production"|"Development"} stage
+ * @property {"Production"|"Development"} environment
  * @property {string} host       - Resolved device name
  * @property {boolean} healthy
  * @property {number|null} responseTimeMs
@@ -51,9 +51,10 @@ export default class InfrastructureRegistryService {
         id,
         name: infra.name,
         type: infra.type,
+        serviceType: infra.serviceType || null,
         url: infra.url,
         port: infra.port,
-        stage: infra.stage,
+        environment: infra.environment,
         visibility: infra.visibility,
         host: DEVICES[infra.device]?.name || infra.device || "Unknown",
         dependsOn: infra.dependsOn || [],
@@ -95,9 +96,10 @@ export default class InfrastructureRegistryService {
       id,
       name: infra.name,
       type: infra.type,
+      serviceType: infra.serviceType || null,
       url: infra.url,
       port: infra.port,
-      stage: infra.stage,
+      environment: infra.environment,
       visibility: infra.visibility,
       host: DEVICES[infra.device]?.name || infra.device || "Unknown",
       dependsOn: infra.dependsOn || [],

@@ -64,16 +64,16 @@ export const DEVICES = {
 // Portal API acts as a BFF: aggregates data from all Sun services.
 // Each entry includes a `device` key referencing the host it runs on.
 export const SERVICES = {
-  prism:      { name: "Prism",         url: PRISM_URL,        healthPath: "/",          stage: "Production",   visibility: "external",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/prism",    dependsOn: ["toolsApi", "mongodb", "minio", "lmStudio", "lmStudio2"] },
-  toolsApi:   { name: "Tools API",     url: TOOLS_API_URL,    healthPath: "/health",    stage: "Production",   visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/tools-api", dependsOn: ["prism", "mongodb"] },
-  sessions:   { name: "Sessions",      url: SESSIONS_URL,     healthPath: "/",          stage: "Development",  visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/sessions",  dependsOn: ["mongodb"] },
-  retina:     { name: "Retina",        url: RETINA_URL,       healthPath: "/",          stage: "Development",  visibility: "external",  device: "workstation",  serviceType: "Web Client",       repo: "https://github.com/rodrigo-barraza/retina",    dependsOn: ["prism", "sessions"] },
-  lights:     { name: "Lights",        url: LIGHTS_URL,       healthPath: "/",          stage: "Development",  visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/lights",    dependsOn: [] },
-  lmStudio:   { name: "LM Studio",     url: LM_STUDIO_URL,    healthPath: "/v1/models", stage: "Production",  visibility: "internal",  device: "workstation",  serviceType: "API",              dependsOn: [] },
-  lmStudio2:  { name: "LM Studio 2",   url: LM_STUDIO_2_URL,  healthPath: "/v1/models", stage: "Production",  visibility: "internal",  device: "workstation2", serviceType: "API",              dependsOn: [] },
-  lupos:      { name: "Lupos",         url: LUPOS_URL,        healthPath: "/health",    stage: "Production",   visibility: "internal",  device: "raspi",        serviceType: "Discord Bot",      repo: "https://github.com/rodrigo-barraza/lupos",     dependsOn: ["prism", "mongodb"] },
-  vault:      { name: "Vault",         url: VAULT_URL,        healthPath: "/health",    stage: "Production",   visibility: "internal",  device: "synology",     serviceType: "API",              repo: "https://github.com/rodrigo-barraza/vault",     dependsOn: [] },
-  rodDev:     { name: "Rod.dev",       url: ROD_DEV_URL,      healthPath: "/",          stage: "Production",   visibility: "external",  device: "synology",     serviceType: "Web Client",       repo: "https://github.com/rodrigo-barraza/rod.dev",   dependsOn: ["prism", "sessions"] },
+  prism:      { name: "Prism",         url: PRISM_URL,        healthPath: "/",          environment: "Production",   visibility: "external",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/prism",    hostname: "prism.rod.dev",  dependsOn: ["toolsApi", "mongodb", "minio", "lmStudio", "lmStudio2", "vault"] },
+  toolsApi:   { name: "Tools API",     url: TOOLS_API_URL,    healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/tools-api", dependsOn: ["prism", "mongodb", "vault"] },
+  sessions:   { name: "Sessions",      url: SESSIONS_URL,     healthPath: "/",          environment: "Development",  visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/sessions",  dependsOn: ["mongodb", "vault"] },
+  retina:     { name: "Retina",        url: RETINA_URL,       healthPath: "/",          environment: "Development",  visibility: "external",  device: "workstation",  serviceType: "Client",       repo: "https://github.com/rodrigo-barraza/retina",    hostname: "retina.rod.dev", dependsOn: ["prism", "sessions", "vault"] },
+  lights:     { name: "Lights",        url: LIGHTS_URL,       healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "synology",     serviceType: "API",              repo: "https://github.com/rodrigo-barraza/lights",    dependsOn: ["vault", "mongodb"] },
+  lmStudio:   { name: "LM Studio",     url: LM_STUDIO_URL,    healthPath: "/v1/models", environment: "Production",  visibility: "internal",  device: "workstation",  serviceType: "API",              dependsOn: [] },
+  lmStudio2:  { name: "LM Studio 2",   url: LM_STUDIO_2_URL,  healthPath: "/v1/models", environment: "Production",  visibility: "internal",  device: "workstation2", serviceType: "API",              dependsOn: [] },
+  lupos:      { name: "Lupos",         url: LUPOS_URL,        healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "raspi",        serviceType: "Client",      repo: "https://github.com/rodrigo-barraza/lupos",     dependsOn: ["prism", "mongodb", "vault"] },
+  vault:      { name: "Vault",         url: VAULT_URL,        healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "synology",     serviceType: "API",              repo: "https://github.com/rodrigo-barraza/vault",     dependsOn: [] },
+  rodDev:     { name: "Rod.dev",       url: ROD_DEV_URL,      healthPath: "/",          environment: "Production",   visibility: "external",  device: "synology",     serviceType: "Client",       repo: "https://github.com/rodrigo-barraza/rod.dev",   hostname: "rod.dev",        dependsOn: ["prism", "sessions", "vault"] },
 };
 
 // ── Infrastructure Services ────────────────────────────────────────
@@ -85,7 +85,7 @@ export const INFRASTRUCTURE = {
     type: "database",
     serviceType: "Database",
     url: MONGO_URI || "",
-    stage: "Production",
+    environment: "Production",
     visibility: "internal",
     device: "synology",
     port: 27017,
@@ -94,9 +94,9 @@ export const INFRASTRUCTURE = {
   minio: {
     name: "MinIO",
     type: "object-store",
-    serviceType: "Object Store",
+    serviceType: "Storage",
     url: MINIO_ENDPOINT || "",
-    stage: "Production",
+    environment: "Production",
     visibility: "internal",
     device: "synology",
     port: 9000,

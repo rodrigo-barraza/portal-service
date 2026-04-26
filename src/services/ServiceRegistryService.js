@@ -14,7 +14,7 @@ import logger from "../utils/logger.js";
  * @property {string} id
  * @property {string} name
  * @property {string} url
- * @property {"Production"|"Development"} stage
+ * @property {"Production"|"Development"} environment
  * @property {string} host - Resolved device name (e.g. "Workstation", "Raspberry Pi")
  * @property {string|null} repo - GitHub repository URL
  * @property {boolean} healthy
@@ -39,11 +39,12 @@ export default class ServiceRegistryService {
         id,
         name: svc.name,
         url: svc.url,
-        stage: svc.stage,
+        environment: svc.environment,
         visibility: svc.visibility,
         serviceType: svc.serviceType || null,
         repo: svc.repo || null,
         host: DEVICES[svc.device]?.name || svc.device || "Unknown",
+        hostname: svc.hostname || null,
         dependsOn: svc.dependsOn || [],
         healthy: false,
         responseTimeMs: null,
@@ -84,11 +85,12 @@ export default class ServiceRegistryService {
         id,
         name: svc.name,
         url: "",
-        stage: svc.stage,
+        environment: svc.environment,
         visibility: svc.visibility,
         serviceType: svc.serviceType || null,
         repo: svc.repo || null,
         host: DEVICES[svc.device]?.name || svc.device || "Unknown",
+        hostname: svc.hostname || null,
         dependsOn: svc.dependsOn || [],
         healthy: false,
         responseTimeMs: null,
@@ -127,11 +129,12 @@ export default class ServiceRegistryService {
         id,
         name: svc.name,
         url: svc.url,
-        stage: svc.stage,
+        environment: svc.environment,
         visibility: svc.visibility,
         serviceType: svc.serviceType || null,
         repo: svc.repo || null,
         host: DEVICES[svc.device]?.name || svc.device || "Unknown",
+        hostname: svc.hostname || null,
         dependsOn: svc.dependsOn || [],
         healthy: res.ok,
         responseTimeMs,
@@ -145,11 +148,12 @@ export default class ServiceRegistryService {
         id,
         name: svc.name,
         url: svc.url,
-        stage: svc.stage,
+        environment: svc.environment,
         visibility: svc.visibility,
         serviceType: svc.serviceType || null,
         repo: svc.repo || null,
         host: DEVICES[svc.device]?.name || svc.device || "Unknown",
+        hostname: svc.hostname || null,
         dependsOn: svc.dependsOn || [],
         healthy: false,
         responseTimeMs: Date.now() - start,
