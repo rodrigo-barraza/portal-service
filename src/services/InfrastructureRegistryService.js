@@ -135,6 +135,7 @@ export default class InfrastructureRegistryService {
   /**
    * MongoDB health check — connects, runs admin ping, disconnects.
    * Uses a short-lived client to avoid leaking connections.
+   * Gracefully handles limited privileges — ping is sufficient for liveness.
    * @returns {Promise<object>}
    */
   static async _checkMongo() {
@@ -149,19 +150,29 @@ export default class InfrastructureRegistryService {
       await client.connect();
       const admin = client.db("admin");
 
-      // Ping for liveness
+      // Ping for liveness (always succeeds if connected)
       await admin.command({ ping: 1 });
 
-      // Gather server metadata
-      const serverStatus = await admin.command({ serverStatus: 1 });
-      const dbList = await admin.command({ listDatabases: 1, nameOnly: true });
+      // Gather server metadata — may fail if user lacks clusterMonitor role
+      const metadata = { version: null, uptime: null, connections: null, databases: null };
 
-      return {
-        version: serverStatus.version,
-        uptime: serverStatus.uptime,
-        connections: serverStatus.connections?.current ?? null,
-        databases: dbList.databases?.length ?? null,
-      };
+      try {
+        const serverStatus = await admin.command({ serverStatus: 1 });
+        metadata.version = serverStatus.version;
+        metadata.uptime = serverStatus.uptime;
+        metadata.connections = serverStatus.connections?.current ?? null;
+      } catch {
+        // User may lack clusterMonitor / root role — that's fine
+      }
+
+      try {
+        const dbList = await admin.command({ listDatabases: 1, nameOnly: true });
+        metadata.databases = dbList.databases?.length ?? null;
+      } catch {
+        // Requires listDatabases privilege
+      }
+
+      return metadata;
     } finally {
       await client.close();
     }

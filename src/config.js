@@ -5,7 +5,7 @@
 // ============================================================
 
 import {
-  PORT as SECRETS_PORT,
+  API_PORT as SECRETS_PORT,
   MONGO_URI,
   MONGO_DB_NAME,
   PRISM_URL,

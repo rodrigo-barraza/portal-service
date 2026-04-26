@@ -6,7 +6,7 @@
 // ============================================================
 
 // Server
-export const PORT = 4001;
+export const API_PORT = 4001;
 
 // MongoDB
 export const MONGO_URI = "mongodb://user:password@<host>:27017/?directConnection=true&replicaSet=rs0&authSource=admin";
