@@ -29,25 +29,36 @@ function enrichWithDependencies(services, infrastructure) {
   // id → name lookup
   const nameMap = Object.fromEntries(all.map((s) => [s.id, s.name]));
 
-  // Normalize a dependency entry — handles both raw string IDs
-  // and already-enriched { id, name } objects (from cached status).
+  // Normalize a dependency entry — handles raw string IDs,
+  // structured { id, criticality } objects, and already-enriched
+  // { id, name, criticality } objects from cached status.
   const rawId = (dep) => (typeof dep === "string" ? dep : dep.id);
+  const rawCriticality = (dep) =>
+    typeof dep === "string" ? "required" : dep.criticality || "required";
 
-  // Compute inverse: dependedOnBy[targetId] = [{ id, name }, ...]
+  // Compute inverse: dependedOnBy[targetId] = [{ id, name, criticality }, ...]
   const inverseMap = {};
   for (const item of all) {
     for (const dep of item.dependsOn || []) {
       const id = rawId(dep);
       if (!inverseMap[id]) inverseMap[id] = [];
-      inverseMap[id].push({ id: item.id, name: item.name });
+      inverseMap[id].push({
+        id: item.id,
+        name: item.name,
+        criticality: rawCriticality(dep),
+      });
     }
   }
 
-  // Enrich each item
+  // Enrich each item — resolve names and carry criticality
   for (const item of all) {
     item.dependsOn = (item.dependsOn || []).map((dep) => {
       const id = rawId(dep);
-      return { id, name: nameMap[id] || id };
+      return {
+        id,
+        name: nameMap[id] || id,
+        criticality: rawCriticality(dep),
+      };
     });
     item.dependedOnBy = inverseMap[item.id] || [];
   }
