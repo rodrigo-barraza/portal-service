@@ -21,7 +21,7 @@ import InfrastructureRegistryService from "./services/InfrastructureRegistryServ
 import healthRouter from "./routes/health.js";
 import servicesRouter from "./routes/services.js";
 import statsRouter from "./routes/stats.js";
-import portfolioRouter from "./routes/portfolio.js";
+
 import devicesRouter from "./routes/devices.js";
 
 // ─── Express App ───────────────────────────────────────────────────
@@ -35,7 +35,7 @@ app.use(requestLoggerMiddleware);
 // ─── Endpoint Registry ────────────────────────────────────────────
 
 const ENDPOINTS = {
-  rest: ["/health", "/services", "/devices", "/stats", "/portfolio"],
+  rest: ["/health", "/services", "/devices", "/stats"],
 };
 
 // ─── Root Health Check ─────────────────────────────────────────────
@@ -55,7 +55,7 @@ app.get("/", (_req, res) => {
 app.use("/health", healthRouter);
 app.use("/services", servicesRouter);
 app.use("/stats", statsRouter);
-app.use("/portfolio", portfolioRouter);
+
 app.use("/devices", devicesRouter);
 
 // ─── Error Handler (must be last) ──────────────────────────────────
@@ -74,14 +74,8 @@ app.use(errorHandler);
     if (db) {
       await Promise.all([
         db
-          .collection(COLLECTIONS.PORTFOLIO_PROJECTS)
-          .createIndex({ id: 1 }, { unique: true }),
-        db
-          .collection(COLLECTIONS.PORTFOLIO_PROJECTS)
-          .createIndex({ order: 1 }),
-        db
-          .collection(COLLECTIONS.PORTFOLIO_CONTENT)
-          .createIndex({ type: 1 }, { unique: true }),
+          .collection(COLLECTIONS.SERVICE_SNAPSHOTS)
+          .createIndex({ timestamp: -1 }),
       ]);
       logger.success("Database indexes ensured");
     }
