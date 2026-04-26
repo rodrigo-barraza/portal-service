@@ -12,6 +12,8 @@
 // API_PORT=4001
 // MONGO_URI=mongodb://user:password@<host>:27017/?directConnection=true&replicaSet=rs0&authSource=admin
 // API_MONGO_DB_NAME=portal
+// PORTAL_URL=http://localhost:5173
+// PORTAL_API_URL=http://localhost:4001
 // PRISM_URL=http://localhost:7777
 // TOOLS_API_URL=http://localhost:5590
 // SESSIONS_URL=http://localhost:5557

@@ -8,6 +8,8 @@ import {
   API_PORT as SECRETS_PORT,
   MONGO_URI,
   MONGO_DB_NAME,
+  PORTAL_URL,
+  PORTAL_API_URL,
   PRISM_URL,
   TOOLS_API_URL,
   SESSIONS_URL,
@@ -66,6 +68,8 @@ export const DEVICES = {
 // Portal API acts as a BFF: aggregates data from all Sun services.
 // Each entry includes a `device` key referencing the host it runs on.
 export const SERVICES = {
+  portal:     { name: "Portal",        url: PORTAL_URL,       healthPath: "/",          environment: "Development",  visibility: "internal",  device: "workstation",  serviceType: "Client",           repo: "https://github.com/rodrigo-barraza/portal",    dependsOn: ["portalApi"] },
+  portalApi:  { name: "Portal API",    url: PORTAL_API_URL,   healthPath: "/health",    environment: "Development",  visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/api",       dependsOn: ["prism", "toolsApi", "sessions", "retina", "lights", "lupos", "vault", "rodDev", "mongodb", "minio", "lmStudio", "lmStudio2"] },
   prism:      { name: "Prism",         url: PRISM_URL,        healthPath: "/",          environment: "Production",   visibility: "external",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/prism",    hostname: "prism.rod.dev",  dependsOn: ["toolsApi", "mongodb", "minio", "lmStudio", "lmStudio2", "vault"] },
   toolsApi:   { name: "Tools API",     url: TOOLS_API_URL,    healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/tools-api", dependsOn: ["prism", "mongodb", "vault"] },
   sessions:   { name: "Sessions",      url: SESSIONS_URL,     healthPath: "/",          environment: "Development",  visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/sessions",  dependsOn: ["mongodb", "vault"] },
