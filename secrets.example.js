@@ -19,6 +19,7 @@
 // LIGHTS_URL=http://localhost:4444
 // LUPOS_URL=
 // VAULT_URL=http://192.168.86.2:5599
+// ROD_DEV_URL=http://216.19.178.138:3000
 // LM_STUDIO_URL=http://localhost:1234
 // LM_STUDIO_2_URL=
 // MINIO_ENDPOINT=http://<host>:9000
