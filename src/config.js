@@ -62,15 +62,15 @@ export const DEVICES = {
 // Portal API acts as a BFF: aggregates data from all Sun services.
 // Each entry includes a `device` key referencing the host it runs on.
 export const SERVICES = {
-  prism:      { name: "Prism",         url: PRISM_URL       || "http://localhost:7777",          healthPath: "/",          stage: "Production",   device: "workstation" },
-  toolsApi:   { name: "Tools API",     url: TOOLS_API_URL   || "http://localhost:5590",          healthPath: "/health",    stage: "Production",   device: "workstation" },
-  sessions:   { name: "Sessions",      url: SESSIONS_URL    || "http://localhost:5557",          healthPath: "/",          stage: "Development",  device: "workstation" },
-  retina:     { name: "Retina",        url: RETINA_URL      || "http://localhost:3333",          healthPath: "/",          stage: "Development",  device: "workstation" },
-  lights:     { name: "Lights",        url: LIGHTS_URL      || "http://localhost:4444",          healthPath: "/",          stage: "Development",  device: "workstation" },
-  lmStudio:   { name: "LM Studio",     url: LM_STUDIO_URL   || "http://localhost:1234",          healthPath: "/v1/models", stage: "Production",  device: "workstation" },
-  lmStudio2:  { name: "LM Studio 2",   url: LM_STUDIO_2_URL || "http://192.168.86.178:1234",    healthPath: "/v1/models", stage: "Production",  device: "workstation2" },
-  lupos:      { name: "Lupos",         url: LUPOS_URL       || "http://192.168.86.247:1337",    healthPath: "/health",    stage: "Production",   device: "raspi" },
-  rodDev:     { name: "Rod.dev",       url: "http://216.19.178.138:3000",                        healthPath: "/",          stage: "Production",   device: "synology" },
+  prism:      { name: "Prism",         url: PRISM_URL       || "http://localhost:7777",          healthPath: "/",          stage: "Production",   visibility: "external",  device: "workstation" },
+  toolsApi:   { name: "Tools API",     url: TOOLS_API_URL   || "http://localhost:5590",          healthPath: "/health",    stage: "Production",   visibility: "internal",  device: "workstation" },
+  sessions:   { name: "Sessions",      url: SESSIONS_URL    || "http://localhost:5557",          healthPath: "/",          stage: "Development",  visibility: "internal",  device: "workstation" },
+  retina:     { name: "Retina",        url: RETINA_URL      || "http://localhost:3333",          healthPath: "/",          stage: "Development",  visibility: "external",  device: "workstation" },
+  lights:     { name: "Lights",        url: LIGHTS_URL      || "http://localhost:4444",          healthPath: "/",          stage: "Development",  visibility: "internal",  device: "workstation" },
+  lmStudio:   { name: "LM Studio",     url: LM_STUDIO_URL   || "http://localhost:1234",          healthPath: "/v1/models", stage: "Production",  visibility: "internal",  device: "workstation" },
+  lmStudio2:  { name: "LM Studio 2",   url: LM_STUDIO_2_URL || "http://192.168.86.178:1234",    healthPath: "/v1/models", stage: "Production",  visibility: "internal",  device: "workstation2" },
+  lupos:      { name: "Lupos",         url: LUPOS_URL       || "http://192.168.86.247:1337",    healthPath: "/health",    stage: "Production",   visibility: "internal",  device: "raspi" },
+  rodDev:     { name: "Rod.dev",       url: "http://216.19.178.138:3000",                        healthPath: "/",          stage: "Production",   visibility: "external",  device: "synology" },
 };
 
 // ── Infrastructure Services ────────────────────────────────────────
@@ -82,6 +82,7 @@ export const INFRASTRUCTURE = {
     type: "database",
     url: MONGO_URI || "",
     stage: "Production",
+    visibility: "internal",
     device: "synology",
     port: 27017,
   },
@@ -90,6 +91,7 @@ export const INFRASTRUCTURE = {
     type: "object-store",
     url: MINIO_ENDPOINT || "",
     stage: "Production",
+    visibility: "internal",
     device: "synology",
     port: 9000,
   },

@@ -54,6 +54,7 @@ export default class InfrastructureRegistryService {
         url: infra.url,
         port: infra.port,
         stage: infra.stage,
+        visibility: infra.visibility,
         host: DEVICES[infra.device]?.name || infra.device || "Unknown",
         healthy: false,
         responseTimeMs: null,
@@ -96,6 +97,7 @@ export default class InfrastructureRegistryService {
       url: infra.url,
       port: infra.port,
       stage: infra.stage,
+      visibility: infra.visibility,
       host: DEVICES[infra.device]?.name || infra.device || "Unknown",
       isInfrastructure: true,
     };
