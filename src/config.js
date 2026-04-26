@@ -56,6 +56,8 @@ export const DEVICES = {
     type: "NAS",
     hostname: "216.19.178.138",
     os: "DSM 7",
+    sshAlias: "nas",
+    dockerBin: "/usr/local/bin/docker",
     notes: "Self-hosted production server — runs containerized services.",
   },
 };
@@ -68,12 +70,12 @@ export const SERVICES = {
   toolsApi:   { name: "Tools API",     url: TOOLS_API_URL,    healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/tools-api", dependsOn: ["prism", "mongodb", "vault"] },
   sessions:   { name: "Sessions",      url: SESSIONS_URL,     healthPath: "/",          environment: "Development",  visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/sessions",  dependsOn: ["mongodb", "vault"] },
   retina:     { name: "Retina",        url: RETINA_URL,       healthPath: "/",          environment: "Development",  visibility: "external",  device: "workstation",  serviceType: "Client",       repo: "https://github.com/rodrigo-barraza/retina",    hostname: "retina.rod.dev", dependsOn: ["prism", "sessions", "vault"] },
-  lights:     { name: "Lights",        url: LIGHTS_URL,       healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "synology",     serviceType: "API",              repo: "https://github.com/rodrigo-barraza/lights",    dependsOn: ["vault", "mongodb"] },
+  lights:     { name: "Lights",        url: LIGHTS_URL,       healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "synology",     serviceType: "API",              repo: "https://github.com/rodrigo-barraza/lights",    dependsOn: ["vault", "mongodb"],    dockerProject: "lights" },
   lmStudio:   { name: "LM Studio",     url: LM_STUDIO_URL,    healthPath: "/v1/models", environment: "Production",  visibility: "internal",  device: "workstation",  serviceType: "API",              dependsOn: [] },
   lmStudio2:  { name: "LM Studio 2",   url: LM_STUDIO_2_URL,  healthPath: "/v1/models", environment: "Production",  visibility: "internal",  device: "workstation2", serviceType: "API",              dependsOn: [] },
   lupos:      { name: "Lupos",         url: LUPOS_URL,        healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "raspi",        serviceType: "Client",      repo: "https://github.com/rodrigo-barraza/lupos",     dependsOn: ["prism", "mongodb", "vault"] },
-  vault:      { name: "Vault",         url: VAULT_URL,        healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "synology",     serviceType: "API",              repo: "https://github.com/rodrigo-barraza/vault",     dependsOn: [] },
-  rodDev:     { name: "Rod.dev",       url: ROD_DEV_URL,      healthPath: "/",          environment: "Production",   visibility: "external",  device: "synology",     serviceType: "Client",       repo: "https://github.com/rodrigo-barraza/rod.dev",   hostname: "rod.dev",        dependsOn: ["prism", "sessions", "vault"] },
+  vault:      { name: "Vault",         url: VAULT_URL,        healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "synology",     serviceType: "API",              repo: "https://github.com/rodrigo-barraza/vault",     dependsOn: [],                     dockerProject: "vault" },
+  rodDev:     { name: "Rod.dev",       url: ROD_DEV_URL,      healthPath: "/",          environment: "Production",   visibility: "external",  device: "synology",     serviceType: "Client",       repo: "https://github.com/rodrigo-barraza/rod.dev",   hostname: "rod.dev",        dependsOn: ["prism", "sessions", "vault"],   dockerProject: "rod-dev" },
 };
 
 // ── Infrastructure Services ────────────────────────────────────────

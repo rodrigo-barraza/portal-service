@@ -1,15 +1,22 @@
 // ============================================================
 // API Portal — Services Route
 // ============================================================
-// GET /services — returns health status for all Sun services
-// and infrastructure backing stores.
+// GET  /services          — returns health status for all Sun services
+//                           and infrastructure backing stores.
+// POST /services/check    — trigger a fresh health check.
+// POST /services/:id/restart — restart a containerized service via SSH.
 // Enriches each item with resolved dependency graph edges.
 // ============================================================
 
 import { Router } from "express";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import ServiceRegistryService from "../services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
+import { SERVICES, DEVICES } from "../config.js";
+import logger from "../utils/logger.js";
 
+const execFileAsync = promisify(execFile);
 const router = Router();
 
 /**
@@ -90,5 +97,61 @@ router.post("/check", async (_req, res, next) => {
   }
 });
 
-export default router;
+/**
+ * POST /services/:id/restart
+ * Restart a containerized service on the remote host via SSH + Docker Compose.
+ * Only works for services that have a `dockerProject` in their config
+ * and run on a device with an `sshAlias`.
+ */
+router.post("/:id/restart", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const svc = SERVICES[id];
 
+    if (!svc) {
+      return res.status(404).json({ error: `Unknown service: ${id}` });
+    }
+
+    if (!svc.dockerProject) {
+      return res.status(400).json({ error: `${svc.name} is not a containerized service` });
+    }
+
+    const device = DEVICES[svc.device];
+    if (!device?.sshAlias) {
+      return res.status(400).json({ error: `No SSH access configured for device: ${svc.device}` });
+    }
+
+    const dockerBin = device.dockerBin || "docker";
+    const composeDir = `/volume1/docker/${svc.dockerProject}`;
+    const sshCmd = `cd '${composeDir}' && sudo ${dockerBin} compose restart`;
+
+    logger.info(`[Restart] ${svc.name} → ssh ${device.sshAlias} "${sshCmd}"`);
+
+    const { stdout, stderr } = await execFileAsync("ssh", [
+      "-o", "ConnectTimeout=5",
+      "-o", "BatchMode=yes",
+      device.sshAlias,
+      sshCmd,
+    ], { timeout: 30_000 });
+
+    logger.success(`[Restart] ${svc.name} restarted successfully`);
+
+    // Trigger a fresh health check after a short delay
+    setTimeout(() => {
+      ServiceRegistryService.checkAll().catch(() => {});
+    }, 3000);
+
+    res.json({
+      success: true,
+      service: svc.name,
+      message: "Container restarted",
+      stdout: stdout.trim(),
+      stderr: stderr.trim(),
+    });
+  } catch (err) {
+    logger.error(`[Restart] Failed: ${err.message}`);
+    next(err);
+  }
+});
+
+export default router;
