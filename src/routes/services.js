@@ -1,10 +1,12 @@
 // ============================================================
 // API Portal — Services Route
 // ============================================================
-// GET  /services          — returns health status for all Sun services
-//                           and infrastructure backing stores.
-// POST /services/check    — trigger a fresh health check.
-// POST /services/:id/restart — restart a containerized service via SSH.
+// GET  /services              — returns health status for all Sun services
+//                               and infrastructure backing stores.
+// POST /services/check        — trigger a fresh health check.
+// POST /services/:id/restart  — restart a containerized service via SSH.
+// POST /services/:id/stop     — stop a containerized service via SSH.
+// POST /services/:id/start    — start a containerized service via SSH.
 // Enriches each item with resolved dependency graph edges.
 // ============================================================
 
@@ -161,6 +163,116 @@ router.post("/:id/restart", async (req, res, next) => {
     });
   } catch (err) {
     logger.error(`[Restart] Failed: ${err.message}`);
+    next(err);
+  }
+});
+
+/**
+ * POST /services/:id/stop
+ * Stop a containerized service on the remote host via SSH + Docker Compose.
+ */
+router.post("/:id/stop", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const svc = SERVICES[id];
+
+    if (!svc) {
+      return res.status(404).json({ error: `Unknown service: ${id}` });
+    }
+
+    if (!svc.dockerProject) {
+      return res.status(400).json({ error: `${svc.name} is not a containerized service` });
+    }
+
+    const device = DEVICES[svc.device];
+    if (!device?.sshAlias) {
+      return res.status(400).json({ error: `No SSH access configured for device: ${svc.device}` });
+    }
+
+    const dockerBin = device.dockerBin || "docker";
+    const composeDir = `/volume1/docker/${svc.dockerProject}`;
+    const sshCmd = `cd '${composeDir}' && sudo ${dockerBin} compose stop`;
+
+    logger.info(`[Stop] ${svc.name} → ssh ${device.sshAlias} "${sshCmd}"`);
+
+    const { stdout, stderr } = await execFileAsync("ssh", [
+      "-o", "ConnectTimeout=5",
+      "-o", "BatchMode=yes",
+      device.sshAlias,
+      sshCmd,
+    ], { timeout: 30_000 });
+
+    logger.success(`[Stop] ${svc.name} stopped successfully`);
+
+    // Trigger a fresh health check after a short delay
+    setTimeout(() => {
+      ServiceRegistryService.checkAll().catch(() => {});
+    }, 3000);
+
+    res.json({
+      success: true,
+      service: svc.name,
+      message: "Container stopped",
+      stdout: stdout.trim(),
+      stderr: stderr.trim(),
+    });
+  } catch (err) {
+    logger.error(`[Stop] Failed: ${err.message}`);
+    next(err);
+  }
+});
+
+/**
+ * POST /services/:id/start
+ * Start a containerized service on the remote host via SSH + Docker Compose.
+ */
+router.post("/:id/start", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const svc = SERVICES[id];
+
+    if (!svc) {
+      return res.status(404).json({ error: `Unknown service: ${id}` });
+    }
+
+    if (!svc.dockerProject) {
+      return res.status(400).json({ error: `${svc.name} is not a containerized service` });
+    }
+
+    const device = DEVICES[svc.device];
+    if (!device?.sshAlias) {
+      return res.status(400).json({ error: `No SSH access configured for device: ${svc.device}` });
+    }
+
+    const dockerBin = device.dockerBin || "docker";
+    const composeDir = `/volume1/docker/${svc.dockerProject}`;
+    const sshCmd = `cd '${composeDir}' && sudo ${dockerBin} compose up -d`;
+
+    logger.info(`[Start] ${svc.name} → ssh ${device.sshAlias} "${sshCmd}"`);
+
+    const { stdout, stderr } = await execFileAsync("ssh", [
+      "-o", "ConnectTimeout=5",
+      "-o", "BatchMode=yes",
+      device.sshAlias,
+      sshCmd,
+    ], { timeout: 30_000 });
+
+    logger.success(`[Start] ${svc.name} started successfully`);
+
+    // Trigger a fresh health check after a short delay
+    setTimeout(() => {
+      ServiceRegistryService.checkAll().catch(() => {});
+    }, 3000);
+
+    res.json({
+      success: true,
+      service: svc.name,
+      message: "Container started",
+      stdout: stdout.trim(),
+      stderr: stderr.trim(),
+    });
+  } catch (err) {
+    logger.error(`[Start] Failed: ${err.message}`);
     next(err);
   }
 });
