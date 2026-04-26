@@ -22,21 +22,26 @@ function enrichWithDependencies(services, infrastructure) {
   // id → name lookup
   const nameMap = Object.fromEntries(all.map((s) => [s.id, s.name]));
 
+  // Normalize a dependency entry — handles both raw string IDs
+  // and already-enriched { id, name } objects (from cached status).
+  const rawId = (dep) => (typeof dep === "string" ? dep : dep.id);
+
   // Compute inverse: dependedOnBy[targetId] = [{ id, name }, ...]
   const inverseMap = {};
   for (const item of all) {
-    for (const depId of item.dependsOn || []) {
-      if (!inverseMap[depId]) inverseMap[depId] = [];
-      inverseMap[depId].push({ id: item.id, name: item.name });
+    for (const dep of item.dependsOn || []) {
+      const id = rawId(dep);
+      if (!inverseMap[id]) inverseMap[id] = [];
+      inverseMap[id].push({ id: item.id, name: item.name });
     }
   }
 
   // Enrich each item
   for (const item of all) {
-    item.dependsOn = (item.dependsOn || []).map((depId) => ({
-      id: depId,
-      name: nameMap[depId] || depId,
-    }));
+    item.dependsOn = (item.dependsOn || []).map((dep) => {
+      const id = rawId(dep);
+      return { id, name: nameMap[id] || id };
+    });
     item.dependedOnBy = inverseMap[item.id] || [];
   }
 
