@@ -1,0 +1,101 @@
+// ============================================================
+// API Portal — Devices Route
+// ============================================================
+// GET /devices — returns device topology with service mapping.
+// ============================================================
+
+import { Router } from "express";
+import { DEVICES, SERVICES, INFRASTRUCTURE } from "../config.js";
+import ServiceRegistryService from "../services/ServiceRegistryService.js";
+import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
+
+const router = Router();
+
+/**
+ * GET /devices
+ * Returns all known devices with their associated services and health status.
+ * Each device includes a list of services it hosts, enriched with live health data.
+ * Infrastructure backing stores (MongoDB, MinIO) are included as a separate array.
+ */
+router.get("/", (_req, res) => {
+  // Build service → health lookup from the registry cache
+  const serviceStatuses = ServiceRegistryService.list();
+  const statusMap = new Map(serviceStatuses.map((s) => [s.id, s]));
+
+  // Build infrastructure → health lookup
+  const infraStatuses = InfrastructureRegistryService.list();
+  const infraMap = new Map(infraStatuses.map((s) => [s.id, s]));
+
+  // Group services and infrastructure by device
+  const devices = Object.entries(DEVICES).map(([deviceId, device]) => {
+    // Application services on this device
+    const hostedServices = Object.entries(SERVICES)
+      .filter(([, svc]) => svc.device === deviceId)
+      .map(([svcId, svc]) => {
+        const status = statusMap.get(svcId);
+        return {
+          id: svcId,
+          name: svc.name,
+          url: svc.url,
+          port: extractPort(svc.url),
+          stage: svc.stage,
+          healthy: status?.healthy ?? false,
+          responseTimeMs: status?.responseTimeMs ?? null,
+          error: status?.error ?? null,
+          checkedAt: status?.checkedAt ?? null,
+        };
+      });
+
+    // Infrastructure backing stores on this device
+    const hostedInfra = Object.entries(INFRASTRUCTURE)
+      .filter(([, infra]) => infra.device === deviceId)
+      .map(([infraId, infra]) => {
+        const status = infraMap.get(infraId);
+        return {
+          id: infraId,
+          name: infra.name,
+          type: infra.type,
+          url: infra.url,
+          port: infra.port,
+          stage: infra.stage,
+          healthy: status?.healthy ?? false,
+          responseTimeMs: status?.responseTimeMs ?? null,
+          metadata: status?.metadata ?? null,
+          error: status?.error ?? null,
+          checkedAt: status?.checkedAt ?? null,
+          isInfrastructure: true,
+        };
+      });
+
+    const allItems = [...hostedServices, ...hostedInfra];
+    const healthyCount = allItems.filter((s) => s.healthy).length;
+
+    return {
+      id: deviceId,
+      ...device,
+      services: hostedServices,
+      infrastructure: hostedInfra,
+      serviceCount: allItems.length,
+      healthyCount,
+    };
+  });
+
+  res.json({ devices });
+});
+
+/**
+ * Extract port from a URL string. Returns null if parsing fails.
+ * @param {string} url
+ * @returns {number|null}
+ */
+function extractPort(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.port ? Number(parsed.port) : null;
+  } catch {
+    return null;
+  }
+}
+
+export default router;
+

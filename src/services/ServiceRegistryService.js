@@ -5,7 +5,7 @@
 // Polls health endpoints and tracks status.
 // ============================================================
 
-import { SERVICES, HEALTH_CHECK_TIMEOUT_MS } from "../config.js";
+import { SERVICES, DEVICES, HEALTH_CHECK_TIMEOUT_MS } from "../config.js";
 import logger from "../utils/logger.js";
 
 /**
@@ -14,6 +14,8 @@ import logger from "../utils/logger.js";
  * @property {string} id
  * @property {string} name
  * @property {string} url
+ * @property {"Production"|"Development"} stage
+ * @property {string} host - Resolved device name (e.g. "Workstation", "Raspberry Pi")
  * @property {boolean} healthy
  * @property {number|null} responseTimeMs
  * @property {object|null} metadata - Root endpoint JSON (version, endpoints, etc.)
@@ -36,6 +38,8 @@ export default class ServiceRegistryService {
         id,
         name: svc.name,
         url: svc.url,
+        stage: svc.stage,
+        host: DEVICES[svc.device]?.name || svc.device || "Unknown",
         healthy: false,
         responseTimeMs: null,
         metadata: null,
@@ -75,6 +79,8 @@ export default class ServiceRegistryService {
         id,
         name: svc.name,
         url: "",
+        stage: svc.stage,
+        host: DEVICES[svc.device]?.name || svc.device || "Unknown",
         healthy: false,
         responseTimeMs: null,
         metadata: null,
@@ -112,6 +118,8 @@ export default class ServiceRegistryService {
         id,
         name: svc.name,
         url: svc.url,
+        stage: svc.stage,
+        host: DEVICES[svc.device]?.name || svc.device || "Unknown",
         healthy: res.ok,
         responseTimeMs,
         metadata,
@@ -124,6 +132,8 @@ export default class ServiceRegistryService {
         id,
         name: svc.name,
         url: svc.url,
+        stage: svc.stage,
+        host: DEVICES[svc.device]?.name || svc.device || "Unknown",
         healthy: false,
         responseTimeMs: Date.now() - start,
         metadata: null,

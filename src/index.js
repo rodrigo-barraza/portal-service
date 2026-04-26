@@ -15,12 +15,14 @@ import MongoWrapper from "./wrappers/MongoWrapper.js";
 import { PORT, MONGO_URI, MONGO_DB_NAME } from "./config.js";
 import { COLLECTIONS } from "./constants.js";
 import ServiceRegistryService from "./services/ServiceRegistryService.js";
+import InfrastructureRegistryService from "./services/InfrastructureRegistryService.js";
 
 // Routes
 import healthRouter from "./routes/health.js";
 import servicesRouter from "./routes/services.js";
 import statsRouter from "./routes/stats.js";
 import portfolioRouter from "./routes/portfolio.js";
+import devicesRouter from "./routes/devices.js";
 
 // ─── Express App ───────────────────────────────────────────────────
 
@@ -33,7 +35,7 @@ app.use(requestLoggerMiddleware);
 // ─── Endpoint Registry ────────────────────────────────────────────
 
 const ENDPOINTS = {
-  rest: ["/health", "/services", "/stats", "/portfolio"],
+  rest: ["/health", "/services", "/devices", "/stats", "/portfolio"],
 };
 
 // ─── Root Health Check ─────────────────────────────────────────────
@@ -54,6 +56,7 @@ app.use("/health", healthRouter);
 app.use("/services", servicesRouter);
 app.use("/stats", statsRouter);
 app.use("/portfolio", portfolioRouter);
+app.use("/devices", devicesRouter);
 
 // ─── Error Handler (must be last) ──────────────────────────────────
 
@@ -87,20 +90,28 @@ app.use(errorHandler);
   }
 
   // Initial health check of all services (fire-and-forget)
-  ServiceRegistryService.checkAll()
-    .then((results) => {
-      const healthy = results.filter((s) => s.healthy).length;
+  Promise.all([
+    ServiceRegistryService.checkAll(),
+    InfrastructureRegistryService.checkAll(),
+  ])
+    .then(([svcResults, infraResults]) => {
+      const svcHealthy = svcResults.filter((s) => s.healthy).length;
+      const infraHealthy = infraResults.filter((s) => s.healthy).length;
       logger.info(
-        `[ServiceRegistry] ${healthy}/${results.length} services healthy`,
+        `[ServiceRegistry] ${svcHealthy}/${svcResults.length} services healthy`,
+      );
+      logger.info(
+        `[InfraRegistry] ${infraHealthy}/${infraResults.length} infrastructure healthy`,
       );
     })
     .catch((err) => {
-      logger.warn(`[ServiceRegistry] Initial check failed: ${err.message}`);
+      logger.warn(`[Registry] Initial check failed: ${err.message}`);
     });
 
   // Periodic health checks every 60 seconds
   setInterval(() => {
     ServiceRegistryService.checkAll().catch(() => {});
+    InfrastructureRegistryService.checkAll().catch(() => {});
   }, 60_000);
 
   // Start server

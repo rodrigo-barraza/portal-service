@@ -12,12 +12,17 @@
     "format": "prettier --write \"src/**/*.js\"",
     "format:check": "prettier --check \"src/**/*.js\""
   },
-  "keywords": ["portal", "dashboard", "observability"],
+  "keywords": [
+    "portal",
+    "dashboard",
+    "observability"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "minio": "^8.0.7",
     "mongodb": "^7.1.0"
   },
   "devDependencies": {

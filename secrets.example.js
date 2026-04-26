@@ -19,3 +19,12 @@ export const SESSIONS_URL = "http://localhost:5557";
 export const RETINA_URL = "http://localhost:3333";
 export const LIGHTS_URL = "http://localhost:4444";
 export const LUPOS_URL = "";
+
+// LM Studio instances
+export const LM_STUDIO_URL = "http://localhost:1234";
+export const LM_STUDIO_2_URL = "";
+
+// MinIO (S3-compatible object storage on NAS)
+export const MINIO_ENDPOINT = "http://<host>:9000";
+export const MINIO_ACCESS_KEY = "";
+export const MINIO_SECRET_KEY = "";
