@@ -19,6 +19,39 @@ import {
 import logger from "../utils/logger.js";
 
 /**
+ * Build a reverse lookup: hostname/IP → device name.
+ */
+function buildHostnameToDeviceMap() {
+  const map = new Map();
+  for (const [_key, device] of Object.entries(DEVICES)) {
+    if (device.hostname) map.set(device.hostname, device.name);
+  }
+  // Localhost aliases → local device (imports os at top if needed)
+  map.set("localhost", DEVICES.workstation?.name || "Workstation");
+  map.set("127.0.0.1", DEVICES.workstation?.name || "Workstation");
+  return map;
+}
+
+const HOSTNAME_TO_DEVICE = buildHostnameToDeviceMap();
+
+/**
+ * Derive the display device name from a URL.
+ * Reverse-looks up the URL hostname against the DEVICES table.
+ */
+function deriveHost(url, infra) {
+  if (!url) return DEVICES[infra.device]?.name || infra.device || "Unknown";
+  try {
+    const parsed = new URL(url);
+    return HOSTNAME_TO_DEVICE.get(parsed.hostname)
+      || DEVICES[infra.device]?.name
+      || infra.device
+      || "Unknown";
+  } catch {
+    return DEVICES[infra.device]?.name || infra.device || "Unknown";
+  }
+}
+
+/**
  * Infrastructure status snapshot.
  * @typedef {object} InfraStatus
  * @property {string} id
@@ -27,7 +60,7 @@ import logger from "../utils/logger.js";
  * @property {string} url
  * @property {number|null} port
  * @property {"Production"|"Development"} environment
- * @property {string} host       - Resolved device name
+ * @property {string} device    - Resolved device name
  * @property {boolean} healthy
  * @property {number|null} responseTimeMs
  * @property {object|null} metadata
@@ -56,7 +89,7 @@ export default class InfrastructureRegistryService {
         port: infra.port,
         environment: infra.environment,
         visibility: infra.visibility,
-        host: DEVICES[infra.device]?.name || infra.device || "Unknown",
+        device: deriveHost(infra.url, infra),
         dependsOn: infra.dependsOn || [],
         healthy: false,
         responseTimeMs: null,
@@ -101,7 +134,7 @@ export default class InfrastructureRegistryService {
       port: infra.port,
       environment: infra.environment,
       visibility: infra.visibility,
-      host: DEVICES[infra.device]?.name || infra.device || "Unknown",
+      device: deriveHost(infra.url, infra),
       dependsOn: infra.dependsOn || [],
       isInfrastructure: true,
     };

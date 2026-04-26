@@ -33,6 +33,57 @@ function detectLocalDevice() {
 const LOCAL_DEVICE_KEY = detectLocalDevice();
 
 /**
+ * Build a reverse lookup: hostname/IP → device name.
+ * Maps each device's configured hostname plus localhost aliases
+ * for the local device, so we always resolve a friendly name.
+ */
+function buildHostnameToDeviceMap() {
+  const map = new Map();
+
+  for (const [_key, device] of Object.entries(DEVICES)) {
+    if (device.hostname) map.set(device.hostname, device.name);
+  }
+
+  // Map localhost aliases to whichever device we're running on
+  if (LOCAL_DEVICE_KEY) {
+    const localName = DEVICES[LOCAL_DEVICE_KEY].name;
+    map.set("localhost", localName);
+    map.set("127.0.0.1", localName);
+
+    // Also map this machine's LAN IPs to the local device name
+    const interfaces = os.networkInterfaces();
+    for (const iface of Object.values(interfaces)) {
+      for (const addr of iface) {
+        if (!addr.internal) map.set(addr.address, localName);
+      }
+    }
+  }
+
+  return map;
+}
+
+const HOSTNAME_TO_DEVICE = buildHostnameToDeviceMap();
+
+/**
+ * Derive the display host from a service's URL.
+ * Reverse-looks up the URL hostname against the DEVICES table
+ * to return the friendly device name (e.g. "Synology NAS").
+ * Falls back to the configured `device` field when no match is found.
+ */
+function deriveHost(url, svc) {
+  if (!url) return DEVICES[svc.device]?.name || svc.device || "Unknown";
+  try {
+    const parsed = new URL(url);
+    return HOSTNAME_TO_DEVICE.get(parsed.hostname)
+      || DEVICES[svc.device]?.name
+      || svc.device
+      || "Unknown";
+  } catch {
+    return DEVICES[svc.device]?.name || svc.device || "Unknown";
+  }
+}
+
+/**
  * Rewrite a URL to use localhost when health-checking a service on
  * the same device.  WSL2 can reach Windows apps via localhost but
  * not always via the LAN IP (apps that bind to 127.0.0.1 only).
@@ -55,7 +106,7 @@ function toLocalHealthUrl(url, svc) {
  * @property {string} name
  * @property {string} url
  * @property {"Production"|"Development"} environment
- * @property {string} host - Resolved device name (e.g. "Workstation", "Raspberry Pi")
+ * @property {string} device - Resolved device name (e.g. "Workstation", "Synology NAS")
  * @property {string|null} repo - GitHub repository URL
  * @property {boolean} healthy
  * @property {number|null} responseTimeMs
@@ -83,7 +134,7 @@ export default class ServiceRegistryService {
         visibility: svc.visibility,
         serviceType: svc.serviceType || null,
         repo: svc.repo || null,
-        host: DEVICES[svc.device]?.name || svc.device || "Unknown",
+        device: deriveHost(svc.url, svc),
         hostname: svc.hostname || null,
         dependsOn: svc.dependsOn || [],
         restartable: !!svc.dockerProject,
@@ -130,7 +181,7 @@ export default class ServiceRegistryService {
         visibility: svc.visibility,
         serviceType: svc.serviceType || null,
         repo: svc.repo || null,
-        host: DEVICES[svc.device]?.name || svc.device || "Unknown",
+        device: deriveHost(svc.url, svc),
         hostname: svc.hostname || null,
         dependsOn: svc.dependsOn || [],
         restartable: !!svc.dockerProject,
@@ -176,7 +227,7 @@ export default class ServiceRegistryService {
         visibility: svc.visibility,
         serviceType: svc.serviceType || null,
         repo: svc.repo || null,
-        host: DEVICES[svc.device]?.name || svc.device || "Unknown",
+        device: deriveHost(svc.url, svc),
         hostname: svc.hostname || null,
         dependsOn: svc.dependsOn || [],
         restartable: !!svc.dockerProject,
@@ -196,7 +247,7 @@ export default class ServiceRegistryService {
         visibility: svc.visibility,
         serviceType: svc.serviceType || null,
         repo: svc.repo || null,
-        host: DEVICES[svc.device]?.name || svc.device || "Unknown",
+        device: deriveHost(svc.url, svc),
         hostname: svc.hostname || null,
         dependsOn: svc.dependsOn || [],
         restartable: !!svc.dockerProject,

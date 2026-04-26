@@ -11,6 +11,7 @@ import {
   PORTAL_URL,
   PORTAL_API_URL,
   PRISM_URL,
+  PRISM_DEV_URL,
   TOOLS_API_URL,
   SESSIONS_URL,
   RETINA_URL,
@@ -76,8 +77,9 @@ export const DEVICES = {
 // Each entry includes a `device` key referencing the host it runs on.
 export const SERVICES = {
   portal:     { name: "Portal",        url: PORTAL_URL,       healthPath: "/",          environment: "Development",  visibility: "internal",  device: "workstation",  serviceType: "Client",           repo: "https://github.com/rodrigo-barraza/portal",    dependsOn: [req("portalApi")] },
-  portalApi:  { name: "Portal API",    url: PORTAL_API_URL,   healthPath: "/health",    environment: "Development",  visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/api",       dependsOn: [req("mongodb"), req("vault"), opt("prism"), opt("toolsApi"), opt("sessions"), opt("retina"), opt("lights"), opt("lupos"), opt("rodDev"), opt("minio"), opt("lmStudio"), opt("lmStudio2")] },
-  prism:      { name: "Prism",         url: PRISM_URL,        healthPath: "/",          environment: "Production",   visibility: "external",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/prism",    hostname: "prism.rod.dev",  dependsOn: [req("mongodb"), req("vault"), opt("toolsApi"), opt("minio"), opt("lmStudio"), opt("lmStudio2")] },
+  portalApi:  { name: "Portal API",    url: PORTAL_API_URL,   healthPath: "/health",    environment: "Development",  visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/api",       dependsOn: [req("mongodb"), req("vault"), opt("prism"), opt("prismDev"), opt("toolsApi"), opt("sessions"), opt("retina"), opt("lights"), opt("lupos"), opt("rodDev"), opt("minio"), opt("lmStudio"), opt("lmStudio2")] },
+  prism:      { name: "Prism",         url: PRISM_URL,        healthPath: "/health",    environment: "Production",   visibility: "external",  device: "synology",     serviceType: "API",              repo: "https://github.com/rodrigo-barraza/prism",    hostname: "prism.rod.dev",  dependsOn: [req("mongodb"), req("vault"), opt("toolsApi"), opt("minio"), opt("lmStudio"), opt("lmStudio2")],   dockerProject: "prism" },
+  prismDev:   { name: "Prism (Dev)",   url: PRISM_DEV_URL,    healthPath: "/health",    environment: "Development",  visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/prism",    dependsOn: [req("mongodb"), req("vault"), opt("toolsApi"), opt("minio"), opt("lmStudio"), opt("lmStudio2")] },
   toolsApi:   { name: "Tools API",     url: TOOLS_API_URL,    healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/tools-api", dependsOn: [req("mongodb"), req("vault"), opt("prism")] },
   sessions:   { name: "Sessions",      url: SESSIONS_URL,     healthPath: "/",          environment: "Development",  visibility: "internal",  device: "workstation",  serviceType: "API",              repo: "https://github.com/rodrigo-barraza/sessions",  dependsOn: [req("mongodb"), req("vault")] },
   retina:     { name: "Retina",        url: RETINA_URL,       healthPath: "/",          environment: "Development",  visibility: "external",  device: "workstation",  serviceType: "Client",       repo: "https://github.com/rodrigo-barraza/retina",    hostname: "retina.rod.dev", dependsOn: [req("prism"), req("sessions"), opt("vault")] },
