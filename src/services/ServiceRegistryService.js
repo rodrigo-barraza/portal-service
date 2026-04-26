@@ -1,7 +1,7 @@
 // ============================================================
 // API — Service Registry Service
 // ============================================================
-// Static registry of all Sun ecosystem services.
+// Static registry of all services.
 // Polls health endpoints and tracks status.
 // ============================================================
 
