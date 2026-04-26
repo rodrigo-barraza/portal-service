@@ -56,6 +56,7 @@ export default class InfrastructureRegistryService {
         stage: infra.stage,
         visibility: infra.visibility,
         host: DEVICES[infra.device]?.name || infra.device || "Unknown",
+        dependsOn: infra.dependsOn || [],
         healthy: false,
         responseTimeMs: null,
         metadata: null,
@@ -99,6 +100,7 @@ export default class InfrastructureRegistryService {
       stage: infra.stage,
       visibility: infra.visibility,
       host: DEVICES[infra.device]?.name || infra.device || "Unknown",
+      dependsOn: infra.dependsOn || [],
       isInfrastructure: true,
     };
 

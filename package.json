@@ -5,8 +5,8 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon --legacy-watch src/index.js",
+    "start": "node src/boot.js",
+    "dev": "nodemon --legacy-watch src/boot.js",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write \"src/**/*.js\"",
