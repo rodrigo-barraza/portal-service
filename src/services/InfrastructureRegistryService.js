@@ -1,5 +1,5 @@
 // ============================================================
-// Portal API — Infrastructure Registry Service
+// API — Infrastructure Registry Service
 // ============================================================
 // Protocol-level health checks for non-HTTP backing services
 // (MongoDB, MinIO). Cached in-memory and polled periodically.

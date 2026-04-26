@@ -1,7 +1,7 @@
 {
   "name": "api",
   "version": "1.0.0",
-  "description": "Portal API — BFF aggregator for the Sun ecosystem developer portal",
+  "description": "API — BFF aggregator for the Sun ecosystem developer portal",
   "type": "module",
   "main": "src/index.js",
   "scripts": {

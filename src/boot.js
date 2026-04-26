@@ -1,5 +1,5 @@
 // ============================================================
-// Portal API — Boot Sequence
+// API — Boot Sequence
 // ============================================================
 // Bootstraps secrets from Vault (or .env fallback) into
 // process.env before any module imports run.

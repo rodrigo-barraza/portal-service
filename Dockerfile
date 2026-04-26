@@ -1,7 +1,7 @@
 # ============================================================
 # API — Multi-stage Dockerfile
 # ============================================================
-# Portal API BFF aggregator — Express server that federates
+# API BFF aggregator — Express server that federates
 # data from all Sun services. Uses boot.js to fetch secrets
 # from Vault at startup.
 # ============================================================

@@ -1,5 +1,5 @@
 // ============================================================
-// API Portal — Entry Point
+// API — Entry Point
 // ============================================================
 // Express 5 BFF aggregator for the Sun ecosystem developer portal.
 // Federates data from Prism, Tools API, Sessions, and other services.
@@ -43,7 +43,7 @@ const ENDPOINTS = {
 
 app.get("/", (_req, res) => {
   res.json({
-    name: "API API",
+    name: "API",
     version: "1.0.0",
     status: "ok",
     uptime: process.uptime(),
@@ -112,7 +112,7 @@ app.use(errorHandler);
 
   // Start server
   app.listen(PORT, () => {
-    logger.success(`API API is running on port ${PORT}`);
+    logger.success(`API is running on port ${PORT}`);
     ENDPOINTS.rest.forEach((ep) =>
       logger.info(`  REST  →  http://localhost:${PORT}${ep}`),
     );

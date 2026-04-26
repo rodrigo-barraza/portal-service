@@ -1,5 +1,5 @@
 // ============================================================
-// Portal API — Request Logger Middleware
+// API — Request Logger Middleware
 // ============================================================
 // Logs each incoming request with timing metadata.
 // ============================================================

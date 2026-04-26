@@ -1,5 +1,5 @@
 // ============================================================
-// Portal API — Logs Route
+// API — Logs Route
 // ============================================================
 // GET /logs             — List services that support log streaming.
 // GET /logs/:id         — Stream container logs via SSE over SSH.

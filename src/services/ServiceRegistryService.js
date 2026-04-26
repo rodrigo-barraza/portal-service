@@ -1,5 +1,5 @@
 // ============================================================
-// Portal API — Service Registry Service
+// API — Service Registry Service
 // ============================================================
 // Static registry of all Sun ecosystem services.
 // Polls health endpoints and tracks status.

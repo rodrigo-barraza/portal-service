@@ -1,5 +1,5 @@
 // ============================================================
-// Portal API — Stats Aggregator Service
+// API — Stats Aggregator Service
 // ============================================================
 // Fetches and caches aggregate statistics from Prism's admin API.
 // Acts as a caching proxy to avoid hammering upstream services.

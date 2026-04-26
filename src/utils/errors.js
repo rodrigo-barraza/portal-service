@@ -1,5 +1,5 @@
 // ============================================================
-// Portal API — Express Error Handler
+// API — Express Error Handler
 // ============================================================
 
 import logger from "./logger.js";

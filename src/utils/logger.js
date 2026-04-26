@@ -1,5 +1,5 @@
 // ============================================================
-// Portal API — Colorized Console Logger
+// API — Colorized Console Logger
 // ============================================================
 // Same pattern used across Prism, Tools API, Sessions.
 // ============================================================

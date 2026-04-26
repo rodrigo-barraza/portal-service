@@ -1,5 +1,5 @@
 // ============================================================
-// Portal API — Secrets Template
+// API — Secrets Template
 // ============================================================
 // Secrets are resolved from (in priority order):
 //   1. process.env (manual env vars, Docker --env)
