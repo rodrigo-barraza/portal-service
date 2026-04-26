@@ -15,7 +15,6 @@
 // PORTAL_URL=http://localhost:5173
 // PORTAL_API_URL=http://localhost:4001
 // PRISM_URL=http://216.19.178.138:7777
-// PRISM_DEV_URL=http://localhost:7777
 // TOOLS_API_URL=http://localhost:5590
 // SESSIONS_URL=http://localhost:5557
 // RETINA_URL=http://localhost:3333
