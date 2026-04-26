@@ -75,7 +75,7 @@ export const SERVICES = {
   lmStudio2:  { name: "LM Studio 2",   url: LM_STUDIO_2_URL,  healthPath: "/v1/models", environment: "Production",  visibility: "internal",  device: "workstation2", serviceType: "API",              dependsOn: [] },
   lupos:      { name: "Lupos",         url: LUPOS_URL,        healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "raspi",        serviceType: "Client",      repo: "https://github.com/rodrigo-barraza/lupos",     dependsOn: ["prism", "mongodb", "vault"] },
   vault:      { name: "Vault",         url: VAULT_URL,        healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "synology",     serviceType: "API",              repo: "https://github.com/rodrigo-barraza/vault",     dependsOn: [],                     dockerProject: "vault" },
-  rodDev:     { name: "Rod.dev",       url: ROD_DEV_URL,      healthPath: "/",          environment: "Production",   visibility: "external",  device: "synology",     serviceType: "Client",       repo: "https://github.com/rodrigo-barraza/rod.dev",   hostname: "rod.dev",        dependsOn: ["prism", "sessions", "vault"],   dockerProject: "rod-dev" },
+  rodDev:     { name: "Rod.dev",       url: ROD_DEV_URL,      healthPath: "/",          environment: "Production",   visibility: "external",  device: "synology",     serviceType: "Client",       repo: "https://github.com/rodrigo-barraza/rod-dev",   hostname: "rod.dev",        dependsOn: ["prism", "sessions", "vault"],   dockerProject: "rod-dev" },
 };
 
 // ── Infrastructure Services ────────────────────────────────────────
