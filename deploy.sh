@@ -12,7 +12,7 @@
 # ============================================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-IMAGE_NAME="api"
+IMAGE_NAME="portal-service"
 DISPLAY_NAME="🔌 API"
 
 source "${SCRIPT_DIR}/../deploy/lib.sh"
