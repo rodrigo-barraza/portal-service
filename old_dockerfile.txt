@@ -1,7 +1,7 @@
 # ============================================================
 # API — Multi-stage Dockerfile
 # ============================================================
-# API BFF aggregator — Express server that federates
+# Portal API BFF aggregator — Express server that federates
 # data from all Sun services. Uses boot.js to fetch secrets
 # from Vault at startup.
 # ============================================================
@@ -21,6 +21,11 @@ COPY --from=deps /app/node_modules ./node_modules
 
 # Copy application source
 COPY . .
+
+# Non-root user for security
+RUN addgroup --system --gid 1001 api && \
+    adduser --system --uid 1001 api
+USER api
 
 EXPOSE 4001
 

@@ -4,22 +4,58 @@
 // GET  /services              — returns health status for all Sun services
 //                               and infrastructure backing stores.
 // POST /services/check        — trigger a fresh health check.
-// POST /services/:id/restart  — restart a containerized service via SSH.
-// POST /services/:id/stop     — stop a containerized service via SSH.
-// POST /services/:id/start    — start a containerized service via SSH.
+// POST /services/:id/restart  — restart a containerized service.
+// POST /services/:id/stop     — stop a containerized service.
+// POST /services/:id/start    — start a containerized service.
 // Enriches each item with resolved dependency graph edges.
+//
+// Uses Docker Engine API over Unix socket (mounted from the host)
+// for container lifecycle operations.
 // ============================================================
 
 import { Router } from "express";
-import { execFile } from "child_process";
-import { promisify } from "util";
+import http from "http";
 import ServiceRegistryService from "../services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
 import { SERVICES, DEVICES } from "../config.js";
 import logger from "../utils/logger.js";
 
-const execFileAsync = promisify(execFile);
 const router = Router();
+
+const DOCKER_SOCKET = "/var/run/docker.sock";
+
+// ── Docker Engine API helper ─────────────────────────────────
+/**
+ * Make a request to the Docker Engine API over the Unix socket.
+ * @param {string} method - HTTP method
+ * @param {string} path - API path (e.g. /containers/prism/restart)
+ * @param {{ timeout?: number }} [opts]
+ * @returns {Promise<{ statusCode: number, body: string }>}
+ */
+function dockerRequest(method, path, { timeout = 30_000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        socketPath: DOCKER_SOCKET,
+        path,
+        method,
+        headers: { "Content-Type": "application/json" },
+      },
+      (res) => {
+        let body = "";
+        res.on("data", (chunk) => (body += chunk));
+        res.on("end", () => resolve({ statusCode: res.statusCode, body }));
+      },
+    );
+
+    req.setTimeout(timeout, () => {
+      req.destroy(new Error(`Docker API timeout after ${timeout}ms`));
+    });
+
+    req.on("error", reject);
+    req.end();
+  });
+}
 
 /**
  * Build a lookup map (id → name) and compute the inverse dependency graph.
@@ -112,9 +148,7 @@ router.post("/check", async (_req, res, next) => {
 
 /**
  * POST /services/:id/restart
- * Restart a containerized service on the remote host via SSH + Docker Compose.
- * Only works for services that have a `dockerProject` in their config
- * and run on a device with an `sshAlias`.
+ * Restart a containerized service via Docker Engine API.
  */
 router.post("/:id/restart", async (req, res, next) => {
   try {
@@ -129,38 +163,29 @@ router.post("/:id/restart", async (req, res, next) => {
       return res.status(400).json({ error: `${svc.name} is not a containerized service` });
     }
 
-    const device = DEVICES[svc.device];
-    if (!device?.sshAlias) {
-      return res.status(400).json({ error: `No SSH access configured for device: ${svc.device}` });
+    const container = svc.dockerProject;
+    logger.info(`[Restart] ${svc.name} → Docker API /containers/${container}/restart`);
+
+    const result = await dockerRequest("POST", `/containers/${container}/restart?t=10`);
+
+    if (result.statusCode === 204) {
+      logger.success(`[Restart] ${svc.name} restarted successfully`);
+
+      // Trigger a fresh health check after a short delay
+      setTimeout(() => {
+        ServiceRegistryService.checkAll().catch(() => {});
+      }, 3000);
+
+      res.json({
+        success: true,
+        service: svc.name,
+        message: "Container restarted",
+      });
+    } else {
+      const msg = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
+      logger.error(`[Restart] Failed for ${svc.name}: ${msg}`);
+      res.status(502).json({ error: msg });
     }
-
-    const dockerBin = device.dockerBin || "docker";
-    const composeDir = `/volume1/docker/${svc.dockerProject}`;
-    const sshCmd = `cd '${composeDir}' && sudo ${dockerBin} compose restart`;
-
-    logger.info(`[Restart] ${svc.name} → ssh ${device.sshAlias} "${sshCmd}"`);
-
-    const { stdout, stderr } = await execFileAsync("ssh", [
-      "-o", "ConnectTimeout=5",
-      "-o", "BatchMode=yes",
-      device.sshAlias,
-      sshCmd,
-    ], { timeout: 30_000 });
-
-    logger.success(`[Restart] ${svc.name} restarted successfully`);
-
-    // Trigger a fresh health check after a short delay
-    setTimeout(() => {
-      ServiceRegistryService.checkAll().catch(() => {});
-    }, 3000);
-
-    res.json({
-      success: true,
-      service: svc.name,
-      message: "Container restarted",
-      stdout: stdout.trim(),
-      stderr: stderr.trim(),
-    });
   } catch (err) {
     logger.error(`[Restart] Failed: ${err.message}`);
     next(err);
@@ -169,7 +194,7 @@ router.post("/:id/restart", async (req, res, next) => {
 
 /**
  * POST /services/:id/stop
- * Stop a containerized service on the remote host via SSH + Docker Compose.
+ * Stop a containerized service via Docker Engine API.
  */
 router.post("/:id/stop", async (req, res, next) => {
   try {
@@ -184,38 +209,28 @@ router.post("/:id/stop", async (req, res, next) => {
       return res.status(400).json({ error: `${svc.name} is not a containerized service` });
     }
 
-    const device = DEVICES[svc.device];
-    if (!device?.sshAlias) {
-      return res.status(400).json({ error: `No SSH access configured for device: ${svc.device}` });
+    const container = svc.dockerProject;
+    logger.info(`[Stop] ${svc.name} → Docker API /containers/${container}/stop`);
+
+    const result = await dockerRequest("POST", `/containers/${container}/stop?t=10`);
+
+    if (result.statusCode === 204 || result.statusCode === 304) {
+      logger.success(`[Stop] ${svc.name} stopped successfully`);
+
+      setTimeout(() => {
+        ServiceRegistryService.checkAll().catch(() => {});
+      }, 3000);
+
+      res.json({
+        success: true,
+        service: svc.name,
+        message: result.statusCode === 304 ? "Container already stopped" : "Container stopped",
+      });
+    } else {
+      const msg = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
+      logger.error(`[Stop] Failed for ${svc.name}: ${msg}`);
+      res.status(502).json({ error: msg });
     }
-
-    const dockerBin = device.dockerBin || "docker";
-    const composeDir = `/volume1/docker/${svc.dockerProject}`;
-    const sshCmd = `cd '${composeDir}' && sudo ${dockerBin} compose stop`;
-
-    logger.info(`[Stop] ${svc.name} → ssh ${device.sshAlias} "${sshCmd}"`);
-
-    const { stdout, stderr } = await execFileAsync("ssh", [
-      "-o", "ConnectTimeout=5",
-      "-o", "BatchMode=yes",
-      device.sshAlias,
-      sshCmd,
-    ], { timeout: 30_000 });
-
-    logger.success(`[Stop] ${svc.name} stopped successfully`);
-
-    // Trigger a fresh health check after a short delay
-    setTimeout(() => {
-      ServiceRegistryService.checkAll().catch(() => {});
-    }, 3000);
-
-    res.json({
-      success: true,
-      service: svc.name,
-      message: "Container stopped",
-      stdout: stdout.trim(),
-      stderr: stderr.trim(),
-    });
   } catch (err) {
     logger.error(`[Stop] Failed: ${err.message}`);
     next(err);
@@ -224,7 +239,7 @@ router.post("/:id/stop", async (req, res, next) => {
 
 /**
  * POST /services/:id/start
- * Start a containerized service on the remote host via SSH + Docker Compose.
+ * Start a containerized service via Docker Engine API.
  */
 router.post("/:id/start", async (req, res, next) => {
   try {
@@ -239,42 +254,43 @@ router.post("/:id/start", async (req, res, next) => {
       return res.status(400).json({ error: `${svc.name} is not a containerized service` });
     }
 
-    const device = DEVICES[svc.device];
-    if (!device?.sshAlias) {
-      return res.status(400).json({ error: `No SSH access configured for device: ${svc.device}` });
+    const container = svc.dockerProject;
+    logger.info(`[Start] ${svc.name} → Docker API /containers/${container}/start`);
+
+    const result = await dockerRequest("POST", `/containers/${container}/start`);
+
+    if (result.statusCode === 204 || result.statusCode === 304) {
+      logger.success(`[Start] ${svc.name} started successfully`);
+
+      setTimeout(() => {
+        ServiceRegistryService.checkAll().catch(() => {});
+      }, 3000);
+
+      res.json({
+        success: true,
+        service: svc.name,
+        message: result.statusCode === 304 ? "Container already running" : "Container started",
+      });
+    } else {
+      const msg = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
+      logger.error(`[Start] Failed for ${svc.name}: ${msg}`);
+      res.status(502).json({ error: msg });
     }
-
-    const dockerBin = device.dockerBin || "docker";
-    const composeDir = `/volume1/docker/${svc.dockerProject}`;
-    const sshCmd = `cd '${composeDir}' && sudo ${dockerBin} compose up -d`;
-
-    logger.info(`[Start] ${svc.name} → ssh ${device.sshAlias} "${sshCmd}"`);
-
-    const { stdout, stderr } = await execFileAsync("ssh", [
-      "-o", "ConnectTimeout=5",
-      "-o", "BatchMode=yes",
-      device.sshAlias,
-      sshCmd,
-    ], { timeout: 30_000 });
-
-    logger.success(`[Start] ${svc.name} started successfully`);
-
-    // Trigger a fresh health check after a short delay
-    setTimeout(() => {
-      ServiceRegistryService.checkAll().catch(() => {});
-    }, 3000);
-
-    res.json({
-      success: true,
-      service: svc.name,
-      message: "Container started",
-      stdout: stdout.trim(),
-      stderr: stderr.trim(),
-    });
   } catch (err) {
     logger.error(`[Start] Failed: ${err.message}`);
     next(err);
   }
 });
+
+/**
+ * Try to extract a message from a Docker API error response body.
+ */
+function tryParseDockerError(body) {
+  try {
+    return JSON.parse(body).message;
+  } catch {
+    return null;
+  }
+}
 
 export default router;
