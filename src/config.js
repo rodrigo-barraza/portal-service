@@ -18,6 +18,7 @@ import {
   LUPOS_URL,
   VAULT_URL,
   ROD_DEV_URL,
+  CLOCK_CREW_URL,
   LM_STUDIO_URL,
   LM_STUDIO_2_URL,
   MINIO_ENDPOINT,
@@ -87,6 +88,7 @@ export const SERVICES = {
   lupos:      { name: "Lupos",         url: LUPOS_URL,        healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "synology",     serviceType: "Client",      repo: "https://github.com/rodrigo-barraza/lupos",     dependsOn: [req("prism"), req("mongodb"), opt("vault")],   dockerProject: "lupos" },
   vault:      { name: "Vault",         url: VAULT_URL,        healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "synology",     serviceType: "API",              repo: "https://github.com/rodrigo-barraza/vault",     dependsOn: [],                     dockerProject: "vault" },
   rodDev:     { name: "Rod.dev",       url: ROD_DEV_URL,      healthPath: "/",          environment: "Production",   visibility: "external",  device: "synology",     serviceType: "Client",       repo: "https://github.com/rodrigo-barraza/rod-dev",   hostname: "rod.dev",        dependsOn: [req("prism"), req("sessions"), opt("vault")],   dockerProject: "rod-dev" },
+  clockCrew:  { name: "Clock Crew",    url: CLOCK_CREW_URL,   healthPath: "/",          environment: "Production",   visibility: "external",  device: "synology",     serviceType: "Client",       repo: "https://github.com/rodrigo-barraza/clock-crew", hostname: "clock-crew.com",  dependsOn: [req("vault"), opt("toolsApi")],   dockerProject: "clock-crew" },
 };
 
 // ── Infrastructure Services ────────────────────────────────────

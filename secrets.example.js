@@ -22,6 +22,7 @@
 // LUPOS_URL=
 // VAULT_URL=http://192.168.86.2:5599
 // ROD_DEV_URL=http://192.168.86.2:3000
+// CLOCK_CREW_URL=http://192.168.86.2:3001
 // LM_STUDIO_URL=http://localhost:1234
 // LM_STUDIO_2_URL=
 // MINIO_ENDPOINT=http://<host>:9000
