@@ -1,5 +1,5 @@
 {
-  "name": "api",
+  "name": "portal-service",
   "version": "1.0.0",
   "description": "API — BFF aggregator for the developer portal",
   "type": "module",
