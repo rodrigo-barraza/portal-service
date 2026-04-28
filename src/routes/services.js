@@ -28,7 +28,7 @@ const DOCKER_SOCKET = "/var/run/docker.sock";
 /**
  * Make a request to the Docker Engine API over the Unix socket.
  * @param {string} method - HTTP method
- * @param {string} path - API path (e.g. /containers/prism/restart)
+ * @param {string} path - API path (e.g. /containers/prism-service/restart)
  * @param {{ timeout?: number }} [opts]
  * @returns {Promise<{ statusCode: number, body: string }>}
  */

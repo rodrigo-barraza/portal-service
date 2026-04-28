@@ -1,7 +1,7 @@
 services:
   portal-service:
     image: portal-service:latest
-    container_name: api
+    container_name: portal-service
     restart: unless-stopped
     ports:
       - "4001:4001"
