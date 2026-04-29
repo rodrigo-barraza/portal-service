@@ -17,7 +17,7 @@ import { Router } from "express";
 import http from "http";
 import ServiceRegistryService from "../services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
-import { SERVICES, DEVICES } from "../config.js";
+import { SERVICES } from "../config.js";
 import logger from "../utils/logger.js";
 
 const router = Router();

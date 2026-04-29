@@ -1,8 +1,8 @@
 // ============================================================
 // API — Service Registry Service
 // ============================================================
-// Static registry of all services.
-// Polls health endpoints and tracks status.
+// Polls health endpoints for all services from the Vault
+// registry and tracks status in an in-memory cache.
 // ============================================================
 
 import os from "os";
