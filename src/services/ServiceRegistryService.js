@@ -11,7 +11,12 @@ import logger from "../utils/logger.js";
 
 /**
  * Detect the device key that this API instance is running on.
- * Matches the machine's LAN IPs against DEVICES hostnames.
+ * Matches the machine's real network-interface IPs against DEVICES hostnames.
+ *
+ * NOTE: We intentionally exclude "localhost" / "127.0.0.1" from the set
+ * because every host (including Docker containers) owns those addresses,
+ * which would cause false positives — e.g. a container on Synology
+ * incorrectly matching as the Workstation device.
  */
 function detectLocalDevice() {
   const interfaces = os.networkInterfaces();
@@ -21,11 +26,9 @@ function detectLocalDevice() {
       if (!addr.internal) localIPs.add(addr.address);
     }
   }
-  localIPs.add("localhost");
-  localIPs.add("127.0.0.1");
 
   for (const [key, device] of Object.entries(DEVICES)) {
-    if (localIPs.has(device.hostname)) return key;
+    if (device.hostname && localIPs.has(device.hostname)) return key;
   }
   return null;
 }
@@ -166,7 +169,19 @@ export default class ServiceRegistryService {
   }
 
   /**
+   * Maximum number of retry attempts for a failed health check.
+   * Retries help catch services that are still initializing after startup.
+   */
+  static HEALTH_CHECK_RETRIES = 1;
+
+  /** Delay (ms) between retry attempts. */
+  static HEALTH_CHECK_RETRY_DELAY_MS = 1500;
+
+  /**
    * Poll a single service's root health endpoint.
+   * Retries once after a short delay if the first attempt fails,
+   * which handles the window where a service (e.g. LM Studio) is
+   * still binding its HTTP listener after startup.
    * @param {string} id
    * @param {{ name: string, url: string }} svc
    * @returns {Promise<ServiceStatus>}
@@ -193,6 +208,38 @@ export default class ServiceRegistryService {
       };
     }
 
+    const wasPreviouslyDown = statusCache.has(id) && !statusCache.get(id).healthy;
+    const maxAttempts = wasPreviouslyDown
+      ? 1 + ServiceRegistryService.HEALTH_CHECK_RETRIES
+      : 1;
+
+    let lastResult = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (attempt > 1) {
+        await new Promise((r) => setTimeout(r, ServiceRegistryService.HEALTH_CHECK_RETRY_DELAY_MS));
+      }
+
+      lastResult = await ServiceRegistryService._attemptHealthCheck(id, svc);
+
+      if (lastResult.healthy) {
+        if (attempt > 1) {
+          logger.info(`[ServiceRegistry] ${svc.name} recovered on retry ${attempt - 1}`);
+        }
+        return lastResult;
+      }
+    }
+
+    return lastResult;
+  }
+
+  /**
+   * Single health-check attempt against a service endpoint.
+   * @param {string} id
+   * @param {object} svc
+   * @returns {Promise<ServiceStatus>}
+   */
+  static async _attemptHealthCheck(id, svc) {
     const start = Date.now();
 
     try {
@@ -238,7 +285,8 @@ export default class ServiceRegistryService {
         checkedAt: new Date().toISOString(),
       };
     } catch (err) {
-      logger.warn(`[ServiceRegistry] ${svc.name} unreachable: ${err.message}`);
+      const errorDetail = ServiceRegistryService._extractErrorDetail(err);
+      logger.warn(`[ServiceRegistry] ${svc.name} unreachable: ${errorDetail}`);
       return {
         id,
         name: svc.name,
@@ -254,9 +302,41 @@ export default class ServiceRegistryService {
         healthy: false,
         responseTimeMs: Date.now() - start,
         metadata: null,
-        error: err.name === "AbortError" ? "Timeout" : err.message,
+        error: errorDetail,
         checkedAt: new Date().toISOString(),
       };
     }
+  }
+
+  /**
+   * Extract a meaningful error message from a fetch failure.
+   * Node's undici wraps the real cause (ECONNREFUSED, EHOSTUNREACH, etc.)
+   * inside err.cause, while err.message is just the opaque "fetch failed".
+   * @param {Error} err
+   * @returns {string}
+   */
+  static _extractErrorDetail(err) {
+    if (err.name === "AbortError") return "Timeout";
+
+    // Dig into undici's nested cause chain for the real error code
+    let cause = err.cause;
+    while (cause) {
+      if (cause.code) {
+        const code = cause.code;
+        const labels = {
+          ECONNREFUSED: "Connection refused",
+          EHOSTUNREACH: "Host unreachable",
+          ENETUNREACH: "Network unreachable",
+          ECONNRESET: "Connection reset",
+          ETIMEDOUT: "Connection timed out",
+          ENOTFOUND: "DNS lookup failed",
+          EPIPE: "Broken pipe",
+        };
+        return labels[code] || `${code}: ${cause.message || err.message}`;
+      }
+      cause = cause.cause;
+    }
+
+    return err.message;
   }
 }

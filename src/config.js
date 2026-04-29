@@ -43,7 +43,7 @@ export const DEVICES = {
   workstation: {
     name: "Workstation",
     type: "Desktop",
-    hostname: "localhost",
+    hostname: "192.168.86.99",
     os: "Windows 11 (WSL2)",
     notes: "Primary development machine — runs most services locally.",
   },
