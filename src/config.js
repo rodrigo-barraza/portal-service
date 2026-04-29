@@ -19,6 +19,8 @@ import {
   VAULT_SERVICE_URL,
   ROD_DEV_CLIENT_URL,
   CLOCK_CREW_CLIENT_URL,
+  MESSAGES_SERVICE_URL,
+  MESSAGES_CLIENT_URL,
   LM_STUDIO_URL,
   LM_STUDIO_2_URL,
   MINIO_ENDPOINT,
@@ -89,6 +91,8 @@ export const SERVICES = {
   vault:      { name: "Vault Service",  url: VAULT_SERVICE_URL,        healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "synology",     serviceType: "API",              repo: "https://github.com/rodrigo-barraza/vault-service",     dependsOn: [],                     dockerProject: "vault-service" },
   rodDev:     { name: "Rod Dev Client", url: ROD_DEV_CLIENT_URL,      healthPath: "/",          environment: "Production",   visibility: "external",  device: "synology",     serviceType: "Client",       repo: "https://github.com/rodrigo-barraza/rod-dev-client",   hostname: "rod.dev",        dependsOn: [req("prism"), req("sessions"), opt("vault")],   dockerProject: "rod-dev-client" },
   clockCrew:  { name: "Clock Crew Client", url: CLOCK_CREW_CLIENT_URL,   healthPath: "/",          environment: "Production",   visibility: "external",  device: "synology",     serviceType: "Client",       repo: "https://github.com/rodrigo-barraza/clock-crew-client", hostname: "clock-crew.com",  dependsOn: [req("vault"), opt("toolsApi")],   dockerProject: "clock-crew-client" },
+  messages:   { name: "Messages Service", url: MESSAGES_SERVICE_URL,     healthPath: "/health",    environment: "Production",   visibility: "internal",  device: "synology",     serviceType: "API",              repo: "https://github.com/rodrigo-barraza/messages-service",  dependsOn: [req("mongodb"), req("vault")],   dockerProject: "messages-service" },
+  messagesCl: { name: "Messages Client",  url: MESSAGES_CLIENT_URL,     healthPath: "/",          environment: "Production",   visibility: "internal",  device: "synology",     serviceType: "Client",           repo: "https://github.com/rodrigo-barraza/messages-client",   dependsOn: [req("messages")],                dockerProject: "messages-client" },
 };
 
 // ── Infrastructure Services ────────────────────────────────────
