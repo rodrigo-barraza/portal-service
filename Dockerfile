@@ -10,7 +10,7 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN apk add --no-cache git && npm ci --omit=dev
 
 # --- Production ---
 FROM node:22-alpine
