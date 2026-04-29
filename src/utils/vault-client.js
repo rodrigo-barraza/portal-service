@@ -14,8 +14,8 @@
 // Resolution order for service URLs:
 //   1. process.env override (e.g. PRISM_SERVICE_URL)
 //   2. Local .env override
-//   3. Vault registry (authoritative, resolved from master .env)
-//   4. Localhost fallback using the service's declared port
+//   3. Vault registry (auto-constructed from DEFAULT_HOST + port)
+//   4. Localhost fallback (dev-only, no DEFAULT_HOST set)
 //
 // Usage (in any service's boot.js):
 //
