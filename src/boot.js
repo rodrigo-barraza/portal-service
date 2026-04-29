@@ -6,7 +6,7 @@
 // initializes the config module before any routes load.
 // ============================================================
 
-import { createVaultClient } from "./utils/vault-client.js";
+import { createVaultClient } from "@rodrigo-barraza/utilities/vault";
 
 const vault = createVaultClient({
   localEnvFile: "./.env",

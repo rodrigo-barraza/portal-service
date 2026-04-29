@@ -26,40 +26,8 @@ export { MONGO_URI, MONGO_DB_NAME, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRE
 
 // ── Devices ────────────────────────────────────────────────────
 // Physical machines / hosts that run Sun services.
-// This is portal-specific operational topology — NOT stored in
-// the shared registry (which is deployment-agnostic).
-export const DEVICES = {
-  workstation: {
-    name: "Workstation",
-    type: "Desktop",
-    hostname: "192.168.86.99",
-    os: "Windows 11 (WSL2)",
-    notes: "Primary development machine — runs most services locally.",
-  },
-  workstation2: {
-    name: "Workstation 2",
-    type: "Desktop",
-    hostname: "192.168.86.178",
-    os: "Windows 11",
-    notes: "Secondary workstation — runs LM Studio for local inference.",
-  },
-  raspi: {
-    name: "Raspberry Pi",
-    type: "SBC",
-    hostname: "192.168.86.247",
-    os: "Raspberry Pi OS",
-    notes: "Always-on LAN device — runs Lupos Discord bot.",
-  },
-  synology: {
-    name: "Synology NAS",
-    type: "NAS",
-    hostname: "192.168.86.2",
-    os: "DSM 7",
-    sshAlias: "nas",
-    dockerBin: "/usr/local/bin/docker",
-    notes: "Self-hosted production server — runs containerized services.",
-  },
-};
+// Populated from the registry's `devices` section at boot.
+export let DEVICES = {};
 
 // ── Portal-Specific Overlays ───────────────────────────────────
 // Operational metadata that the shared registry doesn't carry.
@@ -99,10 +67,10 @@ export let SERVICES = {};
 export let INFRASTRUCTURE = {};
 
 /**
- * Build the SERVICES and INFRASTRUCTURE maps from the Vault registry.
+ * Build the SERVICES, INFRASTRUCTURE, and DEVICES maps from the Vault registry.
  * Called once from boot.js after secrets + registry are loaded.
  *
- * @param {{ services: object[], infrastructure: object[] }} registry
+ * @param {{ services: object[], infrastructure: object[], devices: object[] }} registry
  */
 export function initializeRegistry(registry) {
   if (!registry || !registry.services) {
@@ -155,8 +123,25 @@ export function initializeRegistry(registry) {
 
   INFRASTRUCTURE = infra;
 
+  // ── Devices ─────────────────────────────────────────────────
+  const devices = {};
+
+  for (const dev of registry.devices || []) {
+    devices[dev.id] = {
+      name: dev.label,
+      type: dev.type,
+      hostname: dev.hostname || "",
+      os: dev.os || "",
+      sshAlias: dev.sshAlias || null,
+      dockerBin: dev.dockerBin || null,
+      notes: dev.notes || "",
+    };
+  }
+
+  DEVICES = devices;
+
   console.warn(
-    `📋 Registry → initialized ${Object.keys(services).length} services, ${Object.keys(infra).length} infrastructure`,
+    `📋 Registry → initialized ${Object.keys(services).length} services, ${Object.keys(infra).length} infrastructure, ${Object.keys(devices).length} devices`,
   );
 }
 

@@ -22,6 +22,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@rodrigo-barraza/utilities": "github:rodrigo-barraza/utilities-library",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "minio": "^8.0.7",
