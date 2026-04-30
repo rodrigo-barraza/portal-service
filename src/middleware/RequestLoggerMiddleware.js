@@ -15,18 +15,11 @@ export function requestLoggerMiddleware(req, res, next) {
     const method = req.method;
     const url = req.originalUrl;
 
-    // Color-code by status range
-    const color =
-      status >= 500
-        ? "\x1b[31m"
-        : status >= 400
-          ? "\x1b[33m"
-          : "\x1b[32m";
-    const reset = "\x1b[0m";
+    const time = duration >= 1000
+      ? `${(duration / 1000).toFixed(2)}s`
+      : `${duration}ms`;
 
-    logger.info(
-      `${method} ${url} ${color}${status}${reset} ${duration}ms`,
-    );
+    logger.request(method, url, status, time);
   });
 
   next();
