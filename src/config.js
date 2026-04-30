@@ -34,7 +34,7 @@ export let DEVICES = {};
 // Keyed by the canonical service ID from services.json.
 const SERVICE_OVERLAYS = {
   "portal-client":       { device: "synology",     environment: "Production",  visibility: "internal" },
-  "portal-service":      { device: "synology",     environment: "Production",  visibility: "internal" },
+  "portal-service":      { device: "synology",     environment: "Production",  visibility: "external",  hostname: "api.portal.rod.dev" },
   "prism-service":       { device: "synology",     environment: "Production",  visibility: "external",  hostname: "prism.rod.dev" },
   "tools-service":       { device: "synology",     environment: "Production",  visibility: "internal" },
   "retina-client":       { device: "synology",     environment: "Production",  visibility: "external",  hostname: "retina.rod.dev" },
