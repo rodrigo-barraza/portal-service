@@ -91,7 +91,7 @@ export function initializeRegistry(registry) {
       environment: overlay.environment || "Production",
       visibility: overlay.visibility || "internal",
       serviceType: TYPE_MAP[svc.type] || "API",
-      repo: svc.repo ? `https://github.com/rodrigo-barraza/${svc.repo}` : null,
+      repo: svc.repo || null,
       device: overlay.device || null,
       hostname: overlay.hostname || null,
       dockerProject: svc.dockerProject || null,
