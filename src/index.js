@@ -30,7 +30,27 @@ import devicesRouter from "./routes/devices.js";
 
 const app = express();
 
-app.use(cors());
+// ── CORS — restrict to portal client + local development ──────
+const ALLOWED_ORIGINS = [
+  "https://portal.rod.dev",
+  "http://localhost:4000",
+  "http://localhost:4001",
+];
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Allow requests with no origin (server-to-server, curl, health checks)
+      if (!origin) return callback(null, true);
+      // Allow any localhost port (local development)
+      if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
+      // Allow whitelisted origins
+      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
+    credentials: true,
+  }),
+);
 app.use(express.json({ limit: "5mb" }));
 app.use(requestLoggerMiddleware);
 
