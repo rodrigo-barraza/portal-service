@@ -32,10 +32,10 @@ const app = express();
 
 // ── CORS — restrict to portal client + local development ──────
 const ALLOWED_ORIGINS = [
-  "https://portal.rod.dev",
+  process.env.AUTH_URL,            // e.g. https://portal.rod.dev (from Vault)
   "http://localhost:4000",
   "http://localhost:4001",
-];
+].filter(Boolean);
 
 app.use(
   cors({

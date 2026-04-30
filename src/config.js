@@ -2,13 +2,9 @@
 // Portal Service — Runtime Configuration
 // ============================================================
 // Builds SERVICES and INFRASTRUCTURE from the Vault registry
-// (single source of truth), overlaid with portal-specific
-// operational metadata (devices, hostnames, visibility).
-//
-// The registry supplies:  ports, URLs, dependency graphs,
-//                         types, deploy tiers, docker projects.
-// This file supplies:     device assignments, public hostnames,
-//                         environment labels, visibility.
+// (single source of truth). The registry supplies all metadata:
+// ports, URLs, dependency graphs, deploy tiers, hostnames,
+// visibility, and docker projects.
 // ============================================================
 
 import {
@@ -29,36 +25,15 @@ export { MONGO_URI, MONGO_DB_NAME, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRE
 // Populated from the registry's `devices` section at boot.
 export let DEVICES = {};
 
-// ── Portal-Specific Overlays ───────────────────────────────────
-// Operational metadata that the shared registry doesn't carry.
-// Keyed by the canonical service ID from services.json.
-const SERVICE_OVERLAYS = {
-  "portal-client":       { device: "synology",     environment: "Production",  visibility: "internal" },
-  "portal-service":      { device: "synology",     environment: "Production",  visibility: "external",  hostname: "api.portal.rod.dev" },
-  "prism-service":       { device: "synology",     environment: "Production",  visibility: "external",  hostname: "prism.rod.dev" },
-  "tools-service":       { device: "synology",     environment: "Production",  visibility: "internal" },
-  "retina-client":       { device: "synology",     environment: "Production",  visibility: "external",  hostname: "retina.rod.dev" },
-  "lights-service":      { device: "synology",     environment: "Production",  visibility: "internal" },
-  "lights-client":       { device: "synology",     environment: "Production",  visibility: "internal" },
-  "clock-crew-service":  { device: "synology",     environment: "Production",  visibility: "internal" },
-  "clock-crew-client":   { device: "synology",     environment: "Production",  visibility: "external",  hostname: "clock-crew.com" },
-  "messages-service":    { device: "synology",     environment: "Production",  visibility: "internal" },
-  "messages-client":     { device: "synology",     environment: "Production",  visibility: "internal" },
-  "vault-service":       { device: "synology",     environment: "Production",  visibility: "internal" },
-  "rod-dev-client":      { device: "synology",     environment: "Production",  visibility: "external",  hostname: "rod.dev" },
-  "lupos-bot":           { device: "synology",     environment: "Production",  visibility: "internal" },
-  "lm-studio":           { device: "workstation",  environment: "Production",  visibility: "internal" },
-  "lm-studio-2":         { device: "workstation2", environment: "Production",  visibility: "internal" },
-};
-
-// Map registry type → portal's serviceType label
-const TYPE_MAP = {
-  service: "API",
-  gateway: "API",
-  client:  "Client",
-  bot:     "Client",
-  infra:   "API",
-};
+/**
+ * Infer the portal service type label from the service ID.
+ * Services ending in "-client" or "-bot" are "Client", otherwise "API".
+ */
+function inferServiceType(id) {
+  if (id.endsWith("-client")) return "Client";
+  if (id.endsWith("-bot")) return "Client";
+  return "API";
+}
 
 // ── Registry Hydration ─────────────────────────────────────────
 // Populated at boot time by initializeRegistry().
@@ -82,18 +57,16 @@ export function initializeRegistry(registry) {
   const services = {};
 
   for (const svc of registry.services) {
-    const overlay = SERVICE_OVERLAYS[svc.id] || {};
-
     services[svc.id] = {
       name: svc.label,
       url: svc.url || "",
       healthPath: svc.healthPath || "/",
-      environment: overlay.environment || "Production",
-      visibility: overlay.visibility || "internal",
-      serviceType: TYPE_MAP[svc.type] || "API",
+      environment: "Production",
+      visibility: svc.visibility || "internal",
+      serviceType: inferServiceType(svc.id),
       repo: svc.repo || null,
-      device: overlay.device || null,
-      hostname: overlay.hostname || null,
+      device: "synology",
+      hostname: svc.hostname || null,
       dockerProject: svc.dockerProject || null,
       dependsOn: (svc.dependsOn || []).map((dep) => ({
         id: dep.id,
@@ -150,8 +123,8 @@ export function initializeRegistry(registry) {
 // instances, not deployed services). If their env vars are set,
 // inject them into SERVICES after registry init.
 export function injectLmStudioInstances() {
-  const lm1 = process.env.LM_STUDIO_URL;
-  const lm2 = process.env.LM_STUDIO_2_URL;
+  const lm1 = process.env.PROVIDER_LM_STUDIO_1_URL;
+  const lm2 = process.env.PROVIDER_LM_STUDIO_2_URL;
 
   if (lm1) {
     SERVICES["lm-studio"] = {
