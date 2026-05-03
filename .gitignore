@@ -5,3 +5,6 @@ secrets.js
 .vscode/settings.json
 
 *:Zone.Identifier
+
+# logs
+*.log
