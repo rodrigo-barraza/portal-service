@@ -21,7 +21,7 @@ export const PORT = SECRETS_PORT || 4001;
 export { MONGO_URI, MONGO_DB_NAME, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY };
 
 // ── Devices ────────────────────────────────────────────────────
-// Physical machines / hosts that run Sun services.
+// Physical machines / hosts that run services.
 // Populated from the registry's `devices` section at boot.
 export let DEVICES = {};
 

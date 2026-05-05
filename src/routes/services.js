@@ -1,7 +1,7 @@
 // ============================================================
 // API Portal — Services Route
 // ============================================================
-// GET  /services              — returns health status for all Sun services
+// GET  /services              — returns health status for all services
 //                               and infrastructure backing stores.
 // POST /services/check        — trigger a fresh health check.
 // POST /services/:id/restart  — restart a containerized service.
@@ -106,7 +106,7 @@ function enrichWithDependencies(services, infrastructure) {
 
 /**
  * GET /services
- * Returns the current health status of all registered Sun services
+ * Returns the current health status of all registered services
  * plus infrastructure backing stores (MongoDB, MinIO, etc.).
  * If ?refresh=true, forces a fresh health check before responding.
  */
