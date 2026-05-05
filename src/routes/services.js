@@ -17,7 +17,7 @@ import { Router } from "express";
 import http from "http";
 import ServiceRegistryService from "../services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
-import { SERVICES } from "../config.js";
+import { SERVICES, SERVICE_TYPE_COLORS } from "../config.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
@@ -124,7 +124,8 @@ router.get("/", async (req, res, next) => {
       infrastructure = InfrastructureRegistryService.list();
     }
 
-    res.json(enrichWithDependencies(services, infrastructure));
+    const enriched = enrichWithDependencies(services, infrastructure);
+    res.json({ ...enriched, serviceTypeColors: SERVICE_TYPE_COLORS });
   } catch (err) {
     next(err);
   }
@@ -140,7 +141,8 @@ router.post("/check", async (_req, res, next) => {
       ServiceRegistryService.checkAll(),
       InfrastructureRegistryService.checkAll(),
     ]);
-    res.json(enrichWithDependencies(services, infrastructure));
+    const enriched = enrichWithDependencies(services, infrastructure);
+    res.json({ ...enriched, serviceTypeColors: SERVICE_TYPE_COLORS });
   } catch (err) {
     next(err);
   }

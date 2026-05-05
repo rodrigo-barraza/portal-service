@@ -27,12 +27,12 @@ export let DEVICES = {};
 
 /**
  * Infer the portal service type label from the service ID.
- * Services ending in "-client" or "-bot" are "Client", otherwise "API".
+ * Services ending in "-client" are "Client", "-bot" are "Bot", otherwise "Service".
  */
 function inferServiceType(id) {
   if (id.endsWith("-client")) return "Client";
-  if (id.endsWith("-bot")) return "Client";
-  return "API";
+  if (id.endsWith("-bot")) return "Bot";
+  return "Service";
 }
 
 // ── Registry Hydration ─────────────────────────────────────────
@@ -40,6 +40,7 @@ function inferServiceType(id) {
 // Until then, SERVICES and INFRASTRUCTURE are empty objects.
 export let SERVICES = {};
 export let INFRASTRUCTURE = {};
+export let SERVICE_TYPE_COLORS = {};
 
 /**
  * Build the SERVICES, INFRASTRUCTURE, and DEVICES maps from the Vault registry.
@@ -60,6 +61,7 @@ export function initializeRegistry(registry) {
     services[svc.id] = {
       name: svc.label,
       url: svc.url || "",
+      port: svc.port || null,
       healthPath: svc.healthPath || "/",
       environment: "Production",
       visibility: svc.visibility || "internal",
@@ -84,7 +86,7 @@ export function initializeRegistry(registry) {
     infra[item.id] = {
       name: item.label,
       type: item.type,
-      serviceType: item.type === "database" ? "Database" : "Storage",
+      serviceType: item.type === "database" ? "Database" : "Store",
       url: item.url || "",
       port: item.defaultPort || null,
       environment: "Production",
@@ -95,6 +97,9 @@ export function initializeRegistry(registry) {
   }
 
   INFRASTRUCTURE = infra;
+
+  // ── Service Type Colors ─────────────────────────────────────
+  SERVICE_TYPE_COLORS = registry.serviceTypeColors || {};
 
   // ── Devices ─────────────────────────────────────────────────
   const devices = {};
@@ -133,7 +138,7 @@ export function injectLmStudioInstances() {
       healthPath: "/v1/models",
       environment: "Production",
       visibility: "internal",
-      serviceType: "API",
+      serviceType: "Service",
       device: "workstation",
       domain: null,
       dockerProject: null,
@@ -148,7 +153,7 @@ export function injectLmStudioInstances() {
       healthPath: "/v1/models",
       environment: "Production",
       visibility: "internal",
-      serviceType: "API",
+      serviceType: "Service",
       device: "workstation2",
       domain: null,
       dockerProject: null,
