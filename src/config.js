@@ -66,7 +66,7 @@ export function initializeRegistry(registry) {
       serviceType: inferServiceType(svc.id),
       repo: svc.repo || null,
       device: "synology",
-      hostname: svc.hostname || null,
+      domain: svc.domain || null,
       dockerProject: svc.dockerProject || null,
       dependsOn: (svc.dependsOn || []).map((dep) => ({
         id: dep.id,
@@ -135,7 +135,7 @@ export function injectLmStudioInstances() {
       visibility: "internal",
       serviceType: "API",
       device: "workstation",
-      hostname: null,
+      domain: null,
       dockerProject: null,
       dependsOn: [],
     };
@@ -150,7 +150,7 @@ export function injectLmStudioInstances() {
       visibility: "internal",
       serviceType: "API",
       device: "workstation2",
-      hostname: null,
+      domain: null,
       dockerProject: null,
       dependsOn: [],
     };
