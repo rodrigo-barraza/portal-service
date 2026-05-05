@@ -12,7 +12,7 @@ import { errorHandler } from "./utils/errors.js";
 import logger from "./utils/logger.js";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.js";
 import MongoWrapper from "./wrappers/MongoWrapper.js";
-import { PORT, MONGO_URI, MONGO_DB_NAME } from "./config.js";
+import { PORT, MONGO_URI, MONGO_DB_NAME, SERVICES } from "./config.js";
 import { COLLECTIONS } from "./constants.js";
 import ServiceRegistryService from "./services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "./services/InfrastructureRegistryService.js";
@@ -107,6 +107,52 @@ app.use(errorHandler);
     logger.error(`Failed to ensure indexes: ${err.message}`);
   }
 
+  // ── Deferred Registry Recovery ─────────────────────────────────
+  // If the registry was empty at boot (vault wasn't ready), keep
+  // retrying in the background until we get services populated.
+  // LM Studio entries may exist from env vars, so check for registry-sourced services.
+  const registryServiceCount = Object.keys(SERVICES).filter((id) => !id.startsWith("lm-studio")).length;
+  if (registryServiceCount === 0) {
+    logger.warn("[Registry] No registry services from boot — scheduling deferred recovery");
+
+    const DEFERRED_INTERVAL_MS = 10_000;
+    const MAX_DEFERRED_ATTEMPTS = 30; // give up after 5 minutes
+    let deferredAttempt = 0;
+
+    const deferredTimer = setInterval(async () => {
+      deferredAttempt++;
+
+      try {
+        const { vault } = await import("./boot.js");
+        vault.clearRegistryCache();
+        const registry = await vault.fetchRegistry();
+
+        if (registry.services?.length > 0) {
+          const { initializeRegistry, injectLmStudioInstances } = await import("./config.js");
+          initializeRegistry(registry);
+          injectLmStudioInstances();
+
+          // Run initial health checks now that we have services
+          ServiceRegistryService.checkAll().catch(() => {});
+          InfrastructureRegistryService.checkAll().catch(() => {});
+
+          logger.success(`[Registry] Deferred recovery succeeded on attempt ${deferredAttempt}`);
+          clearInterval(deferredTimer);
+        } else if (deferredAttempt >= MAX_DEFERRED_ATTEMPTS) {
+          logger.error("[Registry] Deferred recovery exhausted — giving up");
+          clearInterval(deferredTimer);
+        } else {
+          logger.warn(`[Registry] Deferred attempt ${deferredAttempt}/${MAX_DEFERRED_ATTEMPTS} — still empty`);
+        }
+      } catch (err) {
+        logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${err.message}`);
+        if (deferredAttempt >= MAX_DEFERRED_ATTEMPTS) {
+          clearInterval(deferredTimer);
+        }
+      }
+    }, DEFERRED_INTERVAL_MS);
+  }
+
   // Initial health check of all services (fire-and-forget)
   Promise.all([
     ServiceRegistryService.checkAll(),
@@ -140,3 +186,4 @@ app.use(errorHandler);
     );
   });
 })();
+
