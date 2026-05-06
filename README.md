@@ -30,7 +30,7 @@ portal-service/
 
 ### Boot Sequence
 
-1. Fetches secrets + service registry from Vault via `@rodrigo-barraza/utilities/vault`
+1. Fetches secrets + service registry from Vault via `@rodrigo-barraza/utilities-library/vault`
 2. Builds `SERVICES`, `INFRASTRUCTURE`, and `DEVICES` maps from the registry
 3. Runs initial health check of all services and infrastructure
 4. Starts periodic health checks every 60 seconds
