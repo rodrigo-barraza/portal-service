@@ -1,18 +1,18 @@
 # ============================================================
-# API — Multi-stage Dockerfile
+# Portal — Multi-stage Dockerfile
 # ============================================================
 # API BFF aggregator — Express server that federates
 # data from all Sun services. Uses boot.js to fetch secrets
 # from Vault at startup.
 # ============================================================
 
-# --- Dependencies ---
+# ── Stage 1: Install dependencies ─────────────────────────────
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN apk add --no-cache git && npm ci --omit=dev
 
-# --- Production ---
+# ── Stage 2: Runtime ──────────────────────────────────────────
 FROM node:22-alpine
 WORKDIR /app
 
@@ -21,6 +21,11 @@ COPY --from=deps /app/node_modules ./node_modules
 
 # Copy application source
 COPY . .
+
+# Non-root user for security
+RUN addgroup --system --gid 1001 portal && \
+    adduser --system --uid 1001 portal
+USER portal
 
 EXPOSE 4001
 
