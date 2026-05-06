@@ -6,6 +6,7 @@
 
 import { Router } from "express";
 import StatsAggregatorService from "../services/StatsAggregatorService.js";
+import DockerStatsService from "../services/DockerStatsService.js";
 
 const router = Router();
 
@@ -51,11 +52,25 @@ router.get("/projects", async (_req, res, next) => {
 });
 
 /**
+ * GET /stats/containers
+ * Returns per-container resource usage from the Docker Engine API.
+ */
+router.get("/containers", async (_req, res, next) => {
+  try {
+    const data = await DockerStatsService.getAll();
+    res.json({ containers: data, fetchedAt: new Date().toISOString() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * POST /stats/invalidate
  * Force-clear the stats cache.
  */
 router.post("/invalidate", (_req, res) => {
   StatsAggregatorService.invalidate();
+  DockerStatsService.invalidate();
   res.json({ ok: true });
 });
 
