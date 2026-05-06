@@ -1,24 +1,21 @@
 // ============================================================
 // Portal Service — Runtime Configuration
 // ============================================================
-// Builds SERVICES and INFRASTRUCTURE from the Vault registry
-// (single source of truth). The registry supplies all metadata:
-// ports, URLs, dependency graphs, deploy tiers, hostnames,
-// visibility, and docker projects.
+// Typed accessor layer over process.env. The Vault service is
+// the single source of truth — boot.js hydrates process.env
+// from the Vault before any module imports run.
+//
+// This file contains NO defaults and NO secrets.
 // ============================================================
 
-import {
-  PORTAL_SERVICE_PORT as SECRETS_PORT,
-  MONGO_URI,
-  MONGO_DB_NAME,
-  MINIO_ENDPOINT,
-  MINIO_ACCESS_KEY,
-  MINIO_SECRET_KEY,
-} from "../secrets.js";
+export const PORT = process.env.PORTAL_SERVICE_PORT;
 
-export const PORT = SECRETS_PORT || 4001;
+export const MONGO_URI = process.env.MONGO_URI;
+export const MONGO_DB_NAME = process.env.PORTAL_SERVICE_MONGO_DB_NAME || process.env.MONGO_DB_NAME;
 
-export { MONGO_URI, MONGO_DB_NAME, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY };
+export const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT;
+export const MINIO_ACCESS_KEY = process.env.MINIO_ACCESS_KEY;
+export const MINIO_SECRET_KEY = process.env.MINIO_SECRET_KEY;
 
 // ── Devices ────────────────────────────────────────────────────
 // Physical machines / hosts that run services.
@@ -44,7 +41,7 @@ export let SERVICE_TYPE_COLORS = {};
 
 /**
  * Build the SERVICES, INFRASTRUCTURE, and DEVICES maps from the Vault registry.
- * Called once from boot.js after secrets + registry are loaded.
+ * Called once from boot.js after the registry is loaded.
  *
  * @param {{ services: object[], infrastructure: object[], devices: object[] }} registry
  */
