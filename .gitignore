@@ -1,6 +1,5 @@
 node_modules/
 .env
-.env.deploy
 .vscode/settings.json
 
 *:Zone.Identifier
