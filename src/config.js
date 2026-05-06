@@ -89,6 +89,7 @@ export function initializeRegistry(registry) {
       environment: "Production",
       visibility: "internal",
       device: "synology",
+      domain: item.domain || null,
       dependsOn: [],
     };
   }
