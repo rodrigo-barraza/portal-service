@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "API — BFF aggregator for the developer portal",
   "type": "module",
-  "main": "src/index.js",
+  "main": "src/boot.js",
   "scripts": {
     "start": "node src/boot.js",
     "dev": "nodemon --legacy-watch src/boot.js",
@@ -24,15 +24,15 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@rodrigo-barraza/utilities-library": "git+https://github.com/rodrigo-barraza/utilities-library.git",
+    "@rodrigo-barraza/utilities-library": "github:rodrigo-barraza/utilities-library",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "minio": "^8.0.7",
     "mongodb": "^7.1.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.3",
-    "eslint": "^9.39.3",
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.4.0",
     "nodemon": "^3.1.14",
