@@ -23,6 +23,7 @@ import servicesRouter from "./routes/services.js";
 import statsRouter from "./routes/stats.js";
 import logsRouter from "./routes/logs.js";
 import integrationsRouter from "./routes/integrations.js";
+import storageRouter from "./routes/storage.js";
 
 import devicesRouter from "./routes/devices.js";
 
@@ -55,7 +56,7 @@ app.use(requestLoggerMiddleware);
 // ─── Endpoint Registry ────────────────────────────────────────────
 
 const ENDPOINTS = {
-  rest: ["/health", "/services", "/devices", "/stats", "/logs", "/integrations"],
+  rest: ["/health", "/services", "/devices", "/stats", "/logs", "/integrations", "/storage"],
 };
 
 // ─── Root Health Check ─────────────────────────────────────────────
@@ -77,6 +78,7 @@ app.use("/services", servicesRouter);
 app.use("/stats", statsRouter);
 app.use("/logs", logsRouter);
 app.use("/integrations", integrationsRouter);
+app.use("/storage", storageRouter);
 
 app.use("/devices", devicesRouter);
 
