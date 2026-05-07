@@ -1,11 +1,11 @@
 // ============================================================
 // API Portal — Storage Route
 // ============================================================
-// GET  /storage/buckets              — list all buckets
-// GET  /storage/buckets/:name        — list objects in a bucket
-// GET  /storage/buckets/:name/stat/* — stat a single object
-// GET  /storage/buckets/:name/download/* — stream/download an object
-// DELETE /storage/buckets/:name/*    — delete an object
+// GET  /storage/buckets                          — list all buckets
+// GET  /storage/buckets/:name                    — list objects in a bucket
+// GET  /storage/buckets/:name/stat/*objectPath    — stat a single object
+// GET  /storage/buckets/:name/download/*objectPath — stream/download an object
+// DELETE /storage/buckets/:name/*objectPath       — delete an object
 // ============================================================
 
 import { Router } from "express";
@@ -80,14 +80,13 @@ router.get("/buckets/:name", async (req, res, next) => {
 });
 
 /**
- * GET /storage/buckets/:name/stat/*
+ * GET /storage/buckets/:name/stat/*objectPath
  * Get metadata (size, content-type, etag, lastModified) for a single object.
  */
-router.get("/buckets/:name/stat/*", async (req, res, next) => {
+router.get("/buckets/:name/stat/*objectPath", async (req, res, next) => {
   try {
     const bucketName = req.params.name;
-    // Express 5 wildcard param — req.params[0] is the rest of the path
-    const objectName = req.params[0];
+    const objectName = req.params.objectPath;
 
     if (!objectName) {
       return res.status(400).json({ error: "Object name required" });
@@ -113,15 +112,15 @@ router.get("/buckets/:name/stat/*", async (req, res, next) => {
 });
 
 /**
- * GET /storage/buckets/:name/download/*
+ * GET /storage/buckets/:name/download/*objectPath
  * Stream an object for download or inline viewing.
  * Query params:
  *   inline — if "true", sets Content-Disposition to inline (default: attachment)
  */
-router.get("/buckets/:name/download/*", async (req, res, next) => {
+router.get("/buckets/:name/download/*objectPath", async (req, res, next) => {
   try {
     const bucketName = req.params.name;
-    const objectName = req.params[0];
+    const objectName = req.params.objectPath;
 
     if (!objectName) {
       return res.status(400).json({ error: "Object name required" });
@@ -150,13 +149,13 @@ router.get("/buckets/:name/download/*", async (req, res, next) => {
 });
 
 /**
- * DELETE /storage/buckets/:name/*
+ * DELETE /storage/buckets/:name/*objectPath
  * Delete a single object from a bucket.
  */
-router.delete("/buckets/:name/*", async (req, res, next) => {
+router.delete("/buckets/:name/*objectPath", async (req, res, next) => {
   try {
     const bucketName = req.params.name;
-    const objectName = req.params[0];
+    const objectName = req.params.objectPath;
 
     if (!objectName) {
       return res.status(400).json({ error: "Object name required" });
