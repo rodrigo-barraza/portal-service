@@ -86,7 +86,7 @@ router.get("/buckets/:name", async (req, res, next) => {
 router.get("/buckets/:name/stat/*objectPath", async (req, res, next) => {
   try {
     const bucketName = req.params.name;
-    const objectName = req.params.objectPath;
+    const objectName = [].concat(req.params.objectPath).join("/");
 
     if (!objectName) {
       return res.status(400).json({ error: "Object name required" });
@@ -120,7 +120,7 @@ router.get("/buckets/:name/stat/*objectPath", async (req, res, next) => {
 router.get("/buckets/:name/download/*objectPath", async (req, res, next) => {
   try {
     const bucketName = req.params.name;
-    const objectName = req.params.objectPath;
+    const objectName = [].concat(req.params.objectPath).join("/");
 
     if (!objectName) {
       return res.status(400).json({ error: "Object name required" });
@@ -155,7 +155,7 @@ router.get("/buckets/:name/download/*objectPath", async (req, res, next) => {
 router.delete("/buckets/:name/*objectPath", async (req, res, next) => {
   try {
     const bucketName = req.params.name;
-    const objectName = req.params.objectPath;
+    const objectName = [].concat(req.params.objectPath).join("/");
 
     if (!objectName) {
       return res.status(400).json({ error: "Object name required" });
