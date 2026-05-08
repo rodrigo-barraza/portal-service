@@ -8,6 +8,9 @@
 // Uses one-shot stats (stream=false) for each container.
 // Results are cached with a short TTL to avoid hammering
 // the Docker API on rapid client refreshes.
+//
+// Also maintains a ring buffer of historical snapshots
+// (every 5 seconds, up to 5 minutes) for live sparkline charts.
 // ============================================================
 
 import http from "http";
@@ -17,8 +20,22 @@ const DOCKER_SOCKET = "/var/run/docker.sock";
 const STATS_CACHE_TTL_MS = 10_000; // 10s cache
 const REQUEST_TIMEOUT_MS = 8_000;
 
+// ── Ring Buffer Config ───────────────────────────────────────────
+const HISTORY_INTERVAL_MS = 5_000;      // sample every 5 seconds
+const HISTORY_MAX_SAMPLES = 60;         // retain 5 minutes (60 × 5s)
+
 /** @type {{ data: any, fetchedAt: number } | null} */
 let cachedStats = null;
+
+/**
+ * Ring buffer of snapshots.
+ * Each entry: { timestamp: string, containers: { [name]: { cpu, memory, blockIO } } }
+ * @type {Array<object>}
+ */
+const history = [];
+
+/** Timer reference for cleanup on shutdown. */
+let collectorTimer = null;
 
 export default class DockerStatsService {
   /**
@@ -51,10 +68,85 @@ export default class DockerStatsService {
   }
 
   /**
+   * Get the historical time-series ring buffer.
+   * Returns the full array of snapshots (oldest first).
+   * @returns {Array<object>}
+   */
+  static getHistory() {
+    return history;
+  }
+
+  /**
    * Invalidate the stats cache.
    */
   static invalidate() {
     cachedStats = null;
+  }
+
+  /**
+   * Start the background collector that populates the ring buffer.
+   * Called automatically on module load.
+   */
+  static startCollector() {
+    if (collectorTimer) return; // already running
+
+    // Collect immediately, then at intervals
+    DockerStatsService._collectSnapshot();
+    collectorTimer = setInterval(
+      () => DockerStatsService._collectSnapshot(),
+      HISTORY_INTERVAL_MS,
+    );
+
+    logger.info(`[DockerStats] Ring buffer collector started (every ${HISTORY_INTERVAL_MS / 1000}s, ${HISTORY_MAX_SAMPLES} max samples)`);
+  }
+
+  /**
+   * Stop the background collector.
+   */
+  static stopCollector() {
+    if (collectorTimer) {
+      clearInterval(collectorTimer);
+      collectorTimer = null;
+    }
+  }
+
+  /**
+   * Collect a single snapshot and push it into the ring buffer.
+   * @private
+   */
+  static async _collectSnapshot() {
+    try {
+      const stats = await DockerStatsService.getAll();
+
+      const snapshot = {
+        timestamp: new Date().toISOString(),
+        containers: {},
+      };
+
+      for (const s of stats) {
+        snapshot.containers[s.name] = {
+          cpu: s.cpu.percent,
+          memoryUsed: s.memory.used,
+          memoryLimit: s.memory.limit,
+          memoryPercent: s.memory.percent,
+          blockRead: s.blockIO.read,
+          blockWrite: s.blockIO.write,
+          netRx: s.network.rx,
+          netTx: s.network.tx,
+          pids: s.pids,
+        };
+      }
+
+      history.push(snapshot);
+
+      // Trim ring buffer
+      while (history.length > HISTORY_MAX_SAMPLES) {
+        history.shift();
+      }
+    } catch (err) {
+      // Silently ignore — Docker socket may be unavailable
+      logger.warn(`[DockerStats] Snapshot collection failed: ${err.message}`);
+    }
   }
 
   /**
@@ -215,3 +307,6 @@ export default class DockerStatsService {
     });
   }
 }
+
+// ── Auto-start collector on import ────────────────────────────────
+DockerStatsService.startCollector();

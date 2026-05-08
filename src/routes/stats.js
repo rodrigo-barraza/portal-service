@@ -65,6 +65,15 @@ router.get("/containers", async (_req, res, next) => {
 });
 
 /**
+ * GET /stats/containers/history
+ * Returns time-series ring buffer of container stats (last 5 minutes, 5s intervals).
+ */
+router.get("/containers/history", (_req, res) => {
+  const history = DockerStatsService.getHistory();
+  res.json({ history, samples: history.length });
+});
+
+/**
  * POST /stats/invalidate
  * Force-clear the stats cache.
  */
