@@ -25,14 +25,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Non-root user for security
-# DOCKER_GID must match the host's docker group GID so the
-# mounted /var/run/docker.sock is accessible.  Find it with:
-#   stat -c '%g' /var/run/docker.sock
-ARG DOCKER_GID=999
-RUN addgroup --system --gid ${DOCKER_GID} docker && \
-    addgroup --system --gid 1001 portal && \
-    adduser --system --uid 1001 portal && \
-    addgroup portal docker
+RUN addgroup --system --gid 1001 portal && \
+    adduser --system --uid 1001 portal
 USER portal
 
 EXPOSE 4001
