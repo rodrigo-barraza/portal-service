@@ -7,6 +7,7 @@
 import { Router } from "express";
 import StatsAggregatorService from "../services/StatsAggregatorService.js";
 import DockerStatsService from "../services/DockerStatsService.js";
+import MinioService from "../services/MinioService.js";
 
 const router = Router();
 
@@ -81,6 +82,34 @@ router.post("/invalidate", (_req, res) => {
   StatsAggregatorService.invalidate();
   DockerStatsService.invalidate();
   res.json({ ok: true });
+});
+
+/**
+ * GET /stats/system
+ * Returns Docker host system info and disk usage breakdown.
+ */
+router.get("/system", async (_req, res, next) => {
+  try {
+    const data = await DockerStatsService.getSystemInfo();
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /stats/storage
+ * Returns MinIO bucket summary — counts and sizes per bucket.
+ */
+router.get("/storage", async (_req, res, next) => {
+  try {
+    const buckets = await MinioService.listBuckets();
+    const totalObjects = buckets.reduce((sum, b) => sum + b.objectCount, 0);
+    const totalSize = buckets.reduce((sum, b) => sum + b.totalSize, 0);
+    res.json({ buckets, totalObjects, totalSize, fetchedAt: new Date().toISOString() });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;

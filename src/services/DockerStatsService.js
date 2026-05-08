@@ -268,6 +268,108 @@ export default class DockerStatsService {
   }
 
   /**
+   * Get Docker system-level information and disk usage.
+   * Includes images, containers, volumes, and build cache sizes.
+   * @returns {Promise<object>}
+   */
+  static async getSystemInfo() {
+    try {
+      const [infoBody, dfBody] = await Promise.all([
+        DockerStatsService._dockerGet("/info"),
+        DockerStatsService._dockerGet("/system/df"),
+      ]);
+
+      const info = JSON.parse(infoBody);
+      const df = JSON.parse(dfBody);
+
+      // ── Image disk usage ────────────────────────────────────
+      const images = (df.Images || []).map((img) => ({
+        id: img.Id?.substring(0, 12) || "unknown",
+        tags: img.RepoTags || [],
+        size: img.Size || 0,
+        sharedSize: img.SharedSize || 0,
+        created: img.Created,
+        containers: img.Containers || 0,
+      }));
+
+      const totalImageSize = images.reduce((sum, img) => sum + img.size, 0);
+      const totalImageShared = images.reduce((sum, img) => sum + img.sharedSize, 0);
+
+      // ── Volume disk usage ───────────────────────────────────
+      const volumes = (df.Volumes || []).map((vol) => ({
+        name: vol.Name,
+        driver: vol.Driver,
+        size: vol.UsageData?.Size || 0,
+        refCount: vol.UsageData?.RefCount || 0,
+      }));
+
+      const totalVolumeSize = volumes.reduce((sum, vol) => sum + vol.size, 0);
+
+      // ── Build cache disk usage ──────────────────────────────
+      const buildCache = df.BuildCache || [];
+      const totalBuildCacheSize = buildCache.reduce(
+        (sum, entry) => sum + (entry.Size || 0),
+        0,
+      );
+
+      // ── Container disk usage ────────────────────────────────
+      const containersDf = (df.Containers || []).map((c) => ({
+        id: c.Id?.substring(0, 12) || "unknown",
+        names: c.Names || [],
+        sizeRw: c.SizeRw || 0,       // writable layer
+        sizeRootFs: c.SizeRootFs || 0, // total (image + writable)
+        state: c.State,
+      }));
+
+      const totalContainerRw = containersDf.reduce(
+        (sum, c) => sum + c.sizeRw,
+        0,
+      );
+
+      return {
+        // System overview
+        serverVersion: info.ServerVersion,
+        os: info.OperatingSystem,
+        architecture: info.Architecture,
+        totalMemory: info.MemTotal,
+        cpus: info.NCPU,
+        containersRunning: info.ContainersRunning,
+        containersStopped: info.ContainersStopped,
+        containersPaused: info.ContainersPaused,
+        containersTotal: info.Containers,
+        // Disk usage breakdown
+        disk: {
+          images: {
+            count: images.length,
+            totalSize: totalImageSize,
+            sharedSize: totalImageShared,
+            items: images.sort((a, b) => b.size - a.size).slice(0, 20),
+          },
+          volumes: {
+            count: volumes.length,
+            totalSize: totalVolumeSize,
+            items: volumes.sort((a, b) => b.size - a.size),
+          },
+          buildCache: {
+            count: buildCache.length,
+            totalSize: totalBuildCacheSize,
+          },
+          containers: {
+            count: containersDf.length,
+            totalWritableSize: totalContainerRw,
+          },
+          totalReclaimable:
+            totalImageSize + totalVolumeSize + totalBuildCacheSize + totalContainerRw,
+        },
+        fetchedAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      logger.error(`[DockerStats] System info failed: ${err.message}`);
+      throw err;
+    }
+  }
+
+  /**
    * HTTP GET helper for the Docker Engine API via Unix socket.
    * @param {string} path
    * @returns {Promise<string>}
