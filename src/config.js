@@ -165,3 +165,7 @@ export const HEALTH_CHECK_TIMEOUT_MS = 3000;
 
 // Stats cache TTL (ms) — how long to cache aggregated stats before re-fetching
 export const STATS_CACHE_TTL_MS = 30_000;
+
+// ── Google Analytics (GA4 Data API) ───────────────────────────
+export const GOOGLE_ANALYTICS_CREDENTIALS = process.env.GOOGLE_ANALYTICS_CREDENTIALS;
+export const GOOGLE_ANALYTICS_PROPERTIES = process.env.GOOGLE_ANALYTICS_PROPERTIES;
