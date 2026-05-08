@@ -12,6 +12,13 @@ services:
       - .env
     environment:
       - TZ=America/Los_Angeles
+    # GID of the docker.sock owner on the host — grants access
+    # to the mounted socket without running as root.
+    # Synology uses root:root (GID 0). Standard Linux uses the
+    # `docker` group (commonly GID 999 or 998).
+    # Check with: stat -c '%g' /var/run/docker.sock
+    group_add:
+      - "0"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:4001/health"]
       interval: 30s
