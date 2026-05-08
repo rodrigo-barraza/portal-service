@@ -14,6 +14,8 @@
 // ============================================================
 
 import http from "http";
+import { execSync } from "child_process";
+import os from "os";
 import logger from "../utils/logger.js";
 
 const DOCKER_SOCKET = "/var/run/docker.sock";
@@ -326,18 +328,37 @@ export default class DockerStatsService {
         0,
       );
 
+      // ── Host-level disk stats ──────────────────────────────
+      let hostDisk = null;
+      try {
+        const dfOutput = execSync("df -B1 / | tail -1", { encoding: "utf8", timeout: 3000 });
+        const parts = dfOutput.trim().split(/\s+/);
+        // df -B1 columns: Filesystem  1B-blocks  Used  Available  Use%  Mounted
+        if (parts.length >= 5) {
+          const total = parseInt(parts[1], 10) || 0;
+          const used = parseInt(parts[2], 10) || 0;
+          const available = parseInt(parts[3], 10) || 0;
+          const percent = total > 0 ? Math.round((used / total) * 10000) / 100 : 0;
+          hostDisk = { total, used, available, percent };
+        }
+      } catch (dfErr) {
+        logger.warn(`[DockerStats] Host disk stats failed: ${dfErr.message}`);
+      }
+
       return {
         // System overview
         serverVersion: info.ServerVersion,
         os: info.OperatingSystem,
         architecture: info.Architecture,
-        totalMemory: info.MemTotal,
-        cpus: info.NCPU,
+        totalMemory: info.MemTotal || os.totalmem(),
+        cpus: info.NCPU || os.cpus().length,
         containersRunning: info.ContainersRunning,
         containersStopped: info.ContainersStopped,
         containersPaused: info.ContainersPaused,
         containersTotal: info.Containers,
-        // Disk usage breakdown
+        // Host-level disk (entire filesystem)
+        hostDisk,
+        // Docker-specific disk usage breakdown
         disk: {
           images: {
             count: images.length,
