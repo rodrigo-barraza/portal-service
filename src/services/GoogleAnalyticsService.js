@@ -14,7 +14,7 @@ import { BetaAnalyticsDataClient } from "@google-analytics/data";
 import logger from "../utils/logger.js";
 import {
   GOOGLE_ANALYTICS_CREDENTIALS,
-  GOOGLE_ANALYTICS_PROPERTIES,
+  ANALYTICS_PROPERTIES,
 } from "../config.js";
 
 // ── TTL Cache ──────────────────────────────────────────────────
@@ -47,7 +47,6 @@ const REPORT_TTL = 60_000;
 // ── Client Initialization ──────────────────────────────────────
 
 let client = null;
-let properties = [];
 
 function getClient() {
   if (client) return client;
@@ -76,19 +75,7 @@ function getClient() {
 }
 
 function getProperties() {
-  if (properties.length > 0) return properties;
-
-  if (!GOOGLE_ANALYTICS_PROPERTIES) {
-    return [];
-  }
-
-  try {
-    properties = JSON.parse(GOOGLE_ANALYTICS_PROPERTIES);
-    return properties;
-  } catch {
-    logger.error("[GoogleAnalytics] Failed to parse GOOGLE_ANALYTICS_PROPERTIES");
-    return [];
-  }
+  return ANALYTICS_PROPERTIES;
 }
 
 // ── Date Range Helpers ─────────────────────────────────────────

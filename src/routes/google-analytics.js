@@ -3,7 +3,7 @@
 // ============================================================
 // REST endpoints proxying GA4 Data API reports.
 // All routes require a propertyId param matching a configured
-// property in GOOGLE_ANALYTICS_PROPERTIES.
+// property in the service registry (services.json).
 // ============================================================
 
 import { Router } from "express";

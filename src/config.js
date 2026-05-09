@@ -38,6 +38,7 @@ function inferServiceType(id) {
 export let SERVICES = {};
 export let INFRASTRUCTURE = {};
 export let SERVICE_TYPE_COLORS = {};
+export let ANALYTICS_PROPERTIES = [];
 
 /**
  * Build the SERVICES, INFRASTRUCTURE, and DEVICES maps from the Vault registry.
@@ -75,6 +76,18 @@ export function initializeRegistry(registry) {
   }
 
   SERVICES = services;
+
+  // ── Analytics Properties ─────────────────────────────────────
+  // Derive GA4 properties from service entries that declare an
+  // analyticsPropertyId — replaces the old GOOGLE_ANALYTICS_PROPERTIES env var.
+  ANALYTICS_PROPERTIES = (registry.services || [])
+    .filter((svc) => svc.analyticsPropertyId)
+    .map((svc) => ({
+      id: svc.analyticsPropertyId,
+      label: svc.label,
+      measurementId: svc.analyticsMeasurementId || "",
+      serviceId: svc.id,
+    }));
 
   // ── Infrastructure ───────────────────────────────────────────
   const infra = {};
@@ -168,4 +181,4 @@ export const STATS_CACHE_TTL_MS = 30_000;
 
 // ── Google Analytics (GA4 Data API) ───────────────────────────
 export const GOOGLE_ANALYTICS_CREDENTIALS = process.env.GOOGLE_ANALYTICS_CREDENTIALS;
-export const GOOGLE_ANALYTICS_PROPERTIES = process.env.GOOGLE_ANALYTICS_PROPERTIES;
+// Note: ANALYTICS_PROPERTIES is derived from registry entries (see initializeRegistry above)
