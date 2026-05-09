@@ -1,11 +1,11 @@
 // ============================================================
-// API Portal — Storage Route
+// API Portal — Object Store Route
 // ============================================================
-// GET  /storage/buckets                          — list all buckets
-// GET  /storage/buckets/:name                    — list objects in a bucket
-// GET  /storage/buckets/:name/stat/*objectPath    — stat a single object
-// GET  /storage/buckets/:name/download/*objectPath — stream/download an object
-// DELETE /storage/buckets/:name/*objectPath       — delete an object
+// GET  /object-store/buckets                          — list all buckets
+// GET  /object-store/buckets/:name                    — list objects in a bucket
+// GET  /object-store/buckets/:name/stat/*objectPath    — stat a single object
+// GET  /object-store/buckets/:name/download/*objectPath — stream/download an object
+// DELETE /object-store/buckets/:name/*objectPath       — delete an object
 // ============================================================
 
 import { Router } from "express";
@@ -46,7 +46,7 @@ function guessMime(filename) {
 }
 
 /**
- * GET /storage/buckets
+ * GET /object-store/buckets
  * List all MinIO buckets with object counts and total sizes.
  */
 router.get("/buckets", async (_req, res, next) => {
@@ -54,13 +54,13 @@ router.get("/buckets", async (_req, res, next) => {
     const buckets = await MinioService.listBuckets();
     res.json({ buckets });
   } catch (err) {
-    logger.error(`[Storage] listBuckets failed: ${err.message}`);
+    logger.error(`[ObjectStore] listBuckets failed: ${err.message}`);
     next(err);
   }
 });
 
 /**
- * GET /storage/buckets/:name
+ * GET /object-store/buckets/:name
  * List objects in a bucket.
  * Query params:
  *   prefix    — filter by key prefix (default: "")
@@ -74,13 +74,13 @@ router.get("/buckets/:name", async (req, res, next) => {
     const result = await MinioService.listObjects(name, prefix, recursive);
     res.json({ bucket: name, prefix, ...result });
   } catch (err) {
-    logger.error(`[Storage] listObjects failed: ${err.message}`);
+    logger.error(`[ObjectStore] listObjects failed: ${err.message}`);
     next(err);
   }
 });
 
 /**
- * GET /storage/buckets/:name/stat/*objectPath
+ * GET /object-store/buckets/:name/stat/*objectPath
  * Get metadata (size, content-type, etag, lastModified) for a single object.
  */
 router.get("/buckets/:name/stat/*objectPath", async (req, res, next) => {
@@ -106,13 +106,13 @@ router.get("/buckets/:name/stat/*objectPath", async (req, res, next) => {
     if (err.code === "NotFound" || err.message?.includes("Not Found")) {
       return res.status(404).json({ error: "Object not found" });
     }
-    logger.error(`[Storage] statObject failed: ${err.message}`);
+    logger.error(`[ObjectStore] statObject failed: ${err.message}`);
     next(err);
   }
 });
 
 /**
- * GET /storage/buckets/:name/download/*objectPath
+ * GET /object-store/buckets/:name/download/*objectPath
  * Stream an object for download or inline viewing.
  * Query params:
  *   inline — if "true", sets Content-Disposition to inline (default: attachment)
@@ -143,13 +143,13 @@ router.get("/buckets/:name/download/*objectPath", async (req, res, next) => {
     if (err.code === "NotFound" || err.message?.includes("Not Found")) {
       return res.status(404).json({ error: "Object not found" });
     }
-    logger.error(`[Storage] getObject failed: ${err.message}`);
+    logger.error(`[ObjectStore] getObject failed: ${err.message}`);
     next(err);
   }
 });
 
 /**
- * DELETE /storage/buckets/:name/*objectPath
+ * DELETE /object-store/buckets/:name/*objectPath
  * Delete a single object from a bucket.
  */
 router.delete("/buckets/:name/*objectPath", async (req, res, next) => {
@@ -162,10 +162,10 @@ router.delete("/buckets/:name/*objectPath", async (req, res, next) => {
     }
 
     await MinioService.deleteObject(bucketName, objectName);
-    logger.info(`[Storage] Deleted ${bucketName}/${objectName}`);
+    logger.info(`[ObjectStore] Deleted ${bucketName}/${objectName}`);
     res.json({ success: true, bucket: bucketName, object: objectName });
   } catch (err) {
-    logger.error(`[Storage] deleteObject failed: ${err.message}`);
+    logger.error(`[ObjectStore] deleteObject failed: ${err.message}`);
     next(err);
   }
 });
