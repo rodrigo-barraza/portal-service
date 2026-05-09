@@ -139,6 +139,7 @@ export function initializeRegistry(registry) {
       sshAlias: dev.sshAlias || null,
       dockerBin: dev.dockerBin || null,
       notes: dev.notes || "",
+      specs: dev.specs || null,
     };
   }
 
