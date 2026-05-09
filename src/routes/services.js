@@ -17,7 +17,7 @@ import { Router } from "express";
 import http from "http";
 import ServiceRegistryService from "../services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
-import { SERVICES, SERVICE_TYPE_COLORS } from "../config.js";
+import { PROJECTS, PROJECT_TYPE_COLORS } from "../config.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
@@ -125,7 +125,7 @@ router.get("/", async (req, res, next) => {
     }
 
     const enriched = enrichWithDependencies(services, infrastructure);
-    res.json({ ...enriched, serviceTypeColors: SERVICE_TYPE_COLORS });
+    res.json({ ...enriched, projectTypeColors: PROJECT_TYPE_COLORS });
   } catch (err) {
     next(err);
   }
@@ -142,7 +142,7 @@ router.post("/check", async (_req, res, next) => {
       InfrastructureRegistryService.checkAll(),
     ]);
     const enriched = enrichWithDependencies(services, infrastructure);
-    res.json({ ...enriched, serviceTypeColors: SERVICE_TYPE_COLORS });
+    res.json({ ...enriched, projectTypeColors: PROJECT_TYPE_COLORS });
   } catch (err) {
     next(err);
   }
@@ -155,7 +155,7 @@ router.post("/check", async (_req, res, next) => {
 router.post("/:id/restart", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const svc = SERVICES[id];
+    const svc = PROJECTS[id];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
@@ -201,7 +201,7 @@ router.post("/:id/restart", async (req, res, next) => {
 router.post("/:id/stop", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const svc = SERVICES[id];
+    const svc = PROJECTS[id];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
@@ -246,7 +246,7 @@ router.post("/:id/stop", async (req, res, next) => {
 router.post("/:id/start", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const svc = SERVICES[id];
+    const svc = PROJECTS[id];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });

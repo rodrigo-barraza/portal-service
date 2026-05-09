@@ -18,15 +18,15 @@ export const MINIO_ACCESS_KEY = process.env.MINIO_ACCESS_KEY;
 export const MINIO_SECRET_KEY = process.env.MINIO_SECRET_KEY;
 
 // ── Devices ────────────────────────────────────────────────────
-// Physical machines / hosts that run services.
+// Physical machines / hosts that run projects.
 // Populated from the registry's `devices` section at boot.
 export let DEVICES = {};
 
 /**
- * Infer the portal service type label from the service ID.
- * Services ending in "-client" are "Client", "-bot" are "Bot", otherwise "Service".
+ * Infer the project type label from the project ID.
+ * Projects ending in "-client" are "Client", "-bot" are "Bot", otherwise "Service".
  */
-function inferServiceType(id) {
+function inferProjectType(id) {
   if (id.endsWith("-client")) return "Client";
   if (id.endsWith("-bot")) return "Bot";
   return "Service";
@@ -47,36 +47,36 @@ function normalizeRepoUrl(repo) {
 
 // ── Registry Hydration ─────────────────────────────────────────
 // Populated at boot time by initializeRegistry().
-// Until then, SERVICES and INFRASTRUCTURE are empty objects.
-export let SERVICES = {};
+// Until then, PROJECTS and INFRASTRUCTURE are empty objects.
+export let PROJECTS = {};
 export let INFRASTRUCTURE = {};
-export let SERVICE_TYPE_COLORS = {};
+export let PROJECT_TYPE_COLORS = {};
 export let ANALYTICS_PROPERTIES = [];
 
 /**
- * Build the SERVICES, INFRASTRUCTURE, and DEVICES maps from the Vault registry.
+ * Build the PROJECTS, INFRASTRUCTURE, and DEVICES maps from the Vault registry.
  * Called once from boot.js after the registry is loaded.
  *
- * @param {{ services: object[], infrastructure: object[], devices: object[] }} registry
+ * @param {{ projects: object[], infrastructure: object[], devices: object[] }} registry
  */
 export function initializeRegistry(registry) {
-  if (!registry || !registry.services) {
-    console.warn("⚠️  No registry data — SERVICES and INFRASTRUCTURE will be empty");
+  if (!registry || !registry.projects) {
+    console.warn("⚠️  No registry data — PROJECTS and INFRASTRUCTURE will be empty");
     return;
   }
 
-  // ── Services ─────────────────────────────────────────────────
-  const services = {};
+  // ── Projects ─────────────────────────────────────────────────
+  const projects = {};
 
-  for (const svc of registry.services) {
-    services[svc.id] = {
+  for (const svc of registry.projects) {
+    projects[svc.id] = {
       name: svc.label,
       url: svc.url || "",
       port: svc.port || null,
       healthPath: svc.healthPath || "/",
       environment: "Production",
       visibility: svc.visibility || "internal",
-      serviceType: inferServiceType(svc.id),
+      projectType: inferProjectType(svc.id),
       repo: normalizeRepoUrl(svc.repo),
       device: "synology",
       domain: svc.domain || null,
@@ -89,12 +89,12 @@ export function initializeRegistry(registry) {
     };
   }
 
-  SERVICES = services;
+  PROJECTS = projects;
 
   // ── Analytics Properties ─────────────────────────────────────
-  // Derive GA4 properties from service entries that declare an
+  // Derive GA4 properties from project entries that declare an
   // analyticsPropertyId — replaces the old GOOGLE_ANALYTICS_PROPERTIES env var.
-  ANALYTICS_PROPERTIES = (registry.services || [])
+  ANALYTICS_PROPERTIES = (registry.projects || [])
     .filter((svc) => svc.analyticsPropertyId)
     .map((svc) => ({
       id: svc.analyticsPropertyId,
@@ -110,7 +110,7 @@ export function initializeRegistry(registry) {
     infra[item.id] = {
       name: item.label,
       type: item.type,
-      serviceType: item.type === "database" ? "Database" : "Store",
+      projectType: item.type === "database" ? "Database" : "Store",
       url: item.url || "",
       port: item.defaultPort || null,
       environment: "Production",
@@ -124,8 +124,8 @@ export function initializeRegistry(registry) {
 
   INFRASTRUCTURE = infra;
 
-  // ── Service Type Colors ─────────────────────────────────────
-  SERVICE_TYPE_COLORS = registry.serviceTypeColors || {};
+  // ── Project Type Colors ─────────────────────────────────────
+  PROJECT_TYPE_COLORS = registry.projectTypeColors || {};
 
   // ── Devices ─────────────────────────────────────────────────
   const devices = {};
@@ -145,26 +145,26 @@ export function initializeRegistry(registry) {
   DEVICES = devices;
 
   console.warn(
-    `📋 Registry → initialized ${Object.keys(services).length} services, ${Object.keys(infra).length} infrastructure, ${Object.keys(devices).length} devices`,
+    `📋 Registry → initialized ${Object.keys(projects).length} projects, ${Object.keys(infra).length} infrastructure, ${Object.keys(devices).length} devices`,
   );
 }
 
 // ── LM Studio Instances ────────────────────────────────────────
 // These are not in the shared registry (they're local inference
-// instances, not deployed services). If their env vars are set,
-// inject them into SERVICES after registry init.
+// instances, not deployed projects). If their env vars are set,
+// inject them into PROJECTS after registry init.
 export function injectLmStudioInstances() {
   const lm1 = process.env.PROVIDER_LM_STUDIO_1_URL;
   const lm2 = process.env.PROVIDER_LM_STUDIO_2_URL;
 
   if (lm1) {
-    SERVICES["lm-studio"] = {
+    PROJECTS["lm-studio"] = {
       name: "LM Studio",
       url: lm1,
       healthPath: "/v1/models",
       environment: "Production",
       visibility: "internal",
-      serviceType: "Service",
+      projectType: "Service",
       device: "workstation",
       domain: null,
       dockerProject: null,
@@ -174,13 +174,13 @@ export function injectLmStudioInstances() {
   }
 
   if (lm2) {
-    SERVICES["lm-studio-2"] = {
+    PROJECTS["lm-studio-2"] = {
       name: "LM Studio 2",
       url: lm2,
       healthPath: "/v1/models",
       environment: "Production",
       visibility: "internal",
-      serviceType: "Service",
+      projectType: "Service",
       device: "workstation2",
       domain: null,
       dockerProject: null,

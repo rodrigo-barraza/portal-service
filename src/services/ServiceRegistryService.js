@@ -6,7 +6,7 @@
 // ============================================================
 
 import os from "os";
-import { SERVICES, DEVICES, HEALTH_CHECK_TIMEOUT_MS } from "../config.js";
+import { PROJECTS, DEVICES, HEALTH_CHECK_TIMEOUT_MS } from "../config.js";
 import logger from "../utils/logger.js";
 
 /**
@@ -127,7 +127,7 @@ export default class ServiceRegistryService {
    * @returns {ServiceStatus[]}
    */
   static list() {
-    return Object.entries(SERVICES).map(([id, svc]) => {
+    return Object.entries(PROJECTS).map(([id, svc]) => {
       const cached = statusCache.get(id);
       return cached || {
         id,
@@ -136,7 +136,7 @@ export default class ServiceRegistryService {
         port: svc.port || null,
         environment: svc.environment,
         visibility: svc.visibility,
-        serviceType: svc.serviceType || null,
+        projectType: svc.projectType || null,
         repo: svc.repo || null,
         device: deriveHost(svc.url, svc),
         domain: svc.domain || null,
@@ -159,7 +159,7 @@ export default class ServiceRegistryService {
    */
   static async checkAll() {
     const results = await Promise.all(
-      Object.entries(SERVICES).map(([id, svc]) =>
+      Object.entries(PROJECTS).map(([id, svc]) =>
         ServiceRegistryService._checkService(id, svc),
       ),
     );
@@ -198,7 +198,7 @@ export default class ServiceRegistryService {
         port: svc.port || null,
         environment: svc.environment,
         visibility: svc.visibility,
-        serviceType: svc.serviceType || null,
+        projectType: svc.projectType || null,
         repo: svc.repo || null,
         device: deriveHost(svc.url, svc),
         domain: svc.domain || null,
@@ -279,7 +279,7 @@ export default class ServiceRegistryService {
         port: svc.port || null,
         environment: svc.environment,
         visibility: svc.visibility,
-        serviceType: svc.serviceType || null,
+        projectType: svc.projectType || null,
         repo: svc.repo || null,
         device: deriveHost(svc.url, svc),
         domain: svc.domain || null,
@@ -303,7 +303,7 @@ export default class ServiceRegistryService {
         port: svc.port || null,
         environment: svc.environment,
         visibility: svc.visibility,
-        serviceType: svc.serviceType || null,
+        projectType: svc.projectType || null,
         repo: svc.repo || null,
         device: deriveHost(svc.url, svc),
         domain: svc.domain || null,

@@ -13,7 +13,7 @@
 
 import { Router } from "express";
 import http from "http";
-import { SERVICES, DEVICES } from "../config.js";
+import { PROJECTS, DEVICES } from "../config.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
@@ -25,7 +25,7 @@ const DOCKER_SOCKET = "/var/run/docker.sock";
  * Returns a list of services that support log streaming.
  */
 router.get("/", (_req, res) => {
-  const loggable = Object.entries(SERVICES)
+  const loggable = Object.entries(PROJECTS)
     .filter(([, svc]) => svc.dockerProject)
     .map(([id, svc]) => ({
       id,
@@ -47,7 +47,7 @@ router.get("/", (_req, res) => {
  */
 router.get("/:id", (req, res) => {
   const { id } = req.params;
-  const svc = SERVICES[id];
+  const svc = PROJECTS[id];
 
   if (!svc) {
     return res.status(404).json({ error: `Unknown service: ${id}` });

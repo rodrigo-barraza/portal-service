@@ -5,7 +5,7 @@
 // ============================================================
 
 import { Router } from "express";
-import { DEVICES, SERVICES, INFRASTRUCTURE } from "../config.js";
+import { DEVICES, PROJECTS, INFRASTRUCTURE } from "../config.js";
 import ServiceRegistryService from "../services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
 
@@ -29,7 +29,7 @@ router.get("/", (_req, res) => {
   // Group services and infrastructure by device
   const devices = Object.entries(DEVICES).map(([deviceId, device]) => {
     // Application services on this device
-    const hostedServices = Object.entries(SERVICES)
+    const hostedServices = Object.entries(PROJECTS)
       .filter(([, svc]) => svc.device === deviceId)
       .map(([svcId, svc]) => {
         const status = statusMap.get(svcId);
@@ -40,6 +40,7 @@ router.get("/", (_req, res) => {
           port: extractPort(svc.url),
           environment: svc.environment,
           visibility: svc.visibility,
+          dockerProject: svc.dockerProject || null,
           healthy: status?.healthy ?? false,
           responseTimeMs: status?.responseTimeMs ?? null,
           error: status?.error ?? null,
@@ -56,7 +57,7 @@ router.get("/", (_req, res) => {
           id: infraId,
           name: infra.name,
           type: infra.type,
-          serviceType: infra.serviceType || null,
+          projectType: infra.projectType || null,
           url: infra.url,
           port: infra.port,
           environment: infra.environment,

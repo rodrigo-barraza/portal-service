@@ -5,7 +5,7 @@
 // Acts as a caching proxy to avoid hammering upstream services.
 // ============================================================
 
-import { SERVICES, STATS_CACHE_TTL_MS } from "../config.js";
+import { PROJECTS, STATS_CACHE_TTL_MS } from "../config.js";
 import logger from "../utils/logger.js";
 
 /**
@@ -28,7 +28,7 @@ export default class StatsAggregatorService {
       return cached.data;
     }
 
-    const prismUrl = SERVICES.prism.url;
+    const prismUrl = PROJECTS.prism.url;
     if (!prismUrl) return { error: "Prism URL not configured" };
 
     try {
@@ -66,7 +66,7 @@ export default class StatsAggregatorService {
       return cached.data;
     }
 
-    const prismUrl = SERVICES.prism.url;
+    const prismUrl = PROJECTS.prism.url;
     if (!prismUrl) return { error: "Prism URL not configured" };
 
     try {
@@ -97,7 +97,7 @@ export default class StatsAggregatorService {
       return cached.data;
     }
 
-    const prismUrl = SERVICES.prism.url;
+    const prismUrl = PROJECTS.prism.url;
     if (!prismUrl) return { error: "Prism URL not configured" };
 
     try {

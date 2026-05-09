@@ -2,7 +2,7 @@
 // API — Boot Sequence
 // ============================================================
 // Bootstraps secrets from Vault (or .env fallback) into
-// process.env, then fetches the service registry and
+// process.env, then fetches the project registry and
 // initializes the config module before any routes load.
 // ============================================================
 
@@ -34,7 +34,7 @@ for (let attempt = 1; attempt <= REGISTRY_RETRIES; attempt++) {
   vault.clearRegistryCache();
   registry = await vault.fetchRegistry();
 
-  if (registry.services?.length > 0) break;
+  if (registry.projects?.length > 0) break;
 
   if (attempt < REGISTRY_RETRIES) {
     console.warn(`⏳ Registry empty (attempt ${attempt}/${REGISTRY_RETRIES}) — retrying in ${REGISTRY_RETRY_DELAY_MS}ms…`);

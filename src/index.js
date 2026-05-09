@@ -12,7 +12,7 @@ import { errorHandler } from "./utils/errors.js";
 import logger from "./utils/logger.js";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.js";
 import MongoWrapper from "./wrappers/MongoWrapper.js";
-import { PORT, MONGO_URI, MONGO_DB_NAME, SERVICES } from "./config.js";
+import { PORT, MONGO_URI, MONGO_DB_NAME, PROJECTS } from "./config.js";
 import { COLLECTIONS } from "./constants.js";
 import ServiceRegistryService from "./services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "./services/InfrastructureRegistryService.js";
@@ -113,9 +113,9 @@ app.use(errorHandler);
   // If the registry was empty at boot (vault wasn't ready), keep
   // retrying in the background until we get services populated.
   // LM Studio entries may exist from env vars, so check for registry-sourced services.
-  const registryServiceCount = Object.keys(SERVICES).filter((id) => !id.startsWith("lm-studio")).length;
-  if (registryServiceCount === 0) {
-    logger.warn("[Registry] No registry services from boot — scheduling deferred recovery");
+  const registryProjectCount = Object.keys(PROJECTS).filter((id) => !id.startsWith("lm-studio")).length;
+  if (registryProjectCount === 0) {
+    logger.warn("[Registry] No registry projects from boot — scheduling deferred recovery");
 
     const DEFERRED_INTERVAL_MS = 10_000;
     const MAX_DEFERRED_ATTEMPTS = 30; // give up after 5 minutes
@@ -129,7 +129,7 @@ app.use(errorHandler);
         vault.clearRegistryCache();
         const registry = await vault.fetchRegistry();
 
-        if (registry.services?.length > 0) {
+        if (registry.projects?.length > 0) {
           const { initializeRegistry, injectLmStudioInstances } = await import("./config.js");
           initializeRegistry(registry);
           injectLmStudioInstances();
