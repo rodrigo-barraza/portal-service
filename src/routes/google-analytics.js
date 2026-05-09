@@ -126,4 +126,74 @@ router.get("/:propertyId/timeseries", validateProperty, async (req, res, next) =
   }
 });
 
+// ── GET /google-analytics/:propertyId/channels ────────────────
+
+router.get("/:propertyId/channels", validateProperty, async (req, res, next) => {
+  try {
+    const data = await GoogleAnalyticsService.getChannelGrouping(
+      req.params.propertyId,
+      req.query.period,
+    );
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /google-analytics/:propertyId/landing-pages ───────────
+
+router.get("/:propertyId/landing-pages", validateProperty, async (req, res, next) => {
+  try {
+    const data = await GoogleAnalyticsService.getLandingPages(
+      req.params.propertyId,
+      req.query.period,
+    );
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /google-analytics/:propertyId/heatmap ─────────────────
+
+router.get("/:propertyId/heatmap", validateProperty, async (req, res, next) => {
+  try {
+    const data = await GoogleAnalyticsService.getHourlyHeatmap(
+      req.params.propertyId,
+      req.query.period,
+    );
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /google-analytics/:propertyId/new-vs-returning ────────
+
+router.get("/:propertyId/new-vs-returning", validateProperty, async (req, res, next) => {
+  try {
+    const data = await GoogleAnalyticsService.getNewVsReturning(
+      req.params.propertyId,
+      req.query.period,
+    );
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /google-analytics/:propertyId/events ──────────────────
+
+router.get("/:propertyId/events", validateProperty, async (req, res, next) => {
+  try {
+    const data = await GoogleAnalyticsService.getTopEvents(
+      req.params.propertyId,
+      req.query.period,
+    );
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

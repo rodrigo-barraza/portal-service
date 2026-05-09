@@ -105,6 +105,18 @@ function periodToDateRange(period = "30d") {
   };
 }
 
+/**
+ * Compute the previous-period date range of equal length for comparison.
+ * e.g. "7d" → current is 7daysAgo..today, previous is 14daysAgo..8daysAgo
+ */
+function previousPeriodRange(period = "30d") {
+  const days = parseInt(period) || 30;
+  return {
+    startDate: `${days * 2}daysAgo`,
+    endDate: `${days + 1}daysAgo`,
+  };
+}
+
 // ── Report Helpers ─────────────────────────────────────────────
 
 function formatRows(response, dimensionNames, metricNames) {
@@ -170,35 +182,57 @@ export default class GoogleAnalyticsService {
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = getClient();
 
+      const metricNames = [
+        "sessions", "screenPageViews", "activeUsers", "totalUsers",
+        "newUsers", "bounceRate", "averageSessionDuration",
+        "engagedSessions", "engagementRate",
+      ];
+
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
-        metrics: [
-          { name: "sessions" },
-          { name: "screenPageViews" },
-          { name: "activeUsers" },
-          { name: "totalUsers" },
-          { name: "newUsers" },
-          { name: "bounceRate" },
-          { name: "averageSessionDuration" },
-          { name: "engagedSessions" },
-          { name: "engagementRate" },
+        dateRanges: [
+          periodToDateRange(period),
+          previousPeriodRange(period),
         ],
+        metrics: metricNames.map((name) => ({ name })),
       });
 
-      const row = response?.rows?.[0];
-      const metrics = row?.metricValues || [];
+      // With two date ranges, GA4 returns rows tagged by dateRange index.
+      // Row 0 = current period, Row 1 = previous period.
+      const parseRow = (row) => {
+        const m = row?.metricValues || [];
+        return {
+          sessions: parseInt(m[0]?.value || "0", 10),
+          pageviews: parseInt(m[1]?.value || "0", 10),
+          activeUsers: parseInt(m[2]?.value || "0", 10),
+          totalUsers: parseInt(m[3]?.value || "0", 10),
+          newUsers: parseInt(m[4]?.value || "0", 10),
+          bounceRate: parseFloat(m[5]?.value || "0"),
+          avgSessionDuration: parseFloat(m[6]?.value || "0"),
+          engagedSessions: parseInt(m[7]?.value || "0", 10),
+          engagementRate: parseFloat(m[8]?.value || "0"),
+        };
+      };
+
+      const current = parseRow(response?.rows?.[0]);
+      const previous = parseRow(response?.rows?.[1]);
+
+      // Compute deltas as fractional change (e.g. 0.15 = +15%)
+      const delta = (cur, prev) => {
+        if (!prev || prev === 0) return cur > 0 ? 1 : 0;
+        return (cur - prev) / Math.abs(prev);
+      };
 
       return {
-        sessions: parseInt(metrics[0]?.value || "0", 10),
-        pageviews: parseInt(metrics[1]?.value || "0", 10),
-        activeUsers: parseInt(metrics[2]?.value || "0", 10),
-        totalUsers: parseInt(metrics[3]?.value || "0", 10),
-        newUsers: parseInt(metrics[4]?.value || "0", 10),
-        bounceRate: parseFloat(metrics[5]?.value || "0"),
-        avgSessionDuration: parseFloat(metrics[6]?.value || "0"),
-        engagedSessions: parseInt(metrics[7]?.value || "0", 10),
-        engagementRate: parseFloat(metrics[8]?.value || "0"),
+        ...current,
+        previous,
+        deltas: {
+          sessions: delta(current.sessions, previous.sessions),
+          pageviews: delta(current.pageviews, previous.pageviews),
+          totalUsers: delta(current.totalUsers, previous.totalUsers),
+          avgSessionDuration: delta(current.avgSessionDuration, previous.avgSessionDuration),
+          engagementRate: delta(current.engagementRate, previous.engagementRate),
+        },
         period,
         fetchedAt: new Date().toISOString(),
       };
@@ -356,9 +390,40 @@ export default class GoogleAnalyticsService {
         limit: 10,
       });
 
+      // Operating systems
+      const [osResponse] = await analyticsClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [periodToDateRange(period)],
+        dimensions: [{ name: "operatingSystem" }],
+        metrics: [
+          { name: "activeUsers" },
+          { name: "sessions" },
+        ],
+        orderBys: [
+          { metric: { metricName: "sessions" }, desc: true },
+        ],
+        limit: 10,
+      });
+
+      // Screen resolutions
+      const [resResponse] = await analyticsClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [periodToDateRange(period)],
+        dimensions: [{ name: "screenResolution" }],
+        metrics: [
+          { name: "sessions" },
+        ],
+        orderBys: [
+          { metric: { metricName: "sessions" }, desc: true },
+        ],
+        limit: 8,
+      });
+
       return {
         categories: formatRows(catResponse, ["category"], ["users", "sessions"]),
         browsers: formatRows(browserResponse, ["browser"], ["users", "sessions"]),
+        operatingSystems: formatRows(osResponse, ["os"], ["users", "sessions"]),
+        screenResolutions: formatRows(resResponse, ["resolution"], ["sessions"]),
         period,
         fetchedAt: new Date().toISOString(),
       };
@@ -399,6 +464,185 @@ export default class GoogleAnalyticsService {
           ...r,
           date: r.date.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"),
         })),
+        period,
+        fetchedAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  /**
+   * Channel grouping — sessionDefaultChannelGroup breakdown.
+   */
+  static async getChannelGrouping(propertyId, period = "30d") {
+    const key = `channels:${propertyId}:${period}`;
+    return cached(key, REPORT_TTL, async () => {
+      const analyticsClient = getClient();
+
+      const [response] = await analyticsClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [periodToDateRange(period)],
+        dimensions: [{ name: "sessionDefaultChannelGroup" }],
+        metrics: [
+          { name: "sessions" },
+          { name: "totalUsers" },
+          { name: "newUsers" },
+          { name: "engagementRate" },
+        ],
+        orderBys: [
+          { metric: { metricName: "sessions" }, desc: true },
+        ],
+        limit: 12,
+      });
+
+      return {
+        channels: formatRows(
+          response,
+          ["channel"],
+          ["sessions", "totalUsers", "newUsers", "engagementRate"],
+        ),
+        period,
+        fetchedAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  /**
+   * Landing pages — entry-point page performance.
+   */
+  static async getLandingPages(propertyId, period = "30d") {
+    const key = `landing:${propertyId}:${period}`;
+    return cached(key, REPORT_TTL, async () => {
+      const analyticsClient = getClient();
+
+      const [response] = await analyticsClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [periodToDateRange(period)],
+        dimensions: [{ name: "landingPagePlusQueryString" }],
+        metrics: [
+          { name: "sessions" },
+          { name: "totalUsers" },
+          { name: "bounceRate" },
+          { name: "averageSessionDuration" },
+          { name: "engagedSessions" },
+        ],
+        orderBys: [
+          { metric: { metricName: "sessions" }, desc: true },
+        ],
+        limit: 20,
+      });
+
+      return {
+        pages: formatRows(
+          response,
+          ["landingPage"],
+          ["sessions", "users", "bounceRate", "avgDuration", "engagedSessions"],
+        ),
+        period,
+        fetchedAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  /**
+   * Hourly heatmap — dayOfWeekName × hour breakdown for traffic heatmap.
+   */
+  static async getHourlyHeatmap(propertyId, period = "30d") {
+    const key = `heatmap:${propertyId}:${period}`;
+    return cached(key, REPORT_TTL, async () => {
+      const analyticsClient = getClient();
+
+      const [response] = await analyticsClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [periodToDateRange(period)],
+        dimensions: [
+          { name: "dayOfWeekName" },
+          { name: "hour" },
+        ],
+        metrics: [
+          { name: "activeUsers" },
+        ],
+      });
+
+      const rows = formatRows(
+        response,
+        ["day", "hour"],
+        ["users"],
+      );
+
+      // Convert hour from string to int
+      return {
+        cells: rows.map((r) => ({
+          ...r,
+          hour: parseInt(r.hour, 10),
+        })),
+        period,
+        fetchedAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  /**
+   * New vs returning users breakdown.
+   */
+  static async getNewVsReturning(propertyId, period = "30d") {
+    const key = `retention:${propertyId}:${period}`;
+    return cached(key, REPORT_TTL, async () => {
+      const analyticsClient = getClient();
+
+      const [response] = await analyticsClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [periodToDateRange(period)],
+        dimensions: [{ name: "newVsReturning" }],
+        metrics: [
+          { name: "totalUsers" },
+          { name: "sessions" },
+          { name: "engagementRate" },
+        ],
+        orderBys: [
+          { metric: { metricName: "totalUsers" }, desc: true },
+        ],
+      });
+
+      return {
+        segments: formatRows(
+          response,
+          ["segment"],
+          ["users", "sessions", "engagementRate"],
+        ),
+        period,
+        fetchedAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  /**
+   * Top events — GA4 event name breakdown.
+   */
+  static async getTopEvents(propertyId, period = "30d") {
+    const key = `events:${propertyId}:${period}`;
+    return cached(key, REPORT_TTL, async () => {
+      const analyticsClient = getClient();
+
+      const [response] = await analyticsClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [periodToDateRange(period)],
+        dimensions: [{ name: "eventName" }],
+        metrics: [
+          { name: "eventCount" },
+          { name: "totalUsers" },
+        ],
+        orderBys: [
+          { metric: { metricName: "eventCount" }, desc: true },
+        ],
+        limit: 15,
+      });
+
+      return {
+        events: formatRows(
+          response,
+          ["eventName"],
+          ["eventCount", "users"],
+        ),
         period,
         fetchedAt: new Date().toISOString(),
       };
