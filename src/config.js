@@ -26,7 +26,8 @@ export let DEVICES = {};
  * Infer the project type label from the project ID.
  * Projects ending in "-client" are "Client", "-bot" are "Bot", otherwise "Service".
  */
-function inferProjectType(id) {
+function inferProjectType(id, svc) {
+  if (!svc.repo && !svc.dockerProject) return "Infrastructure";
   if (id.endsWith("-client")) return "Client";
   if (id.endsWith("-bot")) return "Bot";
   return "Service";
@@ -51,6 +52,7 @@ function normalizeRepoUrl(repo) {
 export let PROJECTS = {};
 export let INFRASTRUCTURE = {};
 export let PROJECT_TYPE_COLORS = {};
+export let DEPLOY_TIER_COLORS = {};
 export let ANALYTICS_PROPERTIES = [];
 
 /**
@@ -76,9 +78,9 @@ export function initializeRegistry(registry) {
       healthPath: svc.healthPath || "/",
       environment: "Production",
       visibility: svc.visibility || "internal",
-      projectType: inferProjectType(svc.id),
+      projectType: inferProjectType(svc.id, svc),
       repo: normalizeRepoUrl(svc.repo),
-      device: "synology",
+      device: svc.device || "synology",
       domain: svc.domain || null,
       dockerProject: svc.dockerProject || null,
       deployTier: svc.deployTier ?? null,
@@ -127,6 +129,9 @@ export function initializeRegistry(registry) {
   // ── Project Type Colors ─────────────────────────────────────
   PROJECT_TYPE_COLORS = registry.projectTypeColors || {};
 
+  // ── Deploy Tier Colors ──────────────────────────────────────
+  DEPLOY_TIER_COLORS = registry.deployTierColors || {};
+
   // ── Devices ─────────────────────────────────────────────────
   const devices = {};
 
@@ -148,47 +153,6 @@ export function initializeRegistry(registry) {
   console.warn(
     `📋 Registry → initialized ${Object.keys(projects).length} projects, ${Object.keys(infra).length} infrastructure, ${Object.keys(devices).length} devices`,
   );
-}
-
-// ── LM Studio Instances ────────────────────────────────────────
-// These are not in the shared registry (they're local inference
-// instances, not deployed projects). If their env vars are set,
-// inject them into PROJECTS after registry init.
-export function injectLmStudioInstances() {
-  const lm1 = process.env.PROVIDER_LM_STUDIO_1_URL;
-  const lm2 = process.env.PROVIDER_LM_STUDIO_2_URL;
-
-  if (lm1) {
-    PROJECTS["lm-studio"] = {
-      name: "LM Studio",
-      url: lm1,
-      healthPath: "/v1/models",
-      environment: "Production",
-      visibility: "internal",
-      projectType: "Service",
-      device: "workstation",
-      domain: null,
-      dockerProject: null,
-      deployTier: 0,
-      dependsOn: [],
-    };
-  }
-
-  if (lm2) {
-    PROJECTS["lm-studio-2"] = {
-      name: "LM Studio 2",
-      url: lm2,
-      healthPath: "/v1/models",
-      environment: "Production",
-      visibility: "internal",
-      projectType: "Service",
-      device: "workstation2",
-      domain: null,
-      dockerProject: null,
-      deployTier: 0,
-      dependsOn: [],
-    };
-  }
 }
 
 // Health check timeout (ms) — how long to wait before marking a service as down

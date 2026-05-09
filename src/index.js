@@ -112,8 +112,7 @@ app.use(errorHandler);
   // ── Deferred Registry Recovery ─────────────────────────────────
   // If the registry was empty at boot (vault wasn't ready), keep
   // retrying in the background until we get services populated.
-  // LM Studio entries may exist from env vars, so check for registry-sourced services.
-  const registryProjectCount = Object.keys(PROJECTS).filter((id) => !id.startsWith("lm-studio")).length;
+  const registryProjectCount = Object.keys(PROJECTS).length;
   if (registryProjectCount === 0) {
     logger.warn("[Registry] No registry projects from boot — scheduling deferred recovery");
 
@@ -130,9 +129,8 @@ app.use(errorHandler);
         const registry = await vault.fetchRegistry();
 
         if (registry.projects?.length > 0) {
-          const { initializeRegistry, injectLmStudioInstances } = await import("./config.js");
+          const { initializeRegistry } = await import("./config.js");
           initializeRegistry(registry);
-          injectLmStudioInstances();
 
           // Run initial health checks now that we have services
           ServiceRegistryService.checkAll().catch(() => {});

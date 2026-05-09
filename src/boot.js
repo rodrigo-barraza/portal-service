@@ -42,9 +42,8 @@ for (let attempt = 1; attempt <= REGISTRY_RETRIES; attempt++) {
   }
 }
 
-const { initializeRegistry, injectLmStudioInstances } = await import("./config.js");
+const { initializeRegistry } = await import("./config.js");
 initializeRegistry(registry);
-injectLmStudioInstances();
 
 // Export vault client so index.js can schedule a deferred re-fetch
 // if the registry was empty at boot time.
