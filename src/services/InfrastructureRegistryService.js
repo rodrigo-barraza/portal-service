@@ -92,6 +92,7 @@ export default class InfrastructureRegistryService {
         domain: infra.domain || null,
         device: deriveHost(infra.url, infra),
         dependsOn: infra.dependsOn || [],
+        deployTier: infra.deployTier ?? 0,
         healthy: false,
         responseTimeMs: null,
         metadata: null,
@@ -138,6 +139,7 @@ export default class InfrastructureRegistryService {
       domain: infra.domain || null,
       device: deriveHost(infra.url, infra),
       dependsOn: infra.dependsOn || [],
+      deployTier: infra.deployTier ?? 0,
       isInfrastructure: true,
     };
 

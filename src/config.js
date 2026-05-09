@@ -81,6 +81,7 @@ export function initializeRegistry(registry) {
       device: "synology",
       domain: svc.domain || null,
       dockerProject: svc.dockerProject || null,
+      deployTier: svc.deployTier ?? null,
       dependsOn: (svc.dependsOn || []).map((dep) => ({
         id: dep.id,
         criticality: dep.criticality || "required",
@@ -116,6 +117,7 @@ export function initializeRegistry(registry) {
       visibility: "internal",
       device: "synology",
       domain: item.domain || null,
+      deployTier: item.deployTier ?? 0,
       dependsOn: [],
     };
   }
@@ -166,6 +168,7 @@ export function injectLmStudioInstances() {
       device: "workstation",
       domain: null,
       dockerProject: null,
+      deployTier: 0,
       dependsOn: [],
     };
   }
@@ -181,6 +184,7 @@ export function injectLmStudioInstances() {
       device: "workstation2",
       domain: null,
       dockerProject: null,
+      deployTier: 0,
       dependsOn: [],
     };
   }

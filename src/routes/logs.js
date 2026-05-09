@@ -33,6 +33,7 @@ router.get("/", (_req, res) => {
       dockerProject: svc.dockerProject,
       device: svc.device,
       deviceName: DEVICES[svc.device]?.name || svc.device,
+      deployTier: svc.deployTier ?? null,
     }));
 
   res.json({ services: loggable });
