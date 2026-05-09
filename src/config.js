@@ -32,6 +32,19 @@ function inferServiceType(id) {
   return "Service";
 }
 
+/**
+ * Normalize a GitHub repository URL to HTTPS format.
+ * Converts SSH URLs (git@github.com:owner/repo.git) to HTTPS.
+ * @param {string|null} repo
+ * @returns {string|null}
+ */
+function normalizeRepoUrl(repo) {
+  if (!repo) return null;
+  const sshMatch = repo.match(/^git@github\.com:(.+?)(?:\.git)?$/);
+  if (sshMatch) return `https://github.com/${sshMatch[1]}`;
+  return repo;
+}
+
 // ── Registry Hydration ─────────────────────────────────────────
 // Populated at boot time by initializeRegistry().
 // Until then, SERVICES and INFRASTRUCTURE are empty objects.
@@ -64,7 +77,7 @@ export function initializeRegistry(registry) {
       environment: "Production",
       visibility: svc.visibility || "internal",
       serviceType: inferServiceType(svc.id),
-      repo: svc.repo || null,
+      repo: normalizeRepoUrl(svc.repo),
       device: "synology",
       domain: svc.domain || null,
       dockerProject: svc.dockerProject || null,
