@@ -152,6 +152,8 @@ export default class InfrastructureRegistryService {
         metadata = await InfrastructureRegistryService._checkMongo();
       } else if (infra.type === "object-store") {
         metadata = await InfrastructureRegistryService._checkMinio();
+      } else if (infra.type === "inference") {
+        metadata = await InfrastructureRegistryService._checkHttp(infra);
       }
 
       return {
@@ -252,5 +254,34 @@ export default class InfrastructureRegistryService {
       buckets: buckets.length,
       bucketNames: buckets.map((b) => b.name),
     };
+  }
+
+  /**
+   * Generic HTTP health check — hits url + healthPath.
+   * Used for inference servers (LM Studio) and any future HTTP-based infra.
+   * @param {object} infra
+   * @returns {Promise<object>}
+   */
+  static async _checkHttp(infra) {
+    const baseUrl = infra.url;
+    const healthPath = infra.healthPath || "/";
+    if (!baseUrl) throw new Error("No URL configured");
+
+    const url = `${baseUrl.replace(/\/+$/, "")}${healthPath}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
+
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      try {
+        return await res.json();
+      } catch {
+        return { status: "ok" };
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }

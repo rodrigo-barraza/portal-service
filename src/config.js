@@ -108,16 +108,19 @@ export function initializeRegistry(registry) {
   // ── Infrastructure ───────────────────────────────────────────
   const infra = {};
 
+  const infraTypeLabels = { database: "Database", "object-store": "Store", inference: "Inference" };
+
   for (const item of registry.infrastructure || []) {
     infra[item.id] = {
       name: item.label,
       type: item.type,
-      projectType: item.type === "database" ? "Database" : "Store",
+      projectType: infraTypeLabels[item.type] || "Infrastructure",
       url: item.url || "",
       port: item.defaultPort || null,
+      healthPath: item.healthPath || null,
       environment: "Production",
       visibility: "internal",
-      device: "synology",
+      device: item.device || "synology",
       domain: item.domain || null,
       deployTier: item.deployTier ?? 0,
       dependsOn: [],
