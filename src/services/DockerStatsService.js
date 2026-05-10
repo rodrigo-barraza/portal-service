@@ -19,8 +19,10 @@ import os from "os";
 import logger from "../utils/logger.js";
 
 const DOCKER_SOCKET = "/var/run/docker.sock";
-const STATS_CACHE_TTL_MS = 10_000; // 10s cache
+const STATS_CACHE_TTL_MS = 10_000;  // 10s cache for container stats
+const SYSTEM_CACHE_TTL_MS = 60_000; // 60s cache for system info (/system/df is expensive)
 const REQUEST_TIMEOUT_MS = 8_000;
+const SYSTEM_REQUEST_TIMEOUT_MS = 30_000; // /system/df traverses every layer
 
 // ── Ring Buffer Config ───────────────────────────────────────────
 const HISTORY_INTERVAL_MS = 5_000;      // sample every 5 seconds
@@ -28,6 +30,9 @@ const HISTORY_MAX_SAMPLES = 60;         // retain 5 minutes (60 × 5s)
 
 /** @type {{ data: any, fetchedAt: number } | null} */
 let cachedStats = null;
+
+/** @type {{ data: any, fetchedAt: number } | null} */
+let cachedSystemInfo = null;
 
 /**
  * Ring buffer of snapshots.
@@ -83,6 +88,7 @@ export default class DockerStatsService {
    */
   static invalidate() {
     cachedStats = null;
+    cachedSystemInfo = null;
   }
 
   /**
@@ -275,10 +281,15 @@ export default class DockerStatsService {
    * @returns {Promise<object>}
    */
   static async getSystemInfo() {
+    // Return cached data if within TTL
+    if (cachedSystemInfo && Date.now() - cachedSystemInfo.fetchedAt < SYSTEM_CACHE_TTL_MS) {
+      return cachedSystemInfo.data;
+    }
+
     try {
       const [infoBody, dfBody] = await Promise.all([
-        DockerStatsService._dockerGet("/info"),
-        DockerStatsService._dockerGet("/system/df"),
+        DockerStatsService._dockerGet("/info", SYSTEM_REQUEST_TIMEOUT_MS),
+        DockerStatsService._dockerGet("/system/df", SYSTEM_REQUEST_TIMEOUT_MS),
       ]);
 
       const info = JSON.parse(infoBody);
@@ -345,7 +356,7 @@ export default class DockerStatsService {
         logger.warn(`[DockerStats] Host disk stats failed: ${dfErr.message}`);
       }
 
-      return {
+      const result = {
         // System overview
         serverVersion: info.ServerVersion,
         os: info.OperatingSystem,
@@ -384,8 +395,13 @@ export default class DockerStatsService {
         },
         fetchedAt: new Date().toISOString(),
       };
+
+      cachedSystemInfo = { data: result, fetchedAt: Date.now() };
+      return result;
     } catch (err) {
       logger.error(`[DockerStats] System info failed: ${err.message}`);
+      // Return stale cache if available
+      if (cachedSystemInfo) return cachedSystemInfo.data;
       throw err;
     }
   }
@@ -395,7 +411,7 @@ export default class DockerStatsService {
    * @param {string} path
    * @returns {Promise<string>}
    */
-  static _dockerGet(path) {
+  static _dockerGet(path, timeoutMs = REQUEST_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
       const req = http.request(
         {
@@ -421,8 +437,8 @@ export default class DockerStatsService {
         },
       );
 
-      req.setTimeout(REQUEST_TIMEOUT_MS, () => {
-        req.destroy(new Error("Docker API timeout"));
+      req.setTimeout(timeoutMs, () => {
+        req.destroy(new Error(`Docker API timeout after ${timeoutMs}ms`));
       });
 
       req.on("error", reject);
