@@ -1,10 +1,4 @@
-// ============================================================
-// Portal Service — MinIO Storage Service
-// ============================================================
-// Provides bucket listing, object listing, object stat, and
-// object streaming via the MinIO S3-compatible SDK.
-// Uses a lazily-initialized singleton MinIO client.
-// ============================================================
+// ─── MinIO Storage Service ──────────────────────────────────
 
 import { Client } from "minio";
 import {

@@ -1,12 +1,4 @@
-// ============================================================
-// API Portal — Object Store Route
-// ============================================================
-// GET  /object-store/buckets                          — list all buckets
-// GET  /object-store/buckets/:name                    — list objects in a bucket
-// GET  /object-store/buckets/:name/stat/*objectPath    — stat a single object
-// GET  /object-store/buckets/:name/download/*objectPath — stream/download an object
-// DELETE /object-store/buckets/:name/*objectPath       — delete an object
-// ============================================================
+// ─── Object Store Route ─────────────────────────────────────
 
 import { Router } from "express";
 import MinioService from "../services/MinioService.js";

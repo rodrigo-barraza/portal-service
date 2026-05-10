@@ -1,9 +1,4 @@
-// ============================================================
-// API — Entry Point
-// ============================================================
-// Express 5 BFF aggregator for the developer portal.
-// Federates data from Prism, Tools API, Sessions, and other services.
-// ============================================================
+// ─── Entry Point ────────────────────────────────────────────
 
 import express from "express";
 import cors from "cors";

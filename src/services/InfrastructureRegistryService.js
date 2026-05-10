@@ -1,9 +1,4 @@
-// ============================================================
-// API — Infrastructure Registry Service
-// ============================================================
-// Protocol-level health checks for non-HTTP backing services
-// (MongoDB, MinIO). Cached in-memory and polled periodically.
-// ============================================================
+// ─── Infrastructure Registry Service ────────────────────────
 
 import { MongoClient } from "mongodb";
 import { Client as MinioClient } from "minio";

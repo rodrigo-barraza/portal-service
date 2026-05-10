@@ -1,14 +1,4 @@
-// ============================================================
-// Google Analytics Service
-// ============================================================
-// Server-side wrapper around the GA4 Data API v1.
-// Uses a service account (base64-encoded JSON key in env) so
-// no OAuth flow is needed — pure server-to-server auth.
-//
-// TTL cache prevents hammering the API (default quotas are
-// generous but finite). Realtime refreshes every 15s,
-// standard reports every 60s.
-// ============================================================
+// ─── Google Analytics Service ───────────────────────────────
 
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
 import logger from "../utils/logger.js";

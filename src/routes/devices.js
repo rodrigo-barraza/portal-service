@@ -1,8 +1,4 @@
-// ============================================================
-// API Portal — Devices Route
-// ============================================================
-// GET /devices — returns device topology with service mapping.
-// ============================================================
+// ─── Devices Route ──────────────────────────────────────────
 
 import { Router } from "express";
 import { DEVICES, PROJECTS, INFRASTRUCTURE } from "../config.js";

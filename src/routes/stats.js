@@ -1,8 +1,4 @@
-// ============================================================
-// API Portal — Stats Route
-// ============================================================
-// GET /stats — aggregated usage stats from Prism admin API.
-// ============================================================
+// ─── Stats Route ────────────────────────────────────────────
 
 import { Router } from "express";
 import StatsAggregatorService from "../services/StatsAggregatorService.js";
@@ -54,11 +50,14 @@ router.get("/projects", async (_req, res, next) => {
 
 /**
  * GET /stats/containers
- * Returns per-container resource usage from the Docker Engine API.
+ * Returns per-container resource usage from Docker Engine APIs.
+ * Each container includes a `device` field identifying its host.
+ * ?device=synology — filter to a single Docker host.
  */
-router.get("/containers", async (_req, res, next) => {
+router.get("/containers", async (req, res, next) => {
   try {
-    const data = await DockerStatsService.getAll();
+    const deviceId = req.query.device || undefined;
+    const data = await DockerStatsService.getAll(deviceId);
     res.json({ containers: data, fetchedAt: new Date().toISOString() });
   } catch (err) {
     next(err);
@@ -67,11 +66,16 @@ router.get("/containers", async (_req, res, next) => {
 
 /**
  * GET /stats/containers/history
- * Returns time-series ring buffer of container stats (last 5 minutes, 5s intervals).
+ * Returns time-series ring buffer of container stats.
+ * Returns per-device history keyed by device ID.
+ * ?device=synology — filter to a single Docker host.
  */
-router.get("/containers/history", (_req, res) => {
-  const history = DockerStatsService.getHistory();
-  res.json({ history, samples: history.length });
+router.get("/containers/history", (req, res) => {
+  const deviceId = req.query.device || undefined;
+  const history = DockerStatsService.getHistory(deviceId);
+  // Compute total sample count across all devices
+  const samples = Object.values(history).reduce((sum, buf) => sum + buf.length, 0);
+  res.json({ history, samples });
 });
 
 /**
@@ -87,10 +91,13 @@ router.post("/invalidate", (_req, res) => {
 /**
  * GET /stats/system
  * Returns Docker host system info and disk usage breakdown.
+ * Without ?device=, returns info for all Docker hosts.
+ * ?device=synology — filter to a single Docker host.
  */
-router.get("/system", async (_req, res, next) => {
+router.get("/system", async (req, res, next) => {
   try {
-    const data = await DockerStatsService.getSystemInfo();
+    const deviceId = req.query.device || undefined;
+    const data = await DockerStatsService.getSystemInfo(deviceId);
     res.json(data);
   } catch (err) {
     next(err);

@@ -1,8 +1,4 @@
-// ============================================================
-// API — MongoDB Connection Wrapper
-// ============================================================
-// Same pattern as Prism and Sessions.
-// ============================================================
+// ─── MongoDB Connection Wrapper ─────────────────────────────
 
 import { MongoClient } from "mongodb";
 import logger from "../utils/logger.js";

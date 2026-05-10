@@ -1,15 +1,4 @@
-// ============================================================
-// API — Logs Route
-// ============================================================
-// GET /logs             — List services that support log streaming.
-// GET /logs/:id         — Stream container logs via SSE.
-//                         Query params:
-//                           tail=<n>   — number of historical lines (default 200)
-//                           follow=1   — keep connection open for live tailing
-//
-// Uses Docker Engine API over Unix socket for services on the
-// same device, SSH for remote devices.
-// ============================================================
+// ─── Logs Route ─────────────────────────────────────────────
 
 import { Router } from "express";
 import http from "http";

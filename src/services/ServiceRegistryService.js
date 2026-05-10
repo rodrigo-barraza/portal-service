@@ -1,9 +1,4 @@
-// ============================================================
-// API — Service Registry Service
-// ============================================================
-// Polls health endpoints for all services from the Vault
-// registry and tracks status in an in-memory cache.
-// ============================================================
+// ─── Service Registry Service ───────────────────────────────
 
 import os from "os";
 import { PROJECTS, DEVICES, HEALTH_CHECK_TIMEOUT_MS } from "../config.js";

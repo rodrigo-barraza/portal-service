@@ -1,8 +1,4 @@
-// ============================================================
-// API — Request Logger Middleware
-// ============================================================
-// Logs each incoming request with timing metadata.
-// ============================================================
+// ─── Request Logger Middleware ──────────────────────────────
 
 import logger from "../utils/logger.js";
 

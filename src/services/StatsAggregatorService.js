@@ -1,9 +1,4 @@
-// ============================================================
-// API — Stats Aggregator Service
-// ============================================================
-// Fetches and caches aggregate statistics from Prism's admin API.
-// Acts as a caching proxy to avoid hammering upstream services.
-// ============================================================
+// ─── Stats Aggregator Service ───────────────────────────────
 
 import { PROJECTS, STATS_CACHE_TTL_MS } from "../config.js";
 import logger from "../utils/logger.js";

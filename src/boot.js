@@ -1,10 +1,4 @@
-// ============================================================
-// API — Boot Sequence
-// ============================================================
-// Bootstraps secrets from Vault (or .env fallback) into
-// process.env, then fetches the project registry and
-// initializes the config module before any routes load.
-// ============================================================
+// ─── Boot Sequence ──────────────────────────────────────────
 
 import { createVaultClient } from "@rodrigo-barraza/utilities-library/vault";
 

@@ -1,60 +1,29 @@
-// ============================================================
-// API Portal — Services Route
-// ============================================================
-// GET  /services              — returns health status for all services
-//                               and infrastructure backing stores.
-// POST /services/check        — trigger a fresh health check.
-// POST /services/:id/restart  — restart a containerized service.
-// POST /services/:id/stop     — stop a containerized service.
-// POST /services/:id/start    — start a containerized service.
-// Enriches each item with resolved dependency graph edges.
-//
-// Uses Docker Engine API over Unix socket (mounted from the host)
-// for container lifecycle operations.
-// ============================================================
+// ─── Services Route ─────────────────────────────────────────
 
 import { Router } from "express";
-import http from "http";
 import ServiceRegistryService from "../services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
-import { PROJECTS, PROJECT_TYPE_COLORS, DEPLOY_TIER_COLORS } from "../config.js";
+import DockerStatsService from "../services/DockerStatsService.js";
+import { PROJECTS, DEVICES, PROJECT_TYPE_COLORS, DEPLOY_TIER_COLORS } from "../config.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
 
-const DOCKER_SOCKET = "/var/run/docker.sock";
-
-// ── Docker Engine API helper ─────────────────────────────────
 /**
- * Make a request to the Docker Engine API over the Unix socket.
- * @param {string} method - HTTP method
- * @param {string} path - API path (e.g. /containers/prism-service/restart)
- * @param {{ timeout?: number }} [opts]
- * @returns {Promise<{ statusCode: number, body: string }>}
+ * Resolve the device object for a project's Docker host.
+ * Returns the device entry from the registry that has dockerApi configured.
+ * @param {object} svc - Project entry from PROJECTS
+ * @returns {{ id: string, device: object } | null}
  */
-function dockerRequest(method, path, { timeout = 30_000 } = {}) {
-  return new Promise((resolve, reject) => {
-    const req = http.request(
-      {
-        socketPath: DOCKER_SOCKET,
-        path,
-        method,
-        headers: { "Content-Type": "application/json" },
-      },
-      (res) => {
-        let body = "";
-        res.on("data", (chunk) => (body += chunk));
-        res.on("end", () => resolve({ statusCode: res.statusCode, body }));
-      },
-    );
+function resolveDockerDevice(svc) {
+  const deviceId = svc.device || "synology";
+  const device = DEVICES[deviceId];
 
-    req.setTimeout(timeout, () => {
-      req.destroy(new Error(`Docker API timeout after ${timeout}ms`));
-    });
+  if (!device || !device.dockerApi) {
+    return null;
+  }
 
-    req.on("error", reject);
-    req.end();
-  });
+  return { id: deviceId, device };
 }
 
 /**
@@ -151,6 +120,7 @@ router.post("/check", async (_req, res, next) => {
 /**
  * POST /services/:id/restart
  * Restart a containerized service via Docker Engine API.
+ * Routes to the correct Docker host based on the project's device.
  */
 router.post("/:id/restart", async (req, res, next) => {
   try {
@@ -165,10 +135,17 @@ router.post("/:id/restart", async (req, res, next) => {
       return res.status(400).json({ error: `${svc.name} is not a containerized service` });
     }
 
-    const container = svc.dockerProject;
-    logger.info(`[Restart] ${svc.name} → Docker API /containers/${container}/restart`);
+    const target = resolveDockerDevice(svc);
+    if (!target) {
+      return res.status(400).json({ error: `No Docker API configured for device: ${svc.device}` });
+    }
 
-    const result = await dockerRequest("POST", `/containers/${container}/restart?t=10`);
+    const container = svc.dockerProject;
+    logger.info(`[Restart] ${svc.name} → ${target.id}:/containers/${container}/restart`);
+
+    const result = await DockerStatsService.dockerRequest(
+      target.device, "POST", `/containers/${container}/restart?t=10`,
+    );
 
     if (result.statusCode === 204) {
       logger.success(`[Restart] ${svc.name} restarted successfully`);
@@ -181,6 +158,7 @@ router.post("/:id/restart", async (req, res, next) => {
       res.json({
         success: true,
         service: svc.name,
+        device: target.id,
         message: "Container restarted",
       });
     } else {
@@ -211,10 +189,17 @@ router.post("/:id/stop", async (req, res, next) => {
       return res.status(400).json({ error: `${svc.name} is not a containerized service` });
     }
 
-    const container = svc.dockerProject;
-    logger.info(`[Stop] ${svc.name} → Docker API /containers/${container}/stop`);
+    const target = resolveDockerDevice(svc);
+    if (!target) {
+      return res.status(400).json({ error: `No Docker API configured for device: ${svc.device}` });
+    }
 
-    const result = await dockerRequest("POST", `/containers/${container}/stop?t=10`);
+    const container = svc.dockerProject;
+    logger.info(`[Stop] ${svc.name} → ${target.id}:/containers/${container}/stop`);
+
+    const result = await DockerStatsService.dockerRequest(
+      target.device, "POST", `/containers/${container}/stop?t=10`,
+    );
 
     if (result.statusCode === 204 || result.statusCode === 304) {
       logger.success(`[Stop] ${svc.name} stopped successfully`);
@@ -226,6 +211,7 @@ router.post("/:id/stop", async (req, res, next) => {
       res.json({
         success: true,
         service: svc.name,
+        device: target.id,
         message: result.statusCode === 304 ? "Container already stopped" : "Container stopped",
       });
     } else {
@@ -256,10 +242,17 @@ router.post("/:id/start", async (req, res, next) => {
       return res.status(400).json({ error: `${svc.name} is not a containerized service` });
     }
 
-    const container = svc.dockerProject;
-    logger.info(`[Start] ${svc.name} → Docker API /containers/${container}/start`);
+    const target = resolveDockerDevice(svc);
+    if (!target) {
+      return res.status(400).json({ error: `No Docker API configured for device: ${svc.device}` });
+    }
 
-    const result = await dockerRequest("POST", `/containers/${container}/start`);
+    const container = svc.dockerProject;
+    logger.info(`[Start] ${svc.name} → ${target.id}:/containers/${container}/start`);
+
+    const result = await DockerStatsService.dockerRequest(
+      target.device, "POST", `/containers/${container}/start`,
+    );
 
     if (result.statusCode === 204 || result.statusCode === 304) {
       logger.success(`[Start] ${svc.name} started successfully`);
@@ -271,6 +264,7 @@ router.post("/:id/start", async (req, res, next) => {
       res.json({
         success: true,
         service: svc.name,
+        device: target.id,
         message: result.statusCode === 304 ? "Container already running" : "Container started",
       });
     } else {

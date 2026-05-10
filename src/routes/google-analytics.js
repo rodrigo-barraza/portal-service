@@ -1,10 +1,4 @@
-// ============================================================
-// API — Google Analytics Routes
-// ============================================================
-// REST endpoints proxying GA4 Data API reports.
-// All routes require a propertyId param matching a configured
-// property in the project registry (projects.json).
-// ============================================================
+// ─── Google Analytics Routes ────────────────────────────────
 
 import { Router } from "express";
 import GoogleAnalyticsService from "../services/GoogleAnalyticsService.js";

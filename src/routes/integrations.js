@@ -1,9 +1,4 @@
-// ============================================================
-// API — Integrations Route
-// ============================================================
-// Returns metadata about configured external API integrations.
-// Keys are masked — only the first/last 4 chars are shown.
-// ============================================================
+// ─── Integrations Route ─────────────────────────────────────
 
 import { Router } from "express";
 
@@ -83,7 +78,6 @@ const INTEGRATIONS = [
   { envKey: "BRIGHTDATA_CUSTOMER_ID",provider: "Bright Data",  category: "Proxy",           docs: "https://brightdata.com" },
 ];
 
-
 /**
  * Mask a secret value — shows first 4 + last 4 characters.
  * Returns null if the value is empty or not set.
@@ -93,7 +87,6 @@ function maskValue(value) {
   if (value.length <= 12) return `${"•".repeat(value.length)}`;
   return `${value.slice(0, 4)}${"•".repeat(Math.min(value.length - 8, 20))}${value.slice(-4)}`;
 }
-
 
 /**
  * GET /integrations
