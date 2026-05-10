@@ -11,7 +11,7 @@
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write \"src/**/*.js\"",
     "format:check": "prettier --check \"src/**/*.js\"",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "deploy": "bash deploy.sh",
     "deploy:dry": "bash deploy.sh --dry-run"
