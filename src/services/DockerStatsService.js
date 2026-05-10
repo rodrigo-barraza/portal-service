@@ -5,7 +5,11 @@
 // to collect per-container resource usage: CPU %, memory,
 // network I/O, and block I/O.
 //
-// Uses one-shot stats (stream=false) for each container.
+// Uses one-shot stats (stream=false, one-shot=true) for instant
+// parallel responses. CPU deltas are computed internally by
+// caching the previous raw counters between collection cycles,
+// since one-shot mode returns zeroed precpu_stats.
+//
 // Results are cached with a short TTL to avoid hammering
 // the Docker API on rapid client refreshes.
 //
@@ -33,6 +37,13 @@ let cachedStats = null;
 
 /** @type {{ data: any, fetchedAt: number } | null} */
 let cachedSystemInfo = null;
+
+/**
+ * Previous raw CPU counters keyed by container ID.
+ * Used to compute CPU deltas since one-shot mode returns zeroed precpu_stats.
+ * @type {Map<string, { cpuTotal: number, systemTotal: number }>}
+ */
+const previousCpuCounters = new Map();
 
 /**
  * Ring buffer of snapshots.
@@ -63,6 +74,12 @@ export default class DockerStatsService {
 
       // Filter out nulls (failed stats) and sort by name
       const result = stats.filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+
+      // Prune stale entries from previousCpuCounters for containers that no longer exist
+      const activeIds = new Set(containers.map((c) => c.Id));
+      for (const id of previousCpuCounters.keys()) {
+        if (!activeIds.has(id)) previousCpuCounters.delete(id);
+      }
 
       cachedStats = { data: result, fetchedAt: Date.now() };
       return result;
@@ -170,7 +187,8 @@ export default class DockerStatsService {
 
   /**
    * Get one-shot stats for a single container.
-   * stream=false makes the API return immediately instead of streaming.
+   * one-shot=true returns instantly (no ~1s sampling delay).
+   * CPU deltas are computed from our own cached previous counters.
    * @param {object} container - Container object from /containers/json
    * @returns {Promise<object|null>}
    */
@@ -192,27 +210,37 @@ export default class DockerStatsService {
 
   /**
    * Parse raw Docker stats into a clean, displayable format.
+   * Uses cached previous counters to compute CPU deltas since
+   * one-shot mode returns zeroed precpu_stats.
    * @param {object} container
    * @param {object} raw - Raw stats from Docker API
    * @returns {object}
    */
   static _parseStats(container, raw) {
-    // ── CPU ────────────────────────────────────────────────────
-    const cpuDelta =
-      (raw.cpu_stats?.cpu_usage?.total_usage || 0) -
-      (raw.precpu_stats?.cpu_usage?.total_usage || 0);
-    const systemDelta =
-      (raw.cpu_stats?.system_cpu_usage || 0) -
-      (raw.precpu_stats?.system_cpu_usage || 0);
+    // ── CPU (self-tracked deltas) ──────────────────────────────
+    const currentCpuTotal = raw.cpu_stats?.cpu_usage?.total_usage || 0;
+    const currentSystemTotal = raw.cpu_stats?.system_cpu_usage || 0;
     const numCpus =
       raw.cpu_stats?.online_cpus ||
       raw.cpu_stats?.cpu_usage?.percpu_usage?.length ||
       1;
 
+    const prev = previousCpuCounters.get(container.Id);
+
     let cpuPercent = 0;
-    if (systemDelta > 0 && cpuDelta > 0) {
-      cpuPercent = (cpuDelta / systemDelta) * numCpus * 100;
+    if (prev) {
+      const cpuDelta = currentCpuTotal - prev.cpuTotal;
+      const systemDelta = currentSystemTotal - prev.systemTotal;
+      if (systemDelta > 0 && cpuDelta > 0) {
+        cpuPercent = (cpuDelta / systemDelta) * numCpus * 100;
+      }
     }
+
+    // Store current counters for next cycle's delta
+    previousCpuCounters.set(container.Id, {
+      cpuTotal: currentCpuTotal,
+      systemTotal: currentSystemTotal,
+    });
 
     // ── Memory ─────────────────────────────────────────────────
     const memUsage = raw.memory_stats?.usage || 0;
