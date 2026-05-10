@@ -57,8 +57,9 @@ let collectorTimer = null;
 
 export default class DockerStatsService {
   /**
-   * Get resource stats for all running containers.
+   * Get resource stats for all containers (running and stopped).
    * Returns cached data if within TTL, otherwise fetches fresh.
+   * Stopped containers return zeroed metrics.
    * @returns {Promise<object[]>}
    */
   static async getAll() {
@@ -69,7 +70,13 @@ export default class DockerStatsService {
     try {
       const containers = await DockerStatsService._listContainers();
       const stats = await Promise.all(
-        containers.map((c) => DockerStatsService._getContainerStats(c)),
+        containers.map((c) => {
+          // Skip stats API call for non-running containers (would fail)
+          if (c.State !== "running") {
+            return DockerStatsService._buildStoppedSkeleton(c);
+          }
+          return DockerStatsService._getContainerStats(c);
+        }),
       );
 
       // Filter out nulls (failed stats) and sort by name
@@ -175,14 +182,67 @@ export default class DockerStatsService {
   }
 
   /**
-   * List running containers via Docker Engine API.
+   * List all containers (running + stopped) via Docker Engine API.
    * @returns {Promise<object[]>}
    */
   static async _listContainers() {
     const body = await DockerStatsService._dockerGet(
-      "/containers/json?all=false",
+      "/containers/json?all=true",
     );
     return JSON.parse(body);
+  }
+
+  /**
+   * Build a zeroed-stats skeleton for a stopped/exited container.
+   * Mirrors the shape returned by _parseStats so the client doesn't break.
+   * @param {object} container - Container object from /containers/json
+   * @returns {object}
+   */
+  static _buildStoppedSkeleton(container) {
+    const name = (container.Names?.[0] || "unknown").replace(/^\//, "");
+    const command = container.Command || "";
+    const ports = (container.Ports || []).map((p) => ({
+      ip: p.IP || "",
+      privatePort: p.PrivatePort,
+      publicPort: p.PublicPort,
+      type: p.Type,
+    }));
+    const mounts = (container.Mounts || []).map((m) => ({
+      type: m.Type,
+      name: m.Name || "",
+      source: m.Source,
+      destination: m.Destination,
+      mode: m.Mode || "rw",
+      rw: m.RW ?? true,
+    }));
+    const labels = container.Labels || {};
+
+    return {
+      id: container.Id.substring(0, 12),
+      name,
+      image: container.Image,
+      state: container.State,
+      status: container.Status,
+      created: container.Created,
+      command,
+      ports,
+      mounts,
+      labels,
+      cpu: { percent: 0, cores: 0 },
+      cpuThrottling: { periods: 0, throttledPeriods: 0, throttledTimeNs: 0 },
+      memory: { used: 0, limit: 0, percent: 0 },
+      memoryDetail: {
+        rss: 0, cache: 0, swap: 0, maxUsage: 0,
+        activeAnon: 0, inactiveAnon: 0, pgfault: 0, pgmajfault: 0,
+      },
+      network: {
+        rx: 0, tx: 0, rxPackets: 0, txPackets: 0,
+        rxDropped: 0, txDropped: 0, rxErrors: 0, txErrors: 0,
+        interfaces: {},
+      },
+      blockIO: { read: 0, write: 0 },
+      pids: 0,
+    };
   }
 
   /**
