@@ -252,10 +252,33 @@ export default class DockerStatsService {
     // ── Network I/O ────────────────────────────────────────────
     let netRx = 0;
     let netTx = 0;
+    let netRxPackets = 0;
+    let netTxPackets = 0;
+    let netRxDropped = 0;
+    let netTxDropped = 0;
+    let netRxErrors = 0;
+    let netTxErrors = 0;
+    const networkInterfaces = {};
     if (raw.networks) {
-      for (const iface of Object.values(raw.networks)) {
+      for (const [ifaceName, iface] of Object.entries(raw.networks)) {
         netRx += iface.rx_bytes || 0;
         netTx += iface.tx_bytes || 0;
+        netRxPackets += iface.rx_packets || 0;
+        netTxPackets += iface.tx_packets || 0;
+        netRxDropped += iface.rx_dropped || 0;
+        netTxDropped += iface.tx_dropped || 0;
+        netRxErrors += iface.rx_errors || 0;
+        netTxErrors += iface.tx_errors || 0;
+        networkInterfaces[ifaceName] = {
+          rxBytes: iface.rx_bytes || 0,
+          txBytes: iface.tx_bytes || 0,
+          rxPackets: iface.rx_packets || 0,
+          txPackets: iface.tx_packets || 0,
+          rxDropped: iface.rx_dropped || 0,
+          txDropped: iface.tx_dropped || 0,
+          rxErrors: iface.rx_errors || 0,
+          txErrors: iface.tx_errors || 0,
+        };
       }
     }
 
@@ -272,6 +295,44 @@ export default class DockerStatsService {
     // ── PIDs ───────────────────────────────────────────────────
     const pids = raw.pids_stats?.current || 0;
 
+    // ── Memory Detail ─────────────────────────────────────────
+    const memoryDetail = {
+      rss: raw.memory_stats?.stats?.rss || 0,
+      cache: memCache,
+      swap: raw.memory_stats?.stats?.swap || 0,
+      maxUsage: raw.memory_stats?.max_usage || 0,
+      activeAnon: raw.memory_stats?.stats?.active_anon || 0,
+      inactiveAnon: raw.memory_stats?.stats?.inactive_anon || 0,
+      pgfault: raw.memory_stats?.stats?.pgfault || 0,
+      pgmajfault: raw.memory_stats?.stats?.pgmajfault || 0,
+    };
+
+    // ── CPU Throttling ────────────────────────────────────────
+    const throttling = raw.cpu_stats?.throttling_data || {};
+    const cpuThrottling = {
+      periods: throttling.periods || 0,
+      throttledPeriods: throttling.throttled_periods || 0,
+      throttledTimeNs: throttling.throttled_time || 0,
+    };
+
+    // ── Container Metadata ────────────────────────────────────
+    const command = container.Command || "";
+    const ports = (container.Ports || []).map((p) => ({
+      ip: p.IP || "",
+      privatePort: p.PrivatePort,
+      publicPort: p.PublicPort,
+      type: p.Type,
+    }));
+    const mounts = (container.Mounts || []).map((m) => ({
+      type: m.Type,
+      name: m.Name || "",
+      source: m.Source,
+      destination: m.Destination,
+      mode: m.Mode || "rw",
+      rw: m.RW ?? true,
+    }));
+    const labels = container.Labels || {};
+
     // ── Container name cleanup ─────────────────────────────────
     const name = (container.Names?.[0] || "unknown").replace(/^\//, "");
 
@@ -282,18 +343,31 @@ export default class DockerStatsService {
       state: container.State,
       status: container.Status,
       created: container.Created,
+      command,
+      ports,
+      mounts,
+      labels,
       cpu: {
         percent: Math.round(cpuPercent * 100) / 100,
         cores: numCpus,
       },
+      cpuThrottling,
       memory: {
         used: memActual,
         limit: memLimit,
         percent: Math.round(memPercent * 100) / 100,
       },
+      memoryDetail,
       network: {
         rx: netRx,
         tx: netTx,
+        rxPackets: netRxPackets,
+        txPackets: netTxPackets,
+        rxDropped: netRxDropped,
+        txDropped: netTxDropped,
+        rxErrors: netRxErrors,
+        txErrors: netTxErrors,
+        interfaces: networkInterfaces,
       },
       blockIO: {
         read: blockRead,
