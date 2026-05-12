@@ -18,9 +18,12 @@ export let DEVICES = {};
 
 /**
  * Infer the project type label from the project ID.
- * Projects ending in "-client" are "Client", "-bot" are "Bot", otherwise "Service".
+ * If the registry entry carries an explicit `projectType`, use it directly.
+ * Otherwise: projects ending in "-client" are "Client", "-bot" are "Bot",
+ * entries without repo/docker are "Infrastructure", rest are "Service".
  */
 function inferProjectType(id, svc) {
+  if (svc.projectType) return svc.projectType;
   if (!svc.repo && !svc.dockerProject) return "Infrastructure";
   if (id.endsWith("-client")) return "Client";
   if (id.endsWith("-bot")) return "Bot";
@@ -77,6 +80,7 @@ export function initializeRegistry(registry) {
       db: svc.db || null,
       minioBucket: svc.minioBucket || null,
       repo: normalizeRepoUrl(svc.repo),
+      npmPackage: svc.npmPackage || null,
       device: svc.device || "synology",
       domain: svc.domain || null,
       dockerProject: svc.dockerProject || null,

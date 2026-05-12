@@ -76,6 +76,49 @@ export default class MinioService {
   }
 
   /**
+   * Async generator that yields enriched bucket objects one-by-one
+   * as each completes its object enumeration.
+   * Used by the SSE streaming endpoint for progressive loading.
+   * @yields {{ name: string, creationDate: string, objectCount: number, totalSize: number }}
+   */
+  static async *streamBuckets() {
+    const mc = getClient();
+    const rawBuckets = await mc.listBuckets();
+
+    // Yield the total count first so the client knows how many to expect
+    yield { type: "init", totalBuckets: rawBuckets.length };
+
+    for (const bucket of rawBuckets) {
+      let objectCount = 0;
+      let totalSize = 0;
+
+      try {
+        await new Promise((resolve, reject) => {
+          const stream = mc.listObjectsV2(bucket.name, "", true);
+          stream.on("data", (obj) => {
+            objectCount++;
+            totalSize += obj.size || 0;
+          });
+          stream.on("end", resolve);
+          stream.on("error", reject);
+        });
+      } catch (err) {
+        logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${err.message}`);
+      }
+
+      yield {
+        type: "bucket",
+        bucket: {
+          name: bucket.name,
+          creationDate: bucket.creationDate?.toISOString() || null,
+          objectCount,
+          totalSize,
+        },
+      };
+    }
+  }
+
+  /**
    * List objects in a bucket, optionally filtered by prefix.
    * Returns a flat list with virtual "folder" grouping via commonPrefixes.
    * @param {string} bucketName

@@ -52,6 +52,44 @@ router.get("/buckets", async (_req, res, next) => {
 });
 
 /**
+ * GET /object-store/buckets/stream
+ * SSE endpoint — streams each bucket as it finishes enrichment.
+ * Events:
+ *   init   → { totalBuckets: number }
+ *   bucket → { name, creationDate, objectCount, totalSize }
+ *   done   → {} (signals completion)
+ */
+router.get("/buckets/stream", async (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+
+  // Flush headers immediately
+  res.flushHeaders();
+
+  try {
+    for await (const event of MinioService.streamBuckets()) {
+      if (req.closed) break;
+      res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.type === "bucket" ? event.bucket : event)}\n\n`);
+    }
+
+    if (!req.closed) {
+      res.write(`event: done\ndata: {}\n\n`);
+    }
+  } catch (err) {
+    logger.error(`[ObjectStore] streamBuckets failed: ${err.message}`);
+    if (!req.closed) {
+      res.write(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`);
+    }
+  } finally {
+    res.end();
+  }
+});
+
+/**
  * GET /object-store/buckets/:name
  * List objects in a bucket.
  * Query params:
