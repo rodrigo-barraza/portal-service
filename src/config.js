@@ -1,5 +1,7 @@
 // ─── Runtime Configuration ──────────────────────────────────
 
+import logger from "./utils/logger.js";
+
 export const PORT = process.env.PORTAL_SERVICE_PORT;
 
 export const MONGO_URI = process.env.MONGO_URI;
@@ -55,7 +57,7 @@ export let ANALYTICS_PROPERTIES = [];
  */
 export function initializeRegistry(registry) {
   if (!registry || !registry.projects) {
-    console.warn("⚠️  No registry data — PROJECTS and INFRASTRUCTURE will be empty");
+    logger.warn("No registry data — PROJECTS and INFRASTRUCTURE will be empty");
     return;
   }
 
@@ -149,8 +151,8 @@ export function initializeRegistry(registry) {
 
   DEVICES = devices;
 
-  console.warn(
-    `📋 Registry → initialized ${Object.keys(projects).length} projects, ${Object.keys(infra).length} infrastructure, ${Object.keys(devices).length} devices`,
+  logger.warn(
+    `Registry → initialized ${Object.keys(projects).length} projects, ${Object.keys(infra).length} infrastructure, ${Object.keys(devices).length} devices`,
   );
 }
 

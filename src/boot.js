@@ -1,6 +1,9 @@
 // ─── Boot Sequence ──────────────────────────────────────────
 
 import { createVaultClient } from "@rodrigo-barraza/utilities-library/vault";
+import { createLogger } from "@rodrigo-barraza/utilities-library/node";
+
+const bootLogger = createLogger("portal");
 
 const vault = createVaultClient({
   localEnvFile: "./.env",
@@ -31,7 +34,7 @@ for (let attempt = 1; attempt <= REGISTRY_RETRIES; attempt++) {
   if (registry.projects?.length > 0) break;
 
   if (attempt < REGISTRY_RETRIES) {
-    console.warn(`⏳ Registry empty (attempt ${attempt}/${REGISTRY_RETRIES}) — retrying in ${REGISTRY_RETRY_DELAY_MS}ms…`);
+    bootLogger.warn(`Registry empty (attempt ${attempt}/${REGISTRY_RETRIES}) — retrying in ${REGISTRY_RETRY_DELAY_MS}ms…`);
     await new Promise((r) => setTimeout(r, REGISTRY_RETRY_DELAY_MS));
   }
 }
