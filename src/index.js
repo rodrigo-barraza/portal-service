@@ -30,6 +30,7 @@ const app = express();
 // ── CORS — restrict to portal client + local development ──────
 const ALLOWED_ORIGINS = [
   process.env.AUTH_URL,            // e.g. https://portal.rod.dev (from Vault)
+  process.env.PORTAL_CLIENT_URL,   // e.g. http://192.168.86.2:4000 (from Vault registry)
 ].filter(Boolean);
 
 app.use(
@@ -39,6 +40,8 @@ app.use(
       if (!origin) return callback(null, true);
       // Allow any localhost port (local development)
       if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
+      // Allow private-network IPs (LAN access via IP address)
+      if (/^http:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin)) return callback(null, true);
       // Allow whitelisted origins
       if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
       callback(new Error(`Origin ${origin} not allowed by CORS`));
