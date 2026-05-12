@@ -1,6 +1,6 @@
 # Portal — Infrastructure Observability API
 
-Backend-for-frontend (BFF) aggregator for the developer portal dashboard. Federates data from Prism, Tools API, and other services to provide unified health monitoring, log streaming, usage statistics, device topology, and API integration auditing across the entire Sun ecosystem.
+Backend-for-frontend (BFF) aggregator for the developer portal dashboard. Federates data from Prism, Tools API, and other services to provide unified health monitoring, log streaming, usage statistics, device topology, and API integration auditing across the entire ecosystem.
 
 **Port:** `4001` · **Runtime:** Node.js (ES Modules) · **Framework:** Express 5 · **DB:** MongoDB
 
