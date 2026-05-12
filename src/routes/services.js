@@ -279,6 +279,67 @@ router.post("/:id/start", async (req, res, next) => {
 });
 
 /**
+ * GET /services/sizes
+ * Returns GitHub repository sizes for all projects with a repo field.
+ * Results are cached for 5 minutes to avoid GitHub API rate limits.
+ */
+let sizeCache = null;
+let sizeCacheAt = 0;
+const SIZE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+router.get("/sizes", async (_req, res, next) => {
+  try {
+    const now = Date.now();
+    if (sizeCache && now - sizeCacheAt < SIZE_CACHE_TTL_MS) {
+      return res.json(sizeCache);
+    }
+
+    const entries = Object.entries(PROJECTS).filter(([, svc]) => svc.repo);
+    const sizes = {};
+
+    await Promise.allSettled(
+      entries.map(async ([id, svc]) => {
+        const match = svc.repo.match(/github\.com\/(.+?)(?:\.git)?$/);
+        if (!match) return;
+
+        const slug = match[1];
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+
+        try {
+          const resp = await fetch(`https://api.github.com/repos/${slug}`, {
+            headers: {
+              Accept: "application/vnd.github.v3+json",
+              "User-Agent": "portal-service",
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+
+          if (!resp.ok) return;
+
+          const data = await resp.json();
+          sizes[id] = {
+            sizeKB: data.size,
+            sizeBytes: data.size * 1024,
+          };
+        } catch {
+          clearTimeout(timeout);
+        }
+      }),
+    );
+
+    const response = { sizes, fetchedAt: new Date().toISOString() };
+    sizeCache = response;
+    sizeCacheAt = now;
+
+    res.json(response);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * Try to extract a message from a Docker API error response body.
  */
 function tryParseDockerError(body) {
