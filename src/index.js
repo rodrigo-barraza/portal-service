@@ -13,15 +13,14 @@ import ServiceRegistryService from "./services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "./services/InfrastructureRegistryService.js";
 
 // Routes
-import healthRouter from "./routes/health.js";
-import servicesRouter from "./routes/services.js";
-import statsRouter from "./routes/stats.js";
-import logsRouter from "./routes/logs.js";
-import integrationsRouter from "./routes/integrations.js";
-import storageRouter from "./routes/storage.js";
-import googleAnalyticsRouter from "./routes/google-analytics.js";
-
-import devicesRouter from "./routes/devices.js";
+import healthRouter from "./routes/HealthRoutes.js";
+import servicesRouter from "./routes/ServicesRoutes.js";
+import statsRouter from "./routes/StatsRoutes.js";
+import logsRouter from "./routes/LogsRoutes.js";
+import integrationsRouter from "./routes/IntegrationsRoutes.js";
+import storageRouter from "./routes/StorageRoutes.js";
+import googleAnalyticsRouter from "./routes/GoogleAnalyticsRoutes.js";
+import devicesRouter from "./routes/DevicesRoutes.js";
 
 // ─── Express App ───────────────────────────────────────────────────
 

@@ -37,6 +37,7 @@ router.get("/", (_req, res) => {
           environment: svc.environment,
           visibility: svc.visibility,
           dockerProject: svc.dockerProject || null,
+          deployTier: svc.deployTier ?? null,
           healthy: status?.healthy ?? false,
           responseTimeMs: status?.responseTimeMs ?? null,
           error: status?.error ?? null,
