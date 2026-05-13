@@ -280,6 +280,175 @@ router.post("/:id/start", asyncHandler(async (req, res, next) => {
 }));
 
 /**
+ * GET /services/:id/rollback-status
+ * Check whether a :previous image tag exists for a containerized service,
+ * indicating that a rollback is available.
+ */
+router.get("/:id/rollback-status", asyncHandler(async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const svc = PROJECTS[id];
+
+    if (!svc) {
+      return res.status(404).json({ error: `Unknown service: ${id}` });
+    }
+
+    if (!svc.dockerProject) {
+      return res.json({ available: false, reason: "Not a containerized service" });
+    }
+
+    const target = resolveDockerDevice(svc);
+    if (!target) {
+      return res.json({ available: false, reason: "No Docker API configured" });
+    }
+
+    const imageName = svc.dockerProject;
+    const previousTag = `${imageName}:previous`;
+
+    try {
+      const body = await DockerStatsService.dockerGet(
+        target.device,
+        `/images/${encodeURIComponent(previousTag)}/json`,
+      );
+      const imageInfo = JSON.parse(body);
+      const created = imageInfo.Created || null;
+      const size = imageInfo.Size || 0;
+      const labels = imageInfo.Config?.Labels || {};
+
+      res.json({
+        available: true,
+        service: svc.name,
+        device: target.id,
+        previousImage: {
+          tag: previousTag,
+          created,
+          size,
+          gitSha: labels["git.sha"] || null,
+          gitBranch: labels["git.branch"] || null,
+          buildTime: labels["build.time"] || null,
+        },
+      });
+    } catch {
+      // Image not found → 404 from Docker API
+      res.json({ available: false, reason: "No previous image found" });
+    }
+  } catch (err) {
+    next(err);
+  }
+}));
+
+/**
+ * POST /services/:id/rollback
+ * Rollback a containerized service to its :previous image tag.
+ *
+ * Strategy:
+ *  1. Verify :previous image exists
+ *  2. Re-tag current :latest → :rollback-backup
+ *  3. Re-tag :previous → :latest
+ *  4. Re-tag :rollback-backup → :previous (so we can roll-forward)
+ *  5. Restart the container (it uses :latest)
+ */
+router.post("/:id/rollback", asyncHandler(async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const svc = PROJECTS[id];
+
+    if (!svc) {
+      return res.status(404).json({ error: `Unknown service: ${id}` });
+    }
+
+    if (!svc.dockerProject) {
+      return res.status(400).json({ error: `${svc.name} is not a containerized service` });
+    }
+
+    const target = resolveDockerDevice(svc);
+    if (!target) {
+      return res.status(400).json({ error: `No Docker API configured for device: ${svc.device}` });
+    }
+
+    const imageName = svc.dockerProject;
+    const latestTag = `${imageName}:latest`;
+    const previousTag = `${imageName}:previous`;
+    const backupTag = `${imageName}:rollback-backup`;
+
+    logger.info(`[Rollback] ${svc.name} → checking for :previous image`);
+
+    // 1. Verify :previous exists
+    try {
+      await DockerStatsService.dockerGet(
+        target.device,
+        `/images/${encodeURIComponent(previousTag)}/json`,
+      );
+    } catch {
+      return res.status(400).json({ error: "No previous image available for rollback" });
+    }
+
+    // 2. Tag current :latest → :rollback-backup
+    const tagBackup = await DockerStatsService.dockerRequest(
+      target.device, "POST",
+      `/images/${encodeURIComponent(latestTag)}/tag?repo=${encodeURIComponent(imageName)}&tag=rollback-backup`,
+    );
+    if (tagBackup.statusCode !== 201) {
+      logger.warn(`[Rollback] Failed to back up current :latest (${tagBackup.statusCode}), proceeding anyway`);
+    }
+
+    // 3. Tag :previous → :latest
+    const tagLatest = await DockerStatsService.dockerRequest(
+      target.device, "POST",
+      `/images/${encodeURIComponent(previousTag)}/tag?repo=${encodeURIComponent(imageName)}&tag=latest`,
+    );
+    if (tagLatest.statusCode !== 201) {
+      const msg = tryParseDockerError(tagLatest.body) || `Failed to tag :previous as :latest (${tagLatest.statusCode})`;
+      logger.error(`[Rollback] ${msg}`);
+      return res.status(502).json({ error: msg });
+    }
+
+    // 4. Tag :rollback-backup → :previous (enable roll-forward)
+    const tagPrevious = await DockerStatsService.dockerRequest(
+      target.device, "POST",
+      `/images/${encodeURIComponent(backupTag)}/tag?repo=${encodeURIComponent(imageName)}&tag=previous`,
+    );
+    if (tagPrevious.statusCode !== 201) {
+      logger.warn(`[Rollback] Failed to set new :previous for roll-forward (${tagPrevious.statusCode})`);
+    }
+
+    // Cleanup :rollback-backup tag
+    await DockerStatsService.dockerRequest(
+      target.device, "DELETE",
+      `/images/${encodeURIComponent(backupTag)}?noprune=true`,
+    ).catch(() => {});
+
+    // 5. Restart the container so it picks up the new :latest
+    logger.info(`[Rollback] Restarting ${svc.name} with rolled-back image`);
+    const restartResult = await DockerStatsService.dockerRequest(
+      target.device, "POST", `/containers/${svc.dockerProject}/restart?t=10`,
+    );
+
+    if (restartResult.statusCode === 204) {
+      logger.success(`[Rollback] ${svc.name} rolled back and restarted successfully`);
+
+      setTimeout(() => {
+        ServiceRegistryService.checkAll().catch(() => {});
+      }, 3000);
+
+      res.json({
+        success: true,
+        service: svc.name,
+        device: target.id,
+        message: "Rolled back to previous image and restarted",
+      });
+    } else {
+      const msg = tryParseDockerError(restartResult.body) || `Restart after rollback failed: ${restartResult.statusCode}`;
+      logger.error(`[Rollback] ${msg}`);
+      res.status(502).json({ error: msg });
+    }
+  } catch (err) {
+    logger.error(`[Rollback] Failed: ${err.message}`);
+    next(err);
+  }
+}));
+
+/**
  * GET /services/sizes
  * Returns GitHub repository sizes for all projects with a repo field.
  * Results are cached for 5 minutes to avoid GitHub API rate limits.

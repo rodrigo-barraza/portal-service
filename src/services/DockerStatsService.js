@@ -741,6 +741,17 @@ export default class DockerStatsService {
       req.end();
     });
   }
+
+  /**
+   * Public wrapper for _dockerGet — read-only Docker Engine API calls.
+   * @param {object} device - Device object with dockerApi field
+   * @param {string} path - Docker API path
+   * @param {number} [timeoutMs]
+   * @returns {Promise<string>}
+   */
+  static dockerGet(device, path, timeoutMs) {
+    return DockerStatsService._dockerGet(device, path, timeoutMs);
+  }
 }
 
 // ── Auto-start collector on import ────────────────────────────────
