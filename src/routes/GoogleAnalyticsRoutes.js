@@ -1,3 +1,4 @@
+import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Google Analytics Routes ────────────────────────────────
 
 import { Router } from "express";
@@ -27,18 +28,18 @@ router.get("/properties", (_req, res) => {
 
 // ── GET /google-analytics/:propertyId/realtime ────────────────
 
-router.get("/:propertyId/realtime", validateProperty, async (req, res, next) => {
+router.get("/:propertyId/realtime", validateProperty, asyncHandler(async (req, res, next) => {
   try {
     const data = await GoogleAnalyticsService.getRealtimeReport(req.params.propertyId);
     res.json(data);
   } catch (err) {
     next(err);
   }
-});
+}));
 
 // ── GET /google-analytics/:propertyId/overview ────────────────
 
-router.get("/:propertyId/overview", validateProperty, async (req, res, next) => {
+router.get("/:propertyId/overview", validateProperty, asyncHandler(async (req, res, next) => {
   try {
     const data = await GoogleAnalyticsService.getOverviewReport(
       req.params.propertyId,
@@ -48,11 +49,11 @@ router.get("/:propertyId/overview", validateProperty, async (req, res, next) => 
   } catch (err) {
     next(err);
   }
-});
+}));
 
 // ── GET /google-analytics/:propertyId/pages ───────────────────
 
-router.get("/:propertyId/pages", validateProperty, async (req, res, next) => {
+router.get("/:propertyId/pages", validateProperty, asyncHandler(async (req, res, next) => {
   try {
     const data = await GoogleAnalyticsService.getTopPages(
       req.params.propertyId,
@@ -62,11 +63,11 @@ router.get("/:propertyId/pages", validateProperty, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 // ── GET /google-analytics/:propertyId/sources ─────────────────
 
-router.get("/:propertyId/sources", validateProperty, async (req, res, next) => {
+router.get("/:propertyId/sources", validateProperty, asyncHandler(async (req, res, next) => {
   try {
     const data = await GoogleAnalyticsService.getTrafficSources(
       req.params.propertyId,
@@ -76,11 +77,11 @@ router.get("/:propertyId/sources", validateProperty, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 // ── GET /google-analytics/:propertyId/geography ───────────────
 
-router.get("/:propertyId/geography", validateProperty, async (req, res, next) => {
+router.get("/:propertyId/geography", validateProperty, asyncHandler(async (req, res, next) => {
   try {
     const data = await GoogleAnalyticsService.getGeography(
       req.params.propertyId,
@@ -90,11 +91,11 @@ router.get("/:propertyId/geography", validateProperty, async (req, res, next) =>
   } catch (err) {
     next(err);
   }
-});
+}));
 
 // ── GET /google-analytics/:propertyId/devices ─────────────────
 
-router.get("/:propertyId/devices", validateProperty, async (req, res, next) => {
+router.get("/:propertyId/devices", validateProperty, asyncHandler(async (req, res, next) => {
   try {
     const data = await GoogleAnalyticsService.getDevices(
       req.params.propertyId,
@@ -104,11 +105,11 @@ router.get("/:propertyId/devices", validateProperty, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 // ── GET /google-analytics/:propertyId/timeseries ──────────────
 
-router.get("/:propertyId/timeseries", validateProperty, async (req, res, next) => {
+router.get("/:propertyId/timeseries", validateProperty, asyncHandler(async (req, res, next) => {
   try {
     const data = await GoogleAnalyticsService.getTimeSeries(
       req.params.propertyId,
@@ -118,11 +119,11 @@ router.get("/:propertyId/timeseries", validateProperty, async (req, res, next) =
   } catch (err) {
     next(err);
   }
-});
+}));
 
 // ── GET /google-analytics/:propertyId/channels ────────────────
 
-router.get("/:propertyId/channels", validateProperty, async (req, res, next) => {
+router.get("/:propertyId/channels", validateProperty, asyncHandler(async (req, res, next) => {
   try {
     const data = await GoogleAnalyticsService.getChannelGrouping(
       req.params.propertyId,
@@ -132,11 +133,11 @@ router.get("/:propertyId/channels", validateProperty, async (req, res, next) => 
   } catch (err) {
     next(err);
   }
-});
+}));
 
 // ── GET /google-analytics/:propertyId/landing-pages ───────────
 
-router.get("/:propertyId/landing-pages", validateProperty, async (req, res, next) => {
+router.get("/:propertyId/landing-pages", validateProperty, asyncHandler(async (req, res, next) => {
   try {
     const data = await GoogleAnalyticsService.getLandingPages(
       req.params.propertyId,
@@ -146,11 +147,11 @@ router.get("/:propertyId/landing-pages", validateProperty, async (req, res, next
   } catch (err) {
     next(err);
   }
-});
+}));
 
 // ── GET /google-analytics/:propertyId/heatmap ─────────────────
 
-router.get("/:propertyId/heatmap", validateProperty, async (req, res, next) => {
+router.get("/:propertyId/heatmap", validateProperty, asyncHandler(async (req, res, next) => {
   try {
     const data = await GoogleAnalyticsService.getHourlyHeatmap(
       req.params.propertyId,
@@ -160,11 +161,11 @@ router.get("/:propertyId/heatmap", validateProperty, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 // ── GET /google-analytics/:propertyId/new-vs-returning ────────
 
-router.get("/:propertyId/new-vs-returning", validateProperty, async (req, res, next) => {
+router.get("/:propertyId/new-vs-returning", validateProperty, asyncHandler(async (req, res, next) => {
   try {
     const data = await GoogleAnalyticsService.getNewVsReturning(
       req.params.propertyId,
@@ -174,11 +175,11 @@ router.get("/:propertyId/new-vs-returning", validateProperty, async (req, res, n
   } catch (err) {
     next(err);
   }
-});
+}));
 
 // ── GET /google-analytics/:propertyId/events ──────────────────
 
-router.get("/:propertyId/events", validateProperty, async (req, res, next) => {
+router.get("/:propertyId/events", validateProperty, asyncHandler(async (req, res, next) => {
   try {
     const data = await GoogleAnalyticsService.getTopEvents(
       req.params.propertyId,
@@ -188,6 +189,6 @@ router.get("/:propertyId/events", validateProperty, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 export default router;

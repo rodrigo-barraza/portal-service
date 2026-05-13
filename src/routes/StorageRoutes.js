@@ -1,3 +1,4 @@
+import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Object Store Route ─────────────────────────────────────
 
 import { Router } from "express";
@@ -41,7 +42,7 @@ function guessMime(filename) {
  * GET /object-store/buckets
  * List all MinIO buckets with object counts and total sizes.
  */
-router.get("/buckets", async (_req, res, next) => {
+router.get("/buckets", asyncHandler(async (_req, res, next) => {
   try {
     const buckets = await MinioService.listBuckets();
     res.json({ buckets });
@@ -49,7 +50,7 @@ router.get("/buckets", async (_req, res, next) => {
     logger.error(`[ObjectStore] listBuckets failed: ${err.message}`);
     next(err);
   }
-});
+}));
 
 /**
  * GET /object-store/buckets/stream
@@ -59,7 +60,7 @@ router.get("/buckets", async (_req, res, next) => {
  *   bucket → { name, creationDate, objectCount, totalSize }
  *   done   → {} (signals completion)
  */
-router.get("/buckets/stream", async (req, res) => {
+router.get("/buckets/stream", asyncHandler(async (req, res) => {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
@@ -87,7 +88,7 @@ router.get("/buckets/stream", async (req, res) => {
   } finally {
     res.end();
   }
-});
+}));
 
 /**
  * GET /object-store/buckets/:name
@@ -96,7 +97,7 @@ router.get("/buckets/stream", async (req, res) => {
  *   prefix    — filter by key prefix (default: "")
  *   recursive — if "true", list recursively (default: false)
  */
-router.get("/buckets/:name", async (req, res, next) => {
+router.get("/buckets/:name", asyncHandler(async (req, res, next) => {
   try {
     const { name } = req.params;
     const prefix = req.query.prefix || "";
@@ -107,13 +108,13 @@ router.get("/buckets/:name", async (req, res, next) => {
     logger.error(`[ObjectStore] listObjects failed: ${err.message}`);
     next(err);
   }
-});
+}));
 
 /**
  * GET /object-store/buckets/:name/stat/*objectPath
  * Get metadata (size, content-type, etag, lastModified) for a single object.
  */
-router.get("/buckets/:name/stat/*objectPath", async (req, res, next) => {
+router.get("/buckets/:name/stat/*objectPath", asyncHandler(async (req, res, next) => {
   try {
     const bucketName = req.params.name;
     const objectName = [].concat(req.params.objectPath).join("/");
@@ -139,7 +140,7 @@ router.get("/buckets/:name/stat/*objectPath", async (req, res, next) => {
     logger.error(`[ObjectStore] statObject failed: ${err.message}`);
     next(err);
   }
-});
+}));
 
 /**
  * GET /object-store/buckets/:name/download/*objectPath
@@ -147,7 +148,7 @@ router.get("/buckets/:name/stat/*objectPath", async (req, res, next) => {
  * Query params:
  *   inline — if "true", sets Content-Disposition to inline (default: attachment)
  */
-router.get("/buckets/:name/download/*objectPath", async (req, res, next) => {
+router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req, res, next) => {
   try {
     const bucketName = req.params.name;
     const objectName = [].concat(req.params.objectPath).join("/");
@@ -176,13 +177,13 @@ router.get("/buckets/:name/download/*objectPath", async (req, res, next) => {
     logger.error(`[ObjectStore] getObject failed: ${err.message}`);
     next(err);
   }
-});
+}));
 
 /**
  * DELETE /object-store/buckets/:name/*objectPath
  * Delete a single object from a bucket.
  */
-router.delete("/buckets/:name/*objectPath", async (req, res, next) => {
+router.delete("/buckets/:name/*objectPath", asyncHandler(async (req, res, next) => {
   try {
     const bucketName = req.params.name;
     const objectName = [].concat(req.params.objectPath).join("/");
@@ -198,6 +199,6 @@ router.delete("/buckets/:name/*objectPath", async (req, res, next) => {
     logger.error(`[ObjectStore] deleteObject failed: ${err.message}`);
     next(err);
   }
-});
+}));
 
 export default router;

@@ -1,3 +1,4 @@
+import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Services Route ─────────────────────────────────────────
 
 import { Router } from "express";
@@ -79,7 +80,7 @@ function enrichWithDependencies(services, infrastructure) {
  * plus infrastructure backing stores (MongoDB, MinIO, etc.).
  * If ?refresh=true, forces a fresh health check before responding.
  */
-router.get("/", async (req, res, next) => {
+router.get("/", asyncHandler(async (req, res, next) => {
   try {
     let services, infrastructure;
 
@@ -98,13 +99,13 @@ router.get("/", async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * POST /services/check
  * Trigger a fresh health check for all services and infrastructure.
  */
-router.post("/check", async (_req, res, next) => {
+router.post("/check", asyncHandler(async (_req, res, next) => {
   try {
     const [services, infrastructure] = await Promise.all([
       ServiceRegistryService.checkAll(),
@@ -115,14 +116,14 @@ router.post("/check", async (_req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * POST /services/:id/restart
  * Restart a containerized service via Docker Engine API.
  * Routes to the correct Docker host based on the project's device.
  */
-router.post("/:id/restart", async (req, res, next) => {
+router.post("/:id/restart", asyncHandler(async (req, res, next) => {
   try {
     const { id } = req.params;
     const svc = PROJECTS[id];
@@ -170,13 +171,13 @@ router.post("/:id/restart", async (req, res, next) => {
     logger.error(`[Restart] Failed: ${err.message}`);
     next(err);
   }
-});
+}));
 
 /**
  * POST /services/:id/stop
  * Stop a containerized service via Docker Engine API.
  */
-router.post("/:id/stop", async (req, res, next) => {
+router.post("/:id/stop", asyncHandler(async (req, res, next) => {
   try {
     const { id } = req.params;
     const svc = PROJECTS[id];
@@ -223,13 +224,13 @@ router.post("/:id/stop", async (req, res, next) => {
     logger.error(`[Stop] Failed: ${err.message}`);
     next(err);
   }
-});
+}));
 
 /**
  * POST /services/:id/start
  * Start a containerized service via Docker Engine API.
  */
-router.post("/:id/start", async (req, res, next) => {
+router.post("/:id/start", asyncHandler(async (req, res, next) => {
   try {
     const { id } = req.params;
     const svc = PROJECTS[id];
@@ -276,7 +277,7 @@ router.post("/:id/start", async (req, res, next) => {
     logger.error(`[Start] Failed: ${err.message}`);
     next(err);
   }
-});
+}));
 
 /**
  * GET /services/sizes
@@ -287,7 +288,7 @@ let sizeCache = null;
 let sizeCacheAt = 0;
 const SIZE_CACHE_TTL_MS = 5 * 60 * 1000;
 
-router.get("/sizes", async (_req, res, next) => {
+router.get("/sizes", asyncHandler(async (_req, res, next) => {
   try {
     const now = Date.now();
     if (sizeCache && now - sizeCacheAt < SIZE_CACHE_TTL_MS) {
@@ -337,7 +338,7 @@ router.get("/sizes", async (_req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * Try to extract a message from a Docker API error response body.

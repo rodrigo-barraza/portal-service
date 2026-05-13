@@ -1,3 +1,4 @@
+import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Stats Route ────────────────────────────────────────────
 
 import { Router } from "express";
@@ -11,20 +12,20 @@ const router = Router();
  * GET /stats
  * Returns cached overview stats from Prism.
  */
-router.get("/", async (_req, res, next) => {
+router.get("/", asyncHandler(async (_req, res, next) => {
   try {
     const data = await StatsAggregatorService.getOverview();
     res.json(data);
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * GET /stats/breakdown
  * Returns request breakdown stats. ?period=24h|7d|30d
  */
-router.get("/breakdown", async (req, res, next) => {
+router.get("/breakdown", asyncHandler(async (req, res, next) => {
   try {
     const data = await StatsAggregatorService.getRequestBreakdown({
       period: req.query.period,
@@ -33,20 +34,20 @@ router.get("/breakdown", async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * GET /stats/projects
  * Returns per-project usage stats.
  */
-router.get("/projects", async (_req, res, next) => {
+router.get("/projects", asyncHandler(async (_req, res, next) => {
   try {
     const data = await StatsAggregatorService.getProjectStats();
     res.json(data);
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * GET /stats/containers
@@ -54,7 +55,7 @@ router.get("/projects", async (_req, res, next) => {
  * Each container includes a `device` field identifying its host.
  * ?device=synology — filter to a single Docker host.
  */
-router.get("/containers", async (req, res, next) => {
+router.get("/containers", asyncHandler(async (req, res, next) => {
   try {
     const deviceId = req.query.device || undefined;
     const data = await DockerStatsService.getAll(deviceId);
@@ -62,7 +63,7 @@ router.get("/containers", async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * GET /stats/containers/history
@@ -94,7 +95,7 @@ router.post("/invalidate", (_req, res) => {
  * Without ?device=, returns info for all Docker hosts.
  * ?device=synology — filter to a single Docker host.
  */
-router.get("/system", async (req, res, next) => {
+router.get("/system", asyncHandler(async (req, res, next) => {
   try {
     const deviceId = req.query.device || undefined;
     const data = await DockerStatsService.getSystemInfo(deviceId);
@@ -102,13 +103,13 @@ router.get("/system", async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /**
  * GET /stats/storage
  * Returns MinIO bucket summary — counts and sizes per bucket.
  */
-router.get("/storage", async (_req, res, next) => {
+router.get("/storage", asyncHandler(async (_req, res, next) => {
   try {
     const buckets = await MinioService.listBuckets();
     const totalObjects = buckets.reduce((sum, b) => sum + b.objectCount, 0);
@@ -117,6 +118,6 @@ router.get("/storage", async (_req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 export default router;
