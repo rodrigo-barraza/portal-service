@@ -31,6 +31,21 @@ function inferProjectType(id, svc) {
 }
 
 /**
+ * Infer the deploy tier from the project type when the registry
+ * entry doesn't carry an explicit `deployTier` override.
+ *   Tier 0 — Foundation (Infrastructure, vault-service)
+ *   Tier 1 — Services
+ *   Tier 2 — Clients, Bots, Libraries, Kits, Tools
+ */
+function inferDeployTier(projectType) {
+  switch (projectType) {
+    case "Infrastructure": return 0;
+    case "Service":        return 1;
+    default:               return 2; // Client, Bot, Library, Kit, Tool
+  }
+}
+
+/**
  * Normalize a GitHub repository URL to HTTPS format.
  * Converts SSH URLs (git@github.com:owner/repo.git) to HTTPS.
  * @param {string|null} repo
@@ -84,7 +99,7 @@ export function initializeRegistry(registry) {
       device: svc.device || "synology",
       domain: svc.domain || null,
       dockerProject: svc.dockerProject || null,
-      deployTier: svc.deployTier ?? null,
+      deployTier: svc.deployTier ?? inferDeployTier(inferProjectType(svc.id, svc)),
       dependsOn: (svc.dependsOn || []).map((dep) => ({
         id: dep.id,
         criticality: dep.criticality || "required",
