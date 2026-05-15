@@ -30,6 +30,7 @@ const app = express();
 const ALLOWED_ORIGINS = [
   process.env.AUTH_URL,            // e.g. https://portal.rod.dev (from Vault)
   process.env.PORTAL_CLIENT_URL,   // e.g. http://192.168.86.2:4000 (from Vault registry)
+  process.env.PORTAL_SERVICE_PUBLIC_URL?.replace(/^https?:\/\/api\./, 'https://'),  // derive client origin from API domain
 ].filter(Boolean);
 
 app.use(
