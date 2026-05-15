@@ -100,6 +100,7 @@ export function initializeRegistry(registry) {
       domain: svc.domain || null,
       dockerProject: svc.dockerProject || null,
       deployTier: svc.deployTier ?? inferDeployTier(inferProjectType(svc.id, svc)),
+      essential: svc.essential || false,
       dependsOn: (svc.dependsOn || []).map((dep) => ({
         id: dep.id,
         criticality: dep.criticality || "required",
