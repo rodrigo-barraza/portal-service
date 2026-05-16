@@ -96,8 +96,8 @@ router.get("/", asyncHandler(async (req, res, next) => {
 
     const enriched = enrichWithDependencies(services, infrastructure);
     res.json({ ...enriched, projectTypeColors: PROJECT_TYPE_COLORS, deployTierColors: DEPLOY_TIER_COLORS });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -113,8 +113,8 @@ router.post("/check", asyncHandler(async (_req, res, next) => {
     ]);
     const enriched = enrichWithDependencies(services, infrastructure);
     res.json({ ...enriched, projectTypeColors: PROJECT_TYPE_COLORS, deployTierColors: DEPLOY_TIER_COLORS });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -167,9 +167,9 @@ router.post("/:id/restart", asyncHandler(async (req, res, next) => {
       logger.error(`[Restart] Failed for ${svc.name}: ${msg}`);
       res.status(502).json({ error: msg });
     }
-  } catch (err) {
-    logger.error(`[Restart] Failed: ${err.message}`);
-    next(err);
+  } catch (error) {
+    logger.error(`[Restart] Failed: ${error.message}`);
+    next(error);
   }
 }));
 
@@ -220,9 +220,9 @@ router.post("/:id/stop", asyncHandler(async (req, res, next) => {
       logger.error(`[Stop] Failed for ${svc.name}: ${msg}`);
       res.status(502).json({ error: msg });
     }
-  } catch (err) {
-    logger.error(`[Stop] Failed: ${err.message}`);
-    next(err);
+  } catch (error) {
+    logger.error(`[Stop] Failed: ${error.message}`);
+    next(error);
   }
 }));
 
@@ -273,9 +273,9 @@ router.post("/:id/start", asyncHandler(async (req, res, next) => {
       logger.error(`[Start] Failed for ${svc.name}: ${msg}`);
       res.status(502).json({ error: msg });
     }
-  } catch (err) {
-    logger.error(`[Start] Failed: ${err.message}`);
-    next(err);
+  } catch (error) {
+    logger.error(`[Start] Failed: ${error.message}`);
+    next(error);
   }
 }));
 
@@ -332,8 +332,8 @@ router.get("/:id/rollback-status", asyncHandler(async (req, res, next) => {
       // Image not found → 404 from Docker API
       res.json({ available: false, reason: "No previous image found" });
     }
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -442,9 +442,9 @@ router.post("/:id/rollback", asyncHandler(async (req, res, next) => {
       logger.error(`[Rollback] ${msg}`);
       res.status(502).json({ error: msg });
     }
-  } catch (err) {
-    logger.error(`[Rollback] Failed: ${err.message}`);
-    next(err);
+  } catch (error) {
+    logger.error(`[Rollback] Failed: ${error.message}`);
+    next(error);
   }
 }));
 
@@ -504,8 +504,8 @@ router.get("/sizes", asyncHandler(async (_req, res, next) => {
     sizeCacheAt = now;
 
     res.json(response);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 

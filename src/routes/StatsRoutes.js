@@ -16,8 +16,8 @@ router.get("/", asyncHandler(async (_req, res, next) => {
   try {
     const data = await StatsAggregatorService.getOverview();
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -31,8 +31,8 @@ router.get("/breakdown", asyncHandler(async (req, res, next) => {
       period: req.query.period,
     });
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -44,8 +44,8 @@ router.get("/projects", asyncHandler(async (_req, res, next) => {
   try {
     const data = await StatsAggregatorService.getProjectStats();
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -60,8 +60,8 @@ router.get("/containers", asyncHandler(async (req, res, next) => {
     const deviceId = req.query.device || undefined;
     const data = await DockerStatsService.getAll(deviceId);
     res.json({ containers: data, fetchedAt: new Date().toISOString() });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -100,8 +100,8 @@ router.get("/system", asyncHandler(async (req, res, next) => {
     const deviceId = req.query.device || undefined;
     const data = await DockerStatsService.getSystemInfo(deviceId);
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -115,8 +115,8 @@ router.get("/storage", asyncHandler(async (_req, res, next) => {
     const totalObjects = buckets.reduce((sum, b) => sum + b.objectCount, 0);
     const totalSize = buckets.reduce((sum, b) => sum + b.totalSize, 0);
     res.json({ buckets, totalObjects, totalSize, fetchedAt: new Date().toISOString() });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 

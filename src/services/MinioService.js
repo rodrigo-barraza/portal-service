@@ -59,8 +59,8 @@ export default class MinioService {
             stream.on("end", resolve);
             stream.on("error", reject);
           });
-        } catch (err) {
-          logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${err.message}`);
+        } catch (error) {
+          logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${error.message}`);
         }
 
         return {
@@ -102,8 +102,8 @@ export default class MinioService {
           stream.on("end", resolve);
           stream.on("error", reject);
         });
-      } catch (err) {
-        logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${err.message}`);
+      } catch (error) {
+        logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${error.message}`);
       }
 
       yield {

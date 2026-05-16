@@ -40,11 +40,11 @@ export default class StatsAggregatorService {
 
       cache.set("overview", { data, fetchedAt: Date.now() });
       return data;
-    } catch (err) {
-      logger.error(`[StatsAggregator] Failed to fetch overview: ${err.message}`);
+    } catch (error) {
+      logger.error(`[StatsAggregator] Failed to fetch overview: ${error.message}`);
       // Return stale cache if available
       if (cached) return { ...cached.data, stale: true };
-      return { error: err.message };
+      return { error: error.message };
     }
   }
 
@@ -74,10 +74,10 @@ export default class StatsAggregatorService {
 
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
-    } catch (err) {
-      logger.error(`[StatsAggregator] Breakdown fetch failed: ${err.message}`);
+    } catch (error) {
+      logger.error(`[StatsAggregator] Breakdown fetch failed: ${error.message}`);
       if (cached) return { ...cached.data, stale: true };
-      return { error: err.message };
+      return { error: error.message };
     }
   }
 
@@ -102,10 +102,10 @@ export default class StatsAggregatorService {
 
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
-    } catch (err) {
-      logger.error(`[StatsAggregator] Project stats failed: ${err.message}`);
+    } catch (error) {
+      logger.error(`[StatsAggregator] Project stats failed: ${error.message}`);
       if (cached) return { ...cached.data, stale: true };
-      return { error: err.message };
+      return { error: error.message };
     }
   }
 
@@ -130,9 +130,9 @@ export default class StatsAggregatorService {
       }
 
       return res.json();
-    } catch (err) {
+    } catch (error) {
       clearTimeout(timeout);
-      throw err;
+      throw error;
     }
   }
 

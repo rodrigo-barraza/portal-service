@@ -303,8 +303,8 @@ export default class ServiceRegistryService {
         error: res.ok ? null : `HTTP ${res.status}`,
         checkedAt: new Date().toISOString(),
       };
-    } catch (err) {
-      const errorDetail = ServiceRegistryService._extractErrorDetail(err);
+    } catch (error) {
+      const errorDetail = ServiceRegistryService._extractErrorDetail(error);
       logger.warn(`[ServiceRegistry] ${svc.name} unreachable: ${errorDetail}`);
       return {
         id,
@@ -338,15 +338,15 @@ export default class ServiceRegistryService {
   /**
    * Extract a meaningful error message from a fetch failure.
    * Node's undici wraps the real cause (ECONNREFUSED, EHOSTUNREACH, etc.)
-   * inside err.cause, while err.message is just the opaque "fetch failed".
+   * inside error.cause, while error.message is just the opaque "fetch failed".
    * @param {Error} err
    * @returns {string}
    */
-  static _extractErrorDetail(err) {
-    if (err.name === "AbortError") return "Timeout";
+  static _extractErrorDetail(error) {
+    if (error.name === "AbortError") return "Timeout";
 
     // Dig into undici's nested cause chain for the real error code
-    let cause = err.cause;
+    let cause = error.cause;
     while (cause) {
       if (cause.code) {
         const code = cause.code;
@@ -359,11 +359,11 @@ export default class ServiceRegistryService {
           ENOTFOUND: "DNS lookup failed",
           EPIPE: "Broken pipe",
         };
-        return labels[code] || `${code}: ${cause.message || err.message}`;
+        return labels[code] || `${code}: ${cause.message || error.message}`;
       }
       cause = cause.cause;
     }
 
-    return err.message;
+    return error.message;
   }
 }

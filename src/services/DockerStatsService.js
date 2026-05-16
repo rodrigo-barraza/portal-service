@@ -133,8 +133,8 @@ export default class DockerStatsService {
 
       statsCacheMap.set(deviceId, { data: result, fetchedAt: Date.now() });
       return result;
-    } catch (err) {
-      logger.error(`[DockerStats:${deviceId}] Failed to collect stats: ${err.message}`);
+    } catch (error) {
+      logger.error(`[DockerStats:${deviceId}] Failed to collect stats: ${error.message}`);
       const stale = statsCacheMap.get(deviceId);
       if (stale) return stale.data;
       return [];
@@ -248,8 +248,8 @@ export default class DockerStatsService {
       while (history.length > HISTORY_MAX_SAMPLES) {
         history.shift();
       }
-    } catch (err) {
-      logger.warn(`[DockerStats:${deviceId}] Snapshot failed: ${err.message}`);
+    } catch (error) {
+      logger.warn(`[DockerStats:${deviceId}] Snapshot failed: ${error.message}`);
     }
   }
 
@@ -283,9 +283,9 @@ export default class DockerStatsService {
       );
       const raw = JSON.parse(body);
       return DockerStatsService._parseStats(container, raw, deviceId);
-    } catch (err) {
+    } catch (error) {
       logger.warn(
-        `[DockerStats:${deviceId}] Failed to get stats for ${container.Names?.[0]}: ${err.message}`,
+        `[DockerStats:${deviceId}] Failed to get stats for ${container.Names?.[0]}: ${error.message}`,
       );
       return null;
     }
@@ -654,11 +654,11 @@ export default class DockerStatsService {
 
       systemCacheMap.set(deviceId, { data: result, fetchedAt: Date.now() });
       return result;
-    } catch (err) {
-      logger.error(`[DockerStats:${deviceId}] System info failed: ${err.message}`);
+    } catch (error) {
+      logger.error(`[DockerStats:${deviceId}] System info failed: ${error.message}`);
       const stale = systemCacheMap.get(deviceId);
       if (stale) return stale.data;
-      throw err;
+      throw error;
     }
   }
 

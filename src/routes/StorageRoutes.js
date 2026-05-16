@@ -46,9 +46,9 @@ router.get("/buckets", asyncHandler(async (_req, res, next) => {
   try {
     const buckets = await MinioService.listBuckets();
     res.json({ buckets });
-  } catch (err) {
-    logger.error(`[ObjectStore] listBuckets failed: ${err.message}`);
-    next(err);
+  } catch (error) {
+    logger.error(`[ObjectStore] listBuckets failed: ${error.message}`);
+    next(error);
   }
 }));
 
@@ -80,10 +80,10 @@ router.get("/buckets/stream", asyncHandler(async (req, res) => {
     if (!req.closed) {
       res.write(`event: done\ndata: {}\n\n`);
     }
-  } catch (err) {
-    logger.error(`[ObjectStore] streamBuckets failed: ${err.message}`);
+  } catch (error) {
+    logger.error(`[ObjectStore] streamBuckets failed: ${error.message}`);
     if (!req.closed) {
-      res.write(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message: error.message })}\n\n`);
     }
   } finally {
     res.end();
@@ -104,9 +104,9 @@ router.get("/buckets/:name", asyncHandler(async (req, res, next) => {
     const recursive = req.query.recursive === "true";
     const result = await MinioService.listObjects(name, prefix, recursive);
     res.json({ bucket: name, prefix, ...result });
-  } catch (err) {
-    logger.error(`[ObjectStore] listObjects failed: ${err.message}`);
-    next(err);
+  } catch (error) {
+    logger.error(`[ObjectStore] listObjects failed: ${error.message}`);
+    next(error);
   }
 }));
 
@@ -133,12 +133,12 @@ router.get("/buckets/:name/stat/*objectPath", asyncHandler(async (req, res, next
       lastModified: stat.lastModified?.toISOString() || null,
       metadata: stat.metaData || {},
     });
-  } catch (err) {
-    if (err.code === "NotFound" || err.message?.includes("Not Found")) {
+  } catch (error) {
+    if (error.code === "NotFound" || error.message?.includes("Not Found")) {
       return res.status(404).json({ error: "Object not found" });
     }
-    logger.error(`[ObjectStore] statObject failed: ${err.message}`);
-    next(err);
+    logger.error(`[ObjectStore] statObject failed: ${error.message}`);
+    next(error);
   }
 }));
 
@@ -170,12 +170,12 @@ router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req, res, 
 
     const stream = await MinioService.getObject(bucketName, objectName);
     stream.pipe(res);
-  } catch (err) {
-    if (err.code === "NotFound" || err.message?.includes("Not Found")) {
+  } catch (error) {
+    if (error.code === "NotFound" || error.message?.includes("Not Found")) {
       return res.status(404).json({ error: "Object not found" });
     }
-    logger.error(`[ObjectStore] getObject failed: ${err.message}`);
-    next(err);
+    logger.error(`[ObjectStore] getObject failed: ${error.message}`);
+    next(error);
   }
 }));
 
@@ -195,9 +195,9 @@ router.delete("/buckets/:name/*objectPath", asyncHandler(async (req, res, next) 
     await MinioService.deleteObject(bucketName, objectName);
     logger.info(`[ObjectStore] Deleted ${bucketName}/${objectName}`);
     res.json({ success: true, bucket: bucketName, object: objectName });
-  } catch (err) {
-    logger.error(`[ObjectStore] deleteObject failed: ${err.message}`);
-    next(err);
+  } catch (error) {
+    logger.error(`[ObjectStore] deleteObject failed: ${error.message}`);
+    next(error);
   }
 }));
 

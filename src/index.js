@@ -103,8 +103,8 @@ app.use(errorHandler);
       ]);
       logger.success("Database indexes ensured");
     }
-  } catch (err) {
-    logger.error(`Failed to ensure indexes: ${err.message}`);
+  } catch (error) {
+    logger.error(`Failed to ensure indexes: ${error.message}`);
   }
 
   // ── Deferred Registry Recovery ─────────────────────────────────
@@ -142,8 +142,8 @@ app.use(errorHandler);
         } else {
           logger.warn(`[Registry] Deferred attempt ${deferredAttempt}/${MAX_DEFERRED_ATTEMPTS} — still empty`);
         }
-      } catch (err) {
-        logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${err.message}`);
+      } catch (error) {
+        logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${error.message}`);
         if (deferredAttempt >= MAX_DEFERRED_ATTEMPTS) {
           clearInterval(deferredTimer);
         }
@@ -166,8 +166,8 @@ app.use(errorHandler);
         `[InfraRegistry] ${infraHealthy}/${infraResults.length} infrastructure healthy`,
       );
     })
-    .catch((err) => {
-      logger.warn(`[Registry] Initial check failed: ${err.message}`);
+    .catch((error) => {
+      logger.warn(`[Registry] Initial check failed: ${error.message}`);
     });
 
   // Periodic health checks every 60 seconds

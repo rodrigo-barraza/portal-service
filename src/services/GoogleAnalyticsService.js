@@ -18,9 +18,9 @@ function cached(key, ttlMs, fetcher) {
   const promise = fetcher().then((data) => {
     cache.set(key, { data, ts: Date.now() });
     return data;
-  }).catch((err) => {
+  }).catch((error) => {
     cache.delete(key);
-    throw err;
+    throw error;
   });
 
   // Serve stale while revalidating if we have a previous value
@@ -59,8 +59,8 @@ function getClient() {
 
     logger.success("[GoogleAnalytics] Client initialized");
     return client;
-  } catch (err) {
-    throw new Error(`Failed to initialize GA client: ${err.message}`);
+  } catch (error) {
+    throw new Error(`Failed to initialize GA client: ${error.message}`);
   }
 }
 

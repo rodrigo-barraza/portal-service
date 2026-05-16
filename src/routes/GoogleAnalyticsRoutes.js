@@ -32,8 +32,8 @@ router.get("/:propertyId/realtime", validateProperty, asyncHandler(async (req, r
   try {
     const data = await GoogleAnalyticsService.getRealtimeReport(req.params.propertyId);
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -46,8 +46,8 @@ router.get("/:propertyId/overview", validateProperty, asyncHandler(async (req, r
       req.query.period,
     );
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -60,8 +60,8 @@ router.get("/:propertyId/pages", validateProperty, asyncHandler(async (req, res,
       req.query.period,
     );
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -74,8 +74,8 @@ router.get("/:propertyId/sources", validateProperty, asyncHandler(async (req, re
       req.query.period,
     );
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -88,8 +88,8 @@ router.get("/:propertyId/geography", validateProperty, asyncHandler(async (req, 
       req.query.period,
     );
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -102,8 +102,8 @@ router.get("/:propertyId/devices", validateProperty, asyncHandler(async (req, re
       req.query.period,
     );
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -116,8 +116,8 @@ router.get("/:propertyId/timeseries", validateProperty, asyncHandler(async (req,
       req.query.period,
     );
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -130,8 +130,8 @@ router.get("/:propertyId/channels", validateProperty, asyncHandler(async (req, r
       req.query.period,
     );
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -144,8 +144,8 @@ router.get("/:propertyId/landing-pages", validateProperty, asyncHandler(async (r
       req.query.period,
     );
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -158,8 +158,8 @@ router.get("/:propertyId/heatmap", validateProperty, asyncHandler(async (req, re
       req.query.period,
     );
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -172,8 +172,8 @@ router.get("/:propertyId/new-vs-returning", validateProperty, asyncHandler(async
       req.query.period,
     );
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 
@@ -186,8 +186,8 @@ router.get("/:propertyId/events", validateProperty, asyncHandler(async (req, res
       req.query.period,
     );
     res.json(data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }));
 

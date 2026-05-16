@@ -2,6 +2,7 @@
 
 import { Router } from "express";
 import http from "http";
+import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { DEVICES } from "../config.js";
 import DockerStatsService from "../services/DockerStatsService.js";
 import logger from "../utils/logger.js";
@@ -13,7 +14,7 @@ const router = Router();
  * Returns a list of all Docker containers across all hosts,
  * regardless of whether they map to a registered project.
  */
-router.get("/", async (_req, res) => {
+router.get("/", asyncHandler(async (_req, res) => {
   try {
     const containers = await DockerStatsService.getAll();
 
@@ -28,11 +29,11 @@ router.get("/", async (_req, res) => {
     }));
 
     res.json({ containers: loggable });
-  } catch (err) {
-    logger.error(`[Logs] Failed to list containers: ${err.message}`);
+  } catch (error) {
+    logger.error(`[Logs] Failed to list containers: ${error.message}`);
     res.json({ containers: [] });
   }
-});
+}));
 
 /**
  * GET /logs/:containerName
@@ -42,7 +43,7 @@ router.get("/", async (_req, res) => {
  * Each SSE event is a single log line: `data: <line>\n\n`
  * Sends `event: connected` on handshake and `event: error` on failure.
  */
-router.get("/:containerName", async (req, res) => {
+router.get("/:containerName", asyncHandler(async (req, res) => {
   const { containerName } = req.params;
   const deviceFilter = req.query.device || null;
 
@@ -50,8 +51,8 @@ router.get("/:containerName", async (req, res) => {
   let containers;
   try {
     containers = await DockerStatsService.getAll(deviceFilter || undefined);
-  } catch (err) {
-    logger.error(`[Logs] Failed to query containers: ${err.message}`);
+  } catch (error) {
+    logger.error(`[Logs] Failed to query containers: ${error.message}`);
     return res.status(500).json({ error: "Failed to query Docker containers" });
   }
 
@@ -120,7 +121,7 @@ router.get("/:containerName", async (req, res) => {
     sendError(`No Docker API configured for device: ${match.device}`);
     cleanup(null);
   }
-});
+}));
 
 /**
  * Stream logs via Docker Engine API (Unix socket or TCP).
@@ -213,7 +214,7 @@ function streamViaDockerApi(device, containerName, tail, follow, sendLine, sendE
         cleanup();
       });
 
-      dockerRes.on("error", (err) => {
+      dockerRes.on("error", (error) => {
         logger.error(`[Logs] Docker stream error for ${containerName}: ${err.message}`);
         sendError(err.message);
         cleanup();
@@ -228,7 +229,7 @@ function streamViaDockerApi(device, containerName, tail, follow, sendLine, sendE
     },
   );
 
-  dockerReq.on("error", (err) => {
+  dockerReq.on("error", (error) => {
     logger.error(`[Logs] Docker socket error for ${containerName}: ${err.message}`);
     sendError(err.message);
     cleanup();
