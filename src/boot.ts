@@ -25,7 +25,7 @@ for (const [key, value] of Object.entries(secrets)) {
 const REGISTRY_RETRIES = 5;
 const REGISTRY_RETRY_DELAY_MS = 2_000;
 
-let registry = null;
+let registry: any = null;
 
 for (let attempt = 1; attempt <= REGISTRY_RETRIES; attempt++) {
   vault.clearRegistryCache();
@@ -35,7 +35,7 @@ for (let attempt = 1; attempt <= REGISTRY_RETRIES; attempt++) {
 
   if (attempt < REGISTRY_RETRIES) {
     bootLogger.warn(`Registry empty (attempt ${attempt}/${REGISTRY_RETRIES}) — retrying in ${REGISTRY_RETRY_DELAY_MS}ms…`);
-    await new Promise((r) => setTimeout(r, REGISTRY_RETRY_DELAY_MS));
+    await new Promise((r: any) => setTimeout(r, REGISTRY_RETRY_DELAY_MS));
   }
 }
 

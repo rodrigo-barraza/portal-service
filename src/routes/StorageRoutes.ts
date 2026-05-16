@@ -1,14 +1,14 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Object Store Route ─────────────────────────────────────
 
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import MinioService from "../services/MinioService.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
 
 // ── MIME type inference from extension ────────────────────────
-const EXT_TO_MIME = {
+const EXT_TO_MIME: Record<string, string> = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -33,24 +33,24 @@ const EXT_TO_MIME = {
   ".tar": "application/x-tar",
 };
 
-function guessMime(filename) {
+function guessMime(filename: string | null | undefined) {
   const ext = (filename || "").match(/\.[^.]+$/)?.[0]?.toLowerCase();
-  return EXT_TO_MIME[ext] || "application/octet-stream";
+  return (ext && EXT_TO_MIME[ext]) || "application/octet-stream";
 }
 
 /**
  * GET /object-store/buckets
  * List all MinIO buckets with object counts and total sizes.
  */
-router.get("/buckets", asyncHandler(async (_req, res, next) => {
+router.get("/buckets", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const buckets = await MinioService.listBuckets();
     res.json({ buckets });
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`[ObjectStore] listBuckets failed: ${error.message}`);
     next(error);
   }
-}));
+}, "Storage_ListBuckets"));
 
 /**
  * GET /object-store/buckets/stream
@@ -60,7 +60,7 @@ router.get("/buckets", asyncHandler(async (_req, res, next) => {
  *   bucket → { name, creationDate, objectCount, totalSize }
  *   done   → {} (signals completion)
  */
-router.get("/buckets/stream", asyncHandler(async (req, res) => {
+router.get("/buckets/stream", asyncHandler(async (req: Request, res: Response) => {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
@@ -74,13 +74,13 @@ router.get("/buckets/stream", asyncHandler(async (req, res) => {
   try {
     for await (const event of MinioService.streamBuckets()) {
       if (req.closed) break;
-      res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.type === "bucket" ? event.bucket : event)}\n\n`);
+      res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.type === "bucket" ? (event as any).bucket : event)}\n\n`);
     }
 
     if (!req.closed) {
       res.write(`event: done\ndata: {}\n\n`);
     }
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`[ObjectStore] streamBuckets failed: ${error.message}`);
     if (!req.closed) {
       res.write(`event: error\ndata: ${JSON.stringify({ message: error.message })}\n\n`);
@@ -88,7 +88,7 @@ router.get("/buckets/stream", asyncHandler(async (req, res) => {
   } finally {
     res.end();
   }
-}));
+}, "Storage_StreamBuckets"));
 
 /**
  * GET /object-store/buckets/:name
@@ -97,27 +97,27 @@ router.get("/buckets/stream", asyncHandler(async (req, res) => {
  *   prefix    — filter by key prefix (default: "")
  *   recursive — if "true", list recursively (default: false)
  */
-router.get("/buckets/:name", asyncHandler(async (req, res, next) => {
+router.get("/buckets/:name", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name } = req.params;
-    const prefix = req.query.prefix || "";
+    const prefix = (req.query.prefix as string) || "";
     const recursive = req.query.recursive === "true";
     const result = await MinioService.listObjects(name, prefix, recursive);
-    res.json({ bucket: name, prefix, ...result });
-  } catch (error) {
+    res.json({ bucket: name, prefix, ...(result as any) });
+  } catch (error: any) {
     logger.error(`[ObjectStore] listObjects failed: ${error.message}`);
     next(error);
   }
-}));
+}, "Storage_ListObjects"));
 
 /**
  * GET /object-store/buckets/:name/stat/*objectPath
  * Get metadata (size, content-type, etag, lastModified) for a single object.
  */
-router.get("/buckets/:name/stat/*objectPath", asyncHandler(async (req, res, next) => {
+router.get("/buckets/:name/stat/*objectPath", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bucketName = req.params.name;
-    const objectName = [].concat(req.params.objectPath).join("/");
+    const objectName = (req.params.objectPath as string) || req.params[0] || "";
 
     if (!objectName) {
       return res.status(400).json({ error: "Object name required" });
@@ -133,14 +133,14 @@ router.get("/buckets/:name/stat/*objectPath", asyncHandler(async (req, res, next
       lastModified: stat.lastModified?.toISOString() || null,
       metadata: stat.metaData || {},
     });
-  } catch (error) {
+  } catch (error: any) {
     if (error.code === "NotFound" || error.message?.includes("Not Found")) {
       return res.status(404).json({ error: "Object not found" });
     }
     logger.error(`[ObjectStore] statObject failed: ${error.message}`);
     next(error);
   }
-}));
+}, "Storage_StatObject"));
 
 /**
  * GET /object-store/buckets/:name/download/*objectPath
@@ -148,10 +148,10 @@ router.get("/buckets/:name/stat/*objectPath", asyncHandler(async (req, res, next
  * Query params:
  *   inline — if "true", sets Content-Disposition to inline (default: attachment)
  */
-router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req, res, next) => {
+router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bucketName = req.params.name;
-    const objectName = [].concat(req.params.objectPath).join("/");
+    const objectName = (req.params.objectPath as string) || req.params[0] || "";
 
     if (!objectName) {
       return res.status(400).json({ error: "Object name required" });
@@ -170,23 +170,23 @@ router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req, res, 
 
     const stream = await MinioService.getObject(bucketName, objectName);
     stream.pipe(res);
-  } catch (error) {
+  } catch (error: any) {
     if (error.code === "NotFound" || error.message?.includes("Not Found")) {
       return res.status(404).json({ error: "Object not found" });
     }
     logger.error(`[ObjectStore] getObject failed: ${error.message}`);
     next(error);
   }
-}));
+}, "Storage_DownloadObject"));
 
 /**
  * DELETE /object-store/buckets/:name/*objectPath
  * Delete a single object from a bucket.
  */
-router.delete("/buckets/:name/*objectPath", asyncHandler(async (req, res, next) => {
+router.delete("/buckets/:name/*objectPath", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bucketName = req.params.name;
-    const objectName = [].concat(req.params.objectPath).join("/");
+    const objectName = (req.params.objectPath as string) || req.params[0] || "";
 
     if (!objectName) {
       return res.status(400).json({ error: "Object name required" });
@@ -195,10 +195,10 @@ router.delete("/buckets/:name/*objectPath", asyncHandler(async (req, res, next) 
     await MinioService.deleteObject(bucketName, objectName);
     logger.info(`[ObjectStore] Deleted ${bucketName}/${objectName}`);
     res.json({ success: true, bucket: bucketName, object: objectName });
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`[ObjectStore] deleteObject failed: ${error.message}`);
     next(error);
   }
-}));
+}, "Storage_DeleteObject"));
 
 export default router;

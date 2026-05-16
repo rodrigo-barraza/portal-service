@@ -40,7 +40,7 @@ export default class StatsAggregatorService {
 
       cache.set("overview", { data, fetchedAt: Date.now() });
       return data;
-    } catch (error) {
+    } catch (error: any) {
       logger.error(`[StatsAggregator] Failed to fetch overview: ${error.message}`);
       // Return stale cache if available
       if (cached) return { ...cached.data, stale: true };
@@ -54,7 +54,7 @@ export default class StatsAggregatorService {
    * @param {string} [params.period] - "24h", "7d", "30d"
    * @returns {Promise<object>}
    */
-  static async getRequestBreakdown(params = {}) {
+  static async getRequestBreakdown(params: any = {}) {
     const cacheKey = `breakdown:${params.period || "24h"}`;
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.fetchedAt < STATS_CACHE_TTL_MS) {
@@ -74,7 +74,7 @@ export default class StatsAggregatorService {
 
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
-    } catch (error) {
+    } catch (error: any) {
       logger.error(`[StatsAggregator] Breakdown fetch failed: ${error.message}`);
       if (cached) return { ...cached.data, stale: true };
       return { error: error.message };
@@ -102,7 +102,7 @@ export default class StatsAggregatorService {
 
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
-    } catch (error) {
+    } catch (error: any) {
       logger.error(`[StatsAggregator] Project stats failed: ${error.message}`);
       if (cached) return { ...cached.data, stale: true };
       return { error: error.message };
@@ -114,7 +114,7 @@ export default class StatsAggregatorService {
    * @param {string} url
    * @returns {Promise<any>}
    */
-  static async _fetch(url) {
+  static async _fetch(url: any) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 
@@ -130,7 +130,7 @@ export default class StatsAggregatorService {
       }
 
       return res.json();
-    } catch (error) {
+    } catch (error: any) {
       clearTimeout(timeout);
       throw error;
     }

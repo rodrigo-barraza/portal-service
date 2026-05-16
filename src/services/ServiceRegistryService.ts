@@ -17,6 +17,7 @@ function detectLocalDevice() {
   const interfaces = os.networkInterfaces();
   const localIPs = new Set();
   for (const iface of Object.values(interfaces)) {
+    if (!iface) continue;
     for (const addr of iface) {
       if (!addr.internal) localIPs.add(addr.address);
     }
@@ -51,6 +52,7 @@ function buildHostnameToDeviceMap() {
     // Also map this machine's LAN IPs to the local device name
     const interfaces = os.networkInterfaces();
     for (const iface of Object.values(interfaces)) {
+      if (!iface) continue;
       for (const addr of iface) {
         if (!addr.internal) map.set(addr.address, localName);
       }
@@ -68,7 +70,7 @@ const HOSTNAME_TO_DEVICE = buildHostnameToDeviceMap();
  * to return the friendly device name (e.g. "Synology NAS").
  * Falls back to the configured `device` field when no match is found.
  */
-function deriveHost(url, svc) {
+function deriveHost(url: any, svc: any) {
   if (!url) return DEVICES[svc.device]?.name || svc.device || "Unknown";
   try {
     const parsed = new URL(url);
@@ -86,7 +88,7 @@ function deriveHost(url, svc) {
  * the same device.  WSL2 can reach Windows apps via localhost but
  * not always via the LAN IP (apps that bind to 127.0.0.1 only).
  */
-function toLocalHealthUrl(url, svc) {
+function toLocalHealthUrl(url: any, svc: any) {
   if (!LOCAL_DEVICE_KEY || svc.device !== LOCAL_DEVICE_KEY) return url;
   try {
     const parsed = new URL(url);
@@ -122,7 +124,7 @@ export default class ServiceRegistryService {
    * @returns {ServiceStatus[]}
    */
   static list() {
-    return Object.entries(PROJECTS).map(([id, svc]) => {
+    return Object.entries(PROJECTS).map(([id, svc]: any) => {
       const cached = statusCache.get(id);
       return cached || {
         id,
@@ -159,7 +161,7 @@ export default class ServiceRegistryService {
    */
   static async checkAll() {
     const results = await Promise.all(
-      Object.entries(PROJECTS).map(([id, svc]) =>
+      Object.entries(PROJECTS).map(([id, svc]: any) =>
         ServiceRegistryService._checkService(id, svc),
       ),
     );
@@ -189,7 +191,7 @@ export default class ServiceRegistryService {
    * @param {{ name: string, url: string }} svc
    * @returns {Promise<ServiceStatus>}
    */
-  static async _checkService(id, svc) {
+  static async _checkService(id: any, svc: any) {
     if (!svc.url) {
       return {
         id,
@@ -224,11 +226,11 @@ export default class ServiceRegistryService {
       ? 1 + ServiceRegistryService.HEALTH_CHECK_RETRIES
       : 1;
 
-    let lastResult = null;
+    let lastResult: any = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       if (attempt > 1) {
-        await new Promise((r) => setTimeout(r, ServiceRegistryService.HEALTH_CHECK_RETRY_DELAY_MS));
+        await new Promise((r: any) => setTimeout(r, ServiceRegistryService.HEALTH_CHECK_RETRY_DELAY_MS));
       }
 
       lastResult = await ServiceRegistryService._attemptHealthCheck(id, svc);
@@ -250,7 +252,7 @@ export default class ServiceRegistryService {
    * @param {object} svc
    * @returns {Promise<ServiceStatus>}
    */
-  static async _attemptHealthCheck(id, svc) {
+  static async _attemptHealthCheck(id: any, svc: any) {
     const start = Date.now();
 
     try {
@@ -269,7 +271,7 @@ export default class ServiceRegistryService {
       clearTimeout(timeout);
 
       const responseTimeMs = Date.now() - start;
-      let metadata = null;
+      let metadata: any = null;
 
       try {
         metadata = await res.json();
@@ -303,7 +305,7 @@ export default class ServiceRegistryService {
         error: res.ok ? null : `HTTP ${res.status}`,
         checkedAt: new Date().toISOString(),
       };
-    } catch (error) {
+    } catch (error: any) {
       const errorDetail = ServiceRegistryService._extractErrorDetail(error);
       logger.warn(`[ServiceRegistry] ${svc.name} unreachable: ${errorDetail}`);
       return {
@@ -342,7 +344,7 @@ export default class ServiceRegistryService {
    * @param {Error} err
    * @returns {string}
    */
-  static _extractErrorDetail(error) {
+  static _extractErrorDetail(error: any) {
     if (error.name === "AbortError") return "Timeout";
 
     // Dig into undici's nested cause chain for the real error code
@@ -359,7 +361,7 @@ export default class ServiceRegistryService {
           ENOTFOUND: "DNS lookup failed",
           EPIPE: "Broken pipe",
         };
-        return labels[code] || `${code}: ${cause.message || error.message}`;
+        return (labels as Record<string, string>)[code] || `${code}: ${cause.message || error.message}`;
       }
       cause = cause.cause;
     }

@@ -14,7 +14,7 @@ export const MINIO_SECRET_KEY = process.env.MINIO_SECRET_KEY;
 // ── Devices ────────────────────────────────────────────────────
 // Physical machines / hosts that run projects.
 // Populated from the registry's `devices` section at boot.
-export let DEVICES = {};
+export let DEVICES: Record<string, any> = {};
 
 /**
  * Infer the project type label from the project ID.
@@ -22,7 +22,7 @@ export let DEVICES = {};
  * Otherwise: projects ending in "-client" are "Client", "-bot" are "Bot",
  * entries without repo/docker are "Infrastructure", rest are "Service".
  */
-function inferProjectType(id, svc) {
+function inferProjectType(id: string, svc: any) {
   if (svc.projectType) return svc.projectType;
   if (!svc.repo && !svc.dockerProject) return "Infrastructure";
   if (id.endsWith("-client")) return "Client";
@@ -37,7 +37,7 @@ function inferProjectType(id, svc) {
  *   Tier 1 — Services
  *   Tier 2 — Clients, Bots, Libraries, Kits, Tools
  */
-function inferDeployTier(projectType) {
+function inferDeployTier(projectType: string) {
   switch (projectType) {
     case "Infrastructure": return 0;
     case "Service":        return 1;
@@ -51,7 +51,7 @@ function inferDeployTier(projectType) {
  * @param {string|null} repo
  * @returns {string|null}
  */
-function normalizeRepoUrl(repo) {
+function normalizeRepoUrl(repo: string | null) {
   if (!repo) return null;
   const sshMatch = repo.match(/^git@github\.com:(.+?)(?:\.git)?$/);
   if (sshMatch) return `https://github.com/${sshMatch[1]}`;
@@ -61,26 +61,26 @@ function normalizeRepoUrl(repo) {
 // ── Registry Hydration ─────────────────────────────────────────
 // Populated at boot time by initializeRegistry().
 // Until then, PROJECTS and INFRASTRUCTURE are empty objects.
-export let PROJECTS = {};
-export let INFRASTRUCTURE = {};
-export let PROJECT_TYPE_COLORS = {};
-export let DEPLOY_TIER_COLORS = {};
-export let ANALYTICS_PROPERTIES = [];
+export let PROJECTS: Record<string, any> = {};
+export let INFRASTRUCTURE: Record<string, any> = {};
+export let PROJECT_TYPE_COLORS: Record<string, string> = {};
+export let DEPLOY_TIER_COLORS: Record<string, string> = {};
+export let ANALYTICS_PROPERTIES: any[] = [];
 
 /**
  * Build the PROJECTS, INFRASTRUCTURE, and DEVICES maps from the Vault registry.
  * Called once from boot.js after the registry is loaded.
  *
- * @param {{ projects: object[], infrastructure: object[], devices: object[] }} registry
+ * @param {{ projects: any[], infrastructure: any[], devices: any[], projectTypeColors?: any, deployTierColors?: any }} registry
  */
-export function initializeRegistry(registry) {
+export function initializeRegistry(registry: any) {
   if (!registry || !registry.projects) {
     logger.warn("No registry data — PROJECTS and INFRASTRUCTURE will be empty");
     return;
   }
 
   // ── Projects ─────────────────────────────────────────────────
-  const projects = {};
+  const projects: Record<string, any> = {};
 
   for (const svc of registry.projects) {
     projects[svc.id] = {
@@ -101,7 +101,7 @@ export function initializeRegistry(registry) {
       dockerProject: svc.dockerProject || null,
       deployTier: svc.deployTier ?? inferDeployTier(inferProjectType(svc.id, svc)),
       essential: svc.essential || false,
-      dependsOn: (svc.dependsOn || []).map((dep) => ({
+      dependsOn: (svc.dependsOn || []).map((dep: any) => ({
         id: dep.id,
         criticality: dep.criticality || "required",
       })),
@@ -114,8 +114,8 @@ export function initializeRegistry(registry) {
   // Derive GA4 properties from project entries that declare an
   // analyticsPropertyId — replaces the old GOOGLE_ANALYTICS_PROPERTIES env var.
   ANALYTICS_PROPERTIES = (registry.projects || [])
-    .filter((svc) => svc.analyticsPropertyId)
-    .map((svc) => ({
+    .filter((svc: any) => svc.analyticsPropertyId)
+    .map((svc: any) => ({
       id: svc.analyticsPropertyId,
       label: svc.label,
       measurementId: svc.analyticsMeasurementId || "",
@@ -123,9 +123,9 @@ export function initializeRegistry(registry) {
     }));
 
   // ── Infrastructure ───────────────────────────────────────────
-  const infra = {};
+  const infra: Record<string, any> = {};
 
-  const infraTypeLabels = { database: "Database", "object-store": "Store", inference: "Inference" };
+  const infraTypeLabels: Record<string, string> = { database: "Database", "object-store": "Store", inference: "Inference" };
 
   for (const item of registry.infrastructure || []) {
     infra[item.id] = {
@@ -153,7 +153,7 @@ export function initializeRegistry(registry) {
   DEPLOY_TIER_COLORS = registry.deployTierColors || {};
 
   // ── Devices ─────────────────────────────────────────────────
-  const devices = {};
+  const devices: Record<string, any> = {};
 
   for (const dev of registry.devices || []) {
     devices[dev.id] = {

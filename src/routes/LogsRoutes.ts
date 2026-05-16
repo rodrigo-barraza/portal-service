@@ -1,6 +1,6 @@
 // ─── Logs Route ─────────────────────────────────────────────
 
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import http from "http";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { DEVICES } from "../config.js";
@@ -14,11 +14,11 @@ const router = Router();
  * Returns a list of all Docker containers across all hosts,
  * regardless of whether they map to a registered project.
  */
-router.get("/", asyncHandler(async (_req, res) => {
+router.get("/", asyncHandler(async (_req: Request, res: Response) => {
   try {
-    const containers = await DockerStatsService.getAll();
+    const containers = await DockerStatsService.getAll(undefined);
 
-    const loggable = containers.map((c) => ({
+    const loggable = containers.map((c: any) => ({
       id: c.name,
       name: c.name,
       image: c.image,
@@ -29,11 +29,11 @@ router.get("/", asyncHandler(async (_req, res) => {
     }));
 
     res.json({ containers: loggable });
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`[Logs] Failed to list containers: ${error.message}`);
     res.json({ containers: [] });
   }
-}));
+}, "Logs_List"));
 
 /**
  * GET /logs/:containerName
@@ -43,20 +43,20 @@ router.get("/", asyncHandler(async (_req, res) => {
  * Each SSE event is a single log line: `data: <line>\n\n`
  * Sends `event: connected` on handshake and `event: error` on failure.
  */
-router.get("/:containerName", asyncHandler(async (req, res) => {
+router.get("/:containerName", asyncHandler(async (req: Request, res: Response) => {
   const { containerName } = req.params;
   const deviceFilter = req.query.device || null;
 
   // Look up the container in the live stats cache
   let containers;
   try {
-    containers = await DockerStatsService.getAll(deviceFilter || undefined);
-  } catch (error) {
+    containers = await DockerStatsService.getAll(deviceFilter as string | undefined);
+  } catch (error: any) {
     logger.error(`[Logs] Failed to query containers: ${error.message}`);
     return res.status(500).json({ error: "Failed to query Docker containers" });
   }
 
-  const match = containers.find((c) => c.name === containerName);
+  const match = containers.find((c: any) => c.name === containerName);
 
   if (!match) {
     return res.status(404).json({ error: `Container not found: ${containerName}` });
@@ -67,7 +67,7 @@ router.get("/:containerName", asyncHandler(async (req, res) => {
     return res.status(400).json({ error: `Unknown device for container: ${match.device}` });
   }
 
-  const tail = Math.min(Math.max(parseInt(req.query.tail, 10) || 200, 1), 5000);
+  const tail = Math.min(Math.max(parseInt(req.query.tail as string, 10) || 200, 1), 5000);
   const follow = req.query.follow === "1";
 
   // ── SSE headers ──────────────────────────────────────────────
@@ -91,17 +91,17 @@ router.get("/:containerName", asyncHandler(async (req, res) => {
 
   let closed = false;
 
-  function sendLine(line) {
+  function sendLine(line: string) {
     if (closed) return;
     res.write(`data: ${line}\n\n`);
   }
 
-  function sendError(message) {
+  function sendError(message: string) {
     if (closed) return;
     res.write(`event: error\ndata: ${JSON.stringify({ error: message })}\n\n`);
   }
 
-  function cleanup(child) {
+  function cleanup(child: any) {
     if (closed) return;
     closed = true;
     if (child) {
@@ -116,18 +116,18 @@ router.get("/:containerName", asyncHandler(async (req, res) => {
 
   // ── Stream via Docker socket or TCP ──────────────────────────
   if (device.dockerApi) {
-    streamViaDockerApi(device, containerName, tail, follow, sendLine, sendError, () => cleanup(null), req, res);
+    streamViaDockerApi(device, containerName as string, tail, follow, sendLine, sendError, () => cleanup(null), req, res);
   } else {
     sendError(`No Docker API configured for device: ${match.device}`);
     cleanup(null);
   }
-}));
+}, "Logs_Stream"));
 
 /**
  * Stream logs via Docker Engine API (Unix socket or TCP).
  * This is a direct HTTP request to /containers/<name>/logs.
  */
-function streamViaDockerApi(device, containerName, tail, follow, sendLine, sendError, cleanup, clientReq, clientRes) {
+function streamViaDockerApi(device: any, containerName: string, tail: number, follow: boolean, sendLine: (l: string) => void, sendError: (e: string) => void, cleanup: () => void, clientReq: Request, clientRes: Response) {
   const qs = new URLSearchParams({
     stdout: "1",
     stderr: "1",
@@ -162,10 +162,10 @@ function streamViaDockerApi(device, containerName, tail, follow, sendLine, sendE
       ...transport,
       method: "GET",
     },
-    (dockerRes) => {
+    (dockerRes: any) => {
       if (dockerRes.statusCode !== 200) {
         let body = "";
-        dockerRes.on("data", (chunk) => (body += chunk));
+        dockerRes.on("data", (chunk: any) => (body += chunk));
         dockerRes.on("end", () => {
           logger.error(`[Logs] Docker API error ${dockerRes.statusCode}: ${body}`);
           try {
@@ -185,7 +185,7 @@ function streamViaDockerApi(device, containerName, tail, follow, sendLine, sendE
       // We need to strip these headers to get clean log lines.
       let buffer = Buffer.alloc(0);
 
-      dockerRes.on("data", (chunk) => {
+      dockerRes.on("data", (chunk: any) => {
         buffer = Buffer.concat([buffer, chunk]);
 
         // Process all complete frames in the buffer
@@ -214,9 +214,9 @@ function streamViaDockerApi(device, containerName, tail, follow, sendLine, sendE
         cleanup();
       });
 
-      dockerRes.on("error", (error) => {
-        logger.error(`[Logs] Docker stream error for ${containerName}: ${err.message}`);
-        sendError(err.message);
+      dockerRes.on("error", (error: any) => {
+        logger.error(`[Logs] Docker stream error for ${containerName}: ${error.message}`);
+        sendError(error.message);
         cleanup();
       });
 
@@ -229,9 +229,9 @@ function streamViaDockerApi(device, containerName, tail, follow, sendLine, sendE
     },
   );
 
-  dockerReq.on("error", (error) => {
-    logger.error(`[Logs] Docker socket error for ${containerName}: ${err.message}`);
-    sendError(err.message);
+  dockerReq.on("error", (error: any) => {
+    logger.error(`[Logs] Docker socket error for ${containerName}: ${error.message}`);
+    sendError(error.message);
     cleanup();
   });
 

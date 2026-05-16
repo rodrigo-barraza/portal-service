@@ -4,7 +4,7 @@ import { Router } from "express";
 
 const router = Router();
 
-router.get("/", (_req, res) => {
+router.get("/", (_req: any, res: any) => {
   res.json({
     status: "ok",
     uptime: process.uptime(),

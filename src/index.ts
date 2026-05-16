@@ -35,7 +35,7 @@ const ALLOWED_ORIGINS = [
 
 app.use(
   cors({
-    origin(origin, callback) {
+    origin(origin: any, callback: any) {
       // Allow requests with no origin (server-to-server, curl, health checks)
       if (!origin) return callback(null, true);
       // Allow any localhost port (local development)
@@ -60,7 +60,7 @@ const ENDPOINTS = {
 
 // ─── Root Health Check ─────────────────────────────────────────────
 
-app.get("/", (_req, res) => {
+app.get("/", (_req: any, res: any) => {
   res.json({
     name: "API",
     version: "1.0.0",
@@ -90,11 +90,11 @@ app.use(errorHandler);
 
 (async () => {
   // Connect to MongoDB
-  await MongoWrapper.createClient(MONGO_DB_NAME, MONGO_URI);
+  await MongoWrapper.createClient(MONGO_DB_NAME as string, MONGO_URI as string);
 
   // Ensure indexes for query performance
   try {
-    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    const db = MongoWrapper.getDb(MONGO_DB_NAME as string);
     if (db) {
       await Promise.all([
         db
@@ -103,7 +103,7 @@ app.use(errorHandler);
       ]);
       logger.success("Database indexes ensured");
     }
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`Failed to ensure indexes: ${error.message}`);
   }
 
@@ -142,7 +142,7 @@ app.use(errorHandler);
         } else {
           logger.warn(`[Registry] Deferred attempt ${deferredAttempt}/${MAX_DEFERRED_ATTEMPTS} — still empty`);
         }
-      } catch (error) {
+      } catch (error: any) {
         logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${error.message}`);
         if (deferredAttempt >= MAX_DEFERRED_ATTEMPTS) {
           clearInterval(deferredTimer);
@@ -156,9 +156,9 @@ app.use(errorHandler);
     ServiceRegistryService.checkAll(),
     InfrastructureRegistryService.checkAll(),
   ])
-    .then(([svcResults, infraResults]) => {
-      const svcHealthy = svcResults.filter((s) => s.healthy).length;
-      const infraHealthy = infraResults.filter((s) => s.healthy).length;
+    .then(([svcResults, infraResults]: any) => {
+      const svcHealthy = svcResults.filter((s: any) => s && s.healthy).length;
+      const infraHealthy = infraResults.filter((s: any) => s && s.healthy).length;
       logger.info(
         `[ServiceRegistry] ${svcHealthy}/${svcResults.length} services healthy`,
       );
@@ -166,7 +166,7 @@ app.use(errorHandler);
         `[InfraRegistry] ${infraHealthy}/${infraResults.length} infrastructure healthy`,
       );
     })
-    .catch((error) => {
+    .catch((error: any) => {
       logger.warn(`[Registry] Initial check failed: ${error.message}`);
     });
 
@@ -179,7 +179,7 @@ app.use(errorHandler);
   // Start server
   app.listen(PORT, () => {
     logger.success(`API is running on port ${PORT}`);
-    ENDPOINTS.rest.forEach((ep) =>
+    ENDPOINTS.rest.forEach((ep: any) =>
       logger.info(`  REST  →  http://localhost:${PORT}${ep}`),
     );
   });

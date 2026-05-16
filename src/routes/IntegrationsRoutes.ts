@@ -1,6 +1,6 @@
 // ─── Integrations Route ─────────────────────────────────────
 
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 
 const router = Router();
 
@@ -82,7 +82,7 @@ const INTEGRATIONS = [
  * Mask a secret value — shows first 4 + last 4 characters.
  * Returns null if the value is empty or not set.
  */
-function maskValue(value) {
+function maskValue(value: string | undefined | null) {
   if (!value || value.length === 0) return null;
   if (value.length <= 12) return `${"•".repeat(value.length)}`;
   return `${value.slice(0, 4)}${"•".repeat(Math.min(value.length - 8, 20))}${value.slice(-4)}`;
@@ -92,8 +92,8 @@ function maskValue(value) {
  * GET /integrations
  * Returns all integration metadata grouped by category.
  */
-router.get("/", (_req, res) => {
-  const integrations = INTEGRATIONS.map((def) => {
+router.get("/", (_req: Request, res: Response) => {
+  const integrations = INTEGRATIONS.map((def: any) => {
     const rawValue = process.env[def.envKey] || "";
     const configured = rawValue.length > 0;
 
@@ -108,7 +108,7 @@ router.get("/", (_req, res) => {
   });
 
   // Group by category
-  const categories = {};
+  const categories: Record<string, any> = {};
   for (const item of integrations) {
     if (!categories[item.category]) {
       categories[item.category] = {
@@ -123,7 +123,7 @@ router.get("/", (_req, res) => {
     if (item.configured) categories[item.category].configuredCount++;
   }
 
-  const totalConfigured = integrations.filter((i) => i.configured).length;
+  const totalConfigured = integrations.filter((i: any) => i.configured).length;
 
   res.json({
     totalCount: integrations.length,

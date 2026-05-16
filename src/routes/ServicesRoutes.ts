@@ -1,7 +1,7 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Services Route ─────────────────────────────────────────
 
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import ServiceRegistryService from "../services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
 import DockerStatsService from "../services/DockerStatsService.js";
@@ -16,7 +16,7 @@ const router = Router();
  * @param {object} svc - Project entry from PROJECTS
  * @returns {{ id: string, device: object } | null}
  */
-function resolveDockerDevice(svc) {
+function resolveDockerDevice(svc: any) {
   const deviceId = svc.device || "synology";
   const device = DEVICES[deviceId];
 
@@ -31,21 +31,21 @@ function resolveDockerDevice(svc) {
  * Build a lookup map (id → name) and compute the inverse dependency graph.
  * Returns both `dependsOn` (resolved to {id, name}) and `dependedOnBy`.
  */
-function enrichWithDependencies(services, infrastructure) {
+function enrichWithDependencies(services: any[], infrastructure: any[]) {
   const all = [...services, ...infrastructure];
 
   // id → name lookup
-  const nameMap = Object.fromEntries(all.map((s) => [s.id, s.name]));
+  const nameMap = Object.fromEntries(all.map((s: any) => [s.id, s.name]));
 
   // Normalize a dependency entry — handles raw string IDs,
   // structured { id, criticality } objects, and already-enriched
   // { id, name, criticality } objects from cached status.
-  const rawId = (dep) => (typeof dep === "string" ? dep : dep.id);
-  const rawCriticality = (dep) =>
+  const rawId = (dep: any) => (typeof dep === "string" ? dep : dep.id);
+  const rawCriticality = (dep: any) =>
     typeof dep === "string" ? "required" : dep.criticality || "required";
 
   // Compute inverse: dependedOnBy[targetId] = [{ id, name, criticality }, ...]
-  const inverseMap = {};
+  const inverseMap: Record<string, any[]> = {};
   for (const item of all) {
     for (const dep of item.dependsOn || []) {
       const id = rawId(dep);
@@ -60,7 +60,7 @@ function enrichWithDependencies(services, infrastructure) {
 
   // Enrich each item — resolve names and carry criticality
   for (const item of all) {
-    item.dependsOn = (item.dependsOn || []).map((dep) => {
+    item.dependsOn = (item.dependsOn || []).map((dep: any) => {
       const id = rawId(dep);
       return {
         id,
@@ -80,7 +80,7 @@ function enrichWithDependencies(services, infrastructure) {
  * plus infrastructure backing stores (MongoDB, MinIO, etc.).
  * If ?refresh=true, forces a fresh health check before responding.
  */
-router.get("/", asyncHandler(async (req, res, next) => {
+router.get("/", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     let services, infrastructure;
 
@@ -96,16 +96,16 @@ router.get("/", asyncHandler(async (req, res, next) => {
 
     const enriched = enrichWithDependencies(services, infrastructure);
     res.json({ ...enriched, projectTypeColors: PROJECT_TYPE_COLORS, deployTierColors: DEPLOY_TIER_COLORS });
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
-}));
+}, "Services_List"));
 
 /**
  * POST /services/check
  * Trigger a fresh health check for all services and infrastructure.
  */
-router.post("/check", asyncHandler(async (_req, res, next) => {
+router.post("/check", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const [services, infrastructure] = await Promise.all([
       ServiceRegistryService.checkAll(),
@@ -113,20 +113,20 @@ router.post("/check", asyncHandler(async (_req, res, next) => {
     ]);
     const enriched = enrichWithDependencies(services, infrastructure);
     res.json({ ...enriched, projectTypeColors: PROJECT_TYPE_COLORS, deployTierColors: DEPLOY_TIER_COLORS });
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
-}));
+}, "Services_Check"));
 
 /**
  * POST /services/:id/restart
  * Restart a containerized service via Docker Engine API.
  * Routes to the correct Docker host based on the project's device.
  */
-router.post("/:id/restart", asyncHandler(async (req, res, next) => {
+router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[id];
+    const svc = PROJECTS[id as string];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
@@ -148,7 +148,7 @@ router.post("/:id/restart", asyncHandler(async (req, res, next) => {
       target.device, "POST", `/containers/${container}/restart?t=10`,
     );
 
-    if (result.statusCode === 204) {
+    if ((result as any).statusCode === 204) {
       logger.success(`[Restart] ${svc.name} restarted successfully`);
 
       // Trigger a fresh health check after a short delay
@@ -163,24 +163,24 @@ router.post("/:id/restart", asyncHandler(async (req, res, next) => {
         message: "Container restarted",
       });
     } else {
-      const msg = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
+      const msg = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
       logger.error(`[Restart] Failed for ${svc.name}: ${msg}`);
       res.status(502).json({ error: msg });
     }
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`[Restart] Failed: ${error.message}`);
     next(error);
   }
-}));
+}, "Services_Restart"));
 
 /**
  * POST /services/:id/stop
  * Stop a containerized service via Docker Engine API.
  */
-router.post("/:id/stop", asyncHandler(async (req, res, next) => {
+router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[id];
+    const svc = PROJECTS[id as string];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
@@ -202,7 +202,7 @@ router.post("/:id/stop", asyncHandler(async (req, res, next) => {
       target.device, "POST", `/containers/${container}/stop?t=10`,
     );
 
-    if (result.statusCode === 204 || result.statusCode === 304) {
+    if ((result as any).statusCode === 204 || (result as any).statusCode === 304) {
       logger.success(`[Stop] ${svc.name} stopped successfully`);
 
       setTimeout(() => {
@@ -213,27 +213,27 @@ router.post("/:id/stop", asyncHandler(async (req, res, next) => {
         success: true,
         service: svc.name,
         device: target.id,
-        message: result.statusCode === 304 ? "Container already stopped" : "Container stopped",
+        message: (result as any).statusCode === 304 ? "Container already stopped" : "Container stopped",
       });
     } else {
-      const msg = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
+      const msg = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
       logger.error(`[Stop] Failed for ${svc.name}: ${msg}`);
       res.status(502).json({ error: msg });
     }
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`[Stop] Failed: ${error.message}`);
     next(error);
   }
-}));
+}, "Services_Stop"));
 
 /**
  * POST /services/:id/start
  * Start a containerized service via Docker Engine API.
  */
-router.post("/:id/start", asyncHandler(async (req, res, next) => {
+router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[id];
+    const svc = PROJECTS[id as string];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
@@ -255,7 +255,7 @@ router.post("/:id/start", asyncHandler(async (req, res, next) => {
       target.device, "POST", `/containers/${container}/start`,
     );
 
-    if (result.statusCode === 204 || result.statusCode === 304) {
+    if ((result as any).statusCode === 204 || (result as any).statusCode === 304) {
       logger.success(`[Start] ${svc.name} started successfully`);
 
       setTimeout(() => {
@@ -266,28 +266,28 @@ router.post("/:id/start", asyncHandler(async (req, res, next) => {
         success: true,
         service: svc.name,
         device: target.id,
-        message: result.statusCode === 304 ? "Container already running" : "Container started",
+        message: (result as any).statusCode === 304 ? "Container already running" : "Container started",
       });
     } else {
-      const msg = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
+      const msg = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
       logger.error(`[Start] Failed for ${svc.name}: ${msg}`);
       res.status(502).json({ error: msg });
     }
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`[Start] Failed: ${error.message}`);
     next(error);
   }
-}));
+}, "Services_Start"));
 
 /**
  * GET /services/:id/rollback-status
  * Check whether a :previous image tag exists for a containerized service,
  * indicating that a rollback is available.
  */
-router.get("/:id/rollback-status", asyncHandler(async (req, res, next) => {
+router.get("/:id/rollback-status", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[id];
+    const svc = PROJECTS[id as string];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
@@ -309,7 +309,8 @@ router.get("/:id/rollback-status", asyncHandler(async (req, res, next) => {
       const body = await DockerStatsService.dockerGet(
         target.device,
         `/images/${encodeURIComponent(previousTag)}/json`,
-      );
+        undefined
+      ) as string;
       const imageInfo = JSON.parse(body);
       const created = imageInfo.Created || null;
       const size = imageInfo.Size || 0;
@@ -332,10 +333,10 @@ router.get("/:id/rollback-status", asyncHandler(async (req, res, next) => {
       // Image not found → 404 from Docker API
       res.json({ available: false, reason: "No previous image found" });
     }
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
-}));
+}, "Services_RollbackStatus"));
 
 /**
  * POST /services/:id/rollback
@@ -348,10 +349,10 @@ router.get("/:id/rollback-status", asyncHandler(async (req, res, next) => {
  *  4. Re-tag :rollback-backup → :previous (so we can roll-forward)
  *  5. Restart the container (it uses :latest)
  */
-router.post("/:id/rollback", asyncHandler(async (req, res, next) => {
+router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[id];
+    const svc = PROJECTS[id as string];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
@@ -378,6 +379,7 @@ router.post("/:id/rollback", asyncHandler(async (req, res, next) => {
       await DockerStatsService.dockerGet(
         target.device,
         `/images/${encodeURIComponent(previousTag)}/json`,
+        undefined
       );
     } catch {
       return res.status(400).json({ error: "No previous image available for rollback" });
@@ -388,8 +390,8 @@ router.post("/:id/rollback", asyncHandler(async (req, res, next) => {
       target.device, "POST",
       `/images/${encodeURIComponent(latestTag)}/tag?repo=${encodeURIComponent(imageName)}&tag=rollback-backup`,
     );
-    if (tagBackup.statusCode !== 201) {
-      logger.warn(`[Rollback] Failed to back up current :latest (${tagBackup.statusCode}), proceeding anyway`);
+    if ((tagBackup as any).statusCode !== 201) {
+      logger.warn(`[Rollback] Failed to back up current :latest (${(tagBackup as any).statusCode}), proceeding anyway`);
     }
 
     // 3. Tag :previous → :latest
@@ -397,8 +399,8 @@ router.post("/:id/rollback", asyncHandler(async (req, res, next) => {
       target.device, "POST",
       `/images/${encodeURIComponent(previousTag)}/tag?repo=${encodeURIComponent(imageName)}&tag=latest`,
     );
-    if (tagLatest.statusCode !== 201) {
-      const msg = tryParseDockerError(tagLatest.body) || `Failed to tag :previous as :latest (${tagLatest.statusCode})`;
+    if ((tagLatest as any).statusCode !== 201) {
+      const msg = tryParseDockerError((tagLatest as any).body) || `Failed to tag :previous as :latest (${(tagLatest as any).statusCode})`;
       logger.error(`[Rollback] ${msg}`);
       return res.status(502).json({ error: msg });
     }
@@ -408,8 +410,8 @@ router.post("/:id/rollback", asyncHandler(async (req, res, next) => {
       target.device, "POST",
       `/images/${encodeURIComponent(backupTag)}/tag?repo=${encodeURIComponent(imageName)}&tag=previous`,
     );
-    if (tagPrevious.statusCode !== 201) {
-      logger.warn(`[Rollback] Failed to set new :previous for roll-forward (${tagPrevious.statusCode})`);
+    if ((tagPrevious as any).statusCode !== 201) {
+      logger.warn(`[Rollback] Failed to set new :previous for roll-forward (${(tagPrevious as any).statusCode})`);
     }
 
     // Cleanup :rollback-backup tag
@@ -424,7 +426,7 @@ router.post("/:id/rollback", asyncHandler(async (req, res, next) => {
       target.device, "POST", `/containers/${svc.dockerProject}/restart?t=10`,
     );
 
-    if (restartResult.statusCode === 204) {
+    if ((restartResult as any).statusCode === 204) {
       logger.success(`[Rollback] ${svc.name} rolled back and restarted successfully`);
 
       setTimeout(() => {
@@ -438,37 +440,37 @@ router.post("/:id/rollback", asyncHandler(async (req, res, next) => {
         message: "Rolled back to previous image and restarted",
       });
     } else {
-      const msg = tryParseDockerError(restartResult.body) || `Restart after rollback failed: ${restartResult.statusCode}`;
+      const msg = tryParseDockerError((restartResult as any).body) || `Restart after rollback failed: ${(restartResult as any).statusCode}`;
       logger.error(`[Rollback] ${msg}`);
       res.status(502).json({ error: msg });
     }
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`[Rollback] Failed: ${error.message}`);
     next(error);
   }
-}));
+}, "Services_Rollback"));
 
 /**
  * GET /services/sizes
  * Returns GitHub repository sizes for all projects with a repo field.
  * Results are cached for 5 minutes to avoid GitHub API rate limits.
  */
-let sizeCache = null;
+let sizeCache: any = null;
 let sizeCacheAt = 0;
 const SIZE_CACHE_TTL_MS = 5 * 60 * 1000;
 
-router.get("/sizes", asyncHandler(async (_req, res, next) => {
+router.get("/sizes", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const now = Date.now();
     if (sizeCache && now - sizeCacheAt < SIZE_CACHE_TTL_MS) {
       return res.json(sizeCache);
     }
 
-    const entries = Object.entries(PROJECTS).filter(([, svc]) => svc.repo);
-    const sizes = {};
+    const entries = Object.entries(PROJECTS).filter(([, svc]: any) => svc.repo);
+    const sizes: Record<string, any> = {};
 
     await Promise.allSettled(
-      entries.map(async ([id, svc]) => {
+      entries.map(async ([id, svc]: any) => {
         const match = svc.repo.match(/github\.com\/(.+?)(?:\.git)?$/);
         if (!match) return;
 
@@ -488,7 +490,7 @@ router.get("/sizes", asyncHandler(async (_req, res, next) => {
 
           if (!resp.ok) return;
 
-          const data = await resp.json();
+          const data: any = await resp.json();
           sizes[id] = {
             sizeKB: data.size,
             sizeBytes: data.size * 1024,
@@ -504,15 +506,15 @@ router.get("/sizes", asyncHandler(async (_req, res, next) => {
     sizeCacheAt = now;
 
     res.json(response);
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
-}));
+}, "Services_Sizes"));
 
 /**
  * Try to extract a message from a Docker API error response body.
  */
-function tryParseDockerError(body) {
+function tryParseDockerError(body: string) {
   try {
     return JSON.parse(body).message;
   } catch {

@@ -13,21 +13,21 @@ const router = Router();
  * Each device includes a list of services it hosts, enriched with live health data.
  * Infrastructure backing stores (MongoDB, MinIO) are included as a separate array.
  */
-router.get("/", (_req, res) => {
+router.get("/", (_req: any, res: any) => {
   // Build service → health lookup from the registry cache
   const serviceStatuses = ServiceRegistryService.list();
-  const statusMap = new Map(serviceStatuses.map((s) => [s.id, s]));
+  const statusMap = new Map(serviceStatuses.map((s: any) => [s.id, s]));
 
   // Build infrastructure → health lookup
   const infraStatuses = InfrastructureRegistryService.list();
-  const infraMap = new Map(infraStatuses.map((s) => [s.id, s]));
+  const infraMap = new Map(infraStatuses.map((s: any) => [s.id, s]));
 
   // Group services and infrastructure by device
-  const devices = Object.entries(DEVICES).map(([deviceId, device]) => {
+  const devices = Object.entries(DEVICES).map(([deviceId, device]: any) => {
     // Application services on this device
     const hostedServices = Object.entries(PROJECTS)
-      .filter(([, svc]) => svc.device === deviceId)
-      .map(([svcId, svc]) => {
+      .filter(([, svc]: any) => svc.device === deviceId)
+      .map(([svcId, svc]: any) => {
         const status = statusMap.get(svcId);
         return {
           id: svcId,
@@ -47,8 +47,8 @@ router.get("/", (_req, res) => {
 
     // Infrastructure backing stores on this device
     const hostedInfra = Object.entries(INFRASTRUCTURE)
-      .filter(([, infra]) => infra.device === deviceId)
-      .map(([infraId, infra]) => {
+      .filter(([, infra]: any) => infra.device === deviceId)
+      .map(([infraId, infra]: any) => {
         const status = infraMap.get(infraId);
         return {
           id: infraId,
@@ -69,7 +69,7 @@ router.get("/", (_req, res) => {
       });
 
     const allItems = [...hostedServices, ...hostedInfra];
-    const healthyCount = allItems.filter((s) => s.healthy).length;
+    const healthyCount = allItems.filter((s: any) => s.healthy).length;
 
     return {
       id: deviceId,
@@ -89,7 +89,7 @@ router.get("/", (_req, res) => {
  * @param {string} url
  * @returns {number|null}
  */
-function extractPort(url) {
+function extractPort(url: any) {
   try {
     const parsed = new URL(url);
     return parsed.port ? Number(parsed.port) : null;

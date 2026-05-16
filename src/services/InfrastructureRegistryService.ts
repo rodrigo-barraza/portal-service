@@ -33,7 +33,7 @@ const HOSTNAME_TO_DEVICE = buildHostnameToDeviceMap();
  * Derive the display device name from a URL.
  * Reverse-looks up the URL hostname against the DEVICES table.
  */
-function deriveHost(url, infra) {
+function deriveHost(url: any, infra: any) {
   if (!url) return DEVICES[infra.device]?.name || infra.device || "Unknown";
   try {
     const parsed = new URL(url);
@@ -73,7 +73,7 @@ export default class InfrastructureRegistryService {
    * @returns {InfraStatus[]}
    */
   static list() {
-    return Object.entries(INFRASTRUCTURE).map(([id, infra]) => {
+    return Object.entries(INFRASTRUCTURE).map(([id, infra]: any) => {
       const cached = statusCache.get(id);
       return cached || {
         id,
@@ -104,7 +104,7 @@ export default class InfrastructureRegistryService {
    */
   static async checkAll() {
     const results = await Promise.all(
-      Object.entries(INFRASTRUCTURE).map(([id, infra]) =>
+      Object.entries(INFRASTRUCTURE).map(([id, infra]: any) =>
         InfrastructureRegistryService._checkInfra(id, infra),
       ),
     );
@@ -121,7 +121,7 @@ export default class InfrastructureRegistryService {
    * @param {object} infra
    * @returns {Promise<InfraStatus>}
    */
-  static async _checkInfra(id, infra) {
+  static async _checkInfra(id: any, infra: any) {
     const base = {
       id,
       name: infra.name,
@@ -141,7 +141,7 @@ export default class InfrastructureRegistryService {
     const start = Date.now();
 
     try {
-      let metadata = null;
+      let metadata: any = null;
 
       if (infra.type === "database") {
         metadata = await InfrastructureRegistryService._checkMongo();
@@ -159,7 +159,7 @@ export default class InfrastructureRegistryService {
         error: null,
         checkedAt: new Date().toISOString(),
       };
-    } catch (error) {
+    } catch (error: any) {
       logger.warn(`[InfraRegistry] ${infra.name} unreachable: ${error.message}`);
       return {
         ...base,
@@ -237,17 +237,17 @@ export default class InfrastructureRegistryService {
     // listBuckets is the lightest authenticated S3 call
     const buckets = await Promise.race([
       client.listBuckets(),
-      new Promise((_, reject) =>
+      new Promise((_: any, reject: any) =>
         setTimeout(
           () => reject(new Error("Timeout")),
           HEALTH_CHECK_TIMEOUT_MS,
         ),
       ),
-    ]);
+    ]) as any[];
 
     return {
       buckets: buckets.length,
-      bucketNames: buckets.map((b) => b.name),
+      bucketNames: buckets.map((b: any) => b.name),
     };
   }
 
@@ -257,7 +257,7 @@ export default class InfrastructureRegistryService {
    * @param {object} infra
    * @returns {Promise<object>}
    */
-  static async _checkHttp(infra) {
+  static async _checkHttp(infra: any) {
     const baseUrl = infra.url;
     const healthPath = infra.healthPath || "/";
     if (!baseUrl) throw new Error("No URL configured");

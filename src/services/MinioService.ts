@@ -8,7 +8,7 @@ import {
 } from "../config.js";
 import logger from "../utils/logger.js";
 
-let client = null;
+let client: any = null;
 
 /**
  * Ensure the MinIO client is initialized.
@@ -45,21 +45,21 @@ export default class MinioService {
 
     // Gather object counts + total sizes in parallel
     const enriched = await Promise.all(
-      rawBuckets.map(async (bucket) => {
+      rawBuckets.map(async (bucket: any) => {
         let objectCount = 0;
         let totalSize = 0;
 
         try {
-          await new Promise((resolve, reject) => {
+          await new Promise((resolve: any, reject: any) => {
             const stream = mc.listObjectsV2(bucket.name, "", true);
-            stream.on("data", (obj) => {
+            stream.on("data", (obj: any) => {
               objectCount++;
               totalSize += obj.size || 0;
             });
             stream.on("end", resolve);
             stream.on("error", reject);
           });
-        } catch (error) {
+        } catch (error: any) {
           logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${error.message}`);
         }
 
@@ -93,16 +93,16 @@ export default class MinioService {
       let totalSize = 0;
 
       try {
-        await new Promise((resolve, reject) => {
+        await new Promise((resolve: any, reject: any) => {
           const stream = mc.listObjectsV2(bucket.name, "", true);
-          stream.on("data", (obj) => {
+          stream.on("data", (obj: any) => {
             objectCount++;
             totalSize += obj.size || 0;
           });
           stream.on("end", resolve);
           stream.on("error", reject);
         });
-      } catch (error) {
+      } catch (error: any) {
         logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${error.message}`);
       }
 
@@ -126,16 +126,16 @@ export default class MinioService {
    * @param {boolean} [recursive=false]
    * @returns {Promise<{ objects: Array, prefixes: string[] }>}
    */
-  static async listObjects(bucketName, prefix = "", recursive = false) {
+  static async listObjects(bucketName: any, prefix: any = "", recursive: any = false) {
     const mc = getClient();
 
-    return new Promise((resolve, reject) => {
-      const objects = [];
+    return new Promise((resolve: any, reject: any) => {
+      const objects: any[] = [];
       const prefixes = new Set();
 
       const stream = mc.listObjectsV2(bucketName, prefix, recursive);
 
-      stream.on("data", (item) => {
+      stream.on("data", (item: any) => {
         if (item.prefix) {
           // Virtual directory
           prefixes.add(item.prefix);
@@ -166,7 +166,7 @@ export default class MinioService {
    * @param {string} objectName
    * @returns {Promise<object>}
    */
-  static async statObject(bucketName, objectName) {
+  static async statObject(bucketName: any, objectName: any) {
     const mc = getClient();
     return mc.statObject(bucketName, objectName);
   }
@@ -177,7 +177,7 @@ export default class MinioService {
    * @param {string} objectName
    * @returns {Promise<import('stream').Readable>}
    */
-  static async getObject(bucketName, objectName) {
+  static async getObject(bucketName: any, objectName: any) {
     const mc = getClient();
     return mc.getObject(bucketName, objectName);
   }
@@ -188,7 +188,7 @@ export default class MinioService {
    * @param {string} objectName
    * @returns {Promise<void>}
    */
-  static async deleteObject(bucketName, objectName) {
+  static async deleteObject(bucketName: any, objectName: any) {
     const mc = getClient();
     return mc.removeObject(bucketName, objectName);
   }
