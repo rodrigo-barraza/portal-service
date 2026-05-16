@@ -2,53 +2,70 @@
 
 import { Router } from "express";
 import http from "http";
-import { PROJECTS, DEVICES } from "../config.js";
+import { DEVICES } from "../config.js";
+import DockerStatsService from "../services/DockerStatsService.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
 
-const DOCKER_SOCKET = "/var/run/docker.sock";
-
 /**
  * GET /logs
- * Returns a list of services that support log streaming.
+ * Returns a list of all Docker containers across all hosts,
+ * regardless of whether they map to a registered project.
  */
-router.get("/", (_req, res) => {
-  const loggable = Object.entries(PROJECTS)
-    .filter(([, svc]) => svc.dockerProject)
-    .map(([id, svc]) => ({
-      id,
-      name: svc.name,
-      dockerProject: svc.dockerProject,
-      device: svc.device,
-      deviceName: DEVICES[svc.device]?.name || svc.device,
-      deployTier: svc.deployTier ?? null,
+router.get("/", async (_req, res) => {
+  try {
+    const containers = await DockerStatsService.getAll();
+
+    const loggable = containers.map((c) => ({
+      id: c.name,
+      name: c.name,
+      image: c.image,
+      state: c.state,
+      status: c.status,
+      device: c.device,
+      deviceName: DEVICES[c.device]?.name || c.device,
     }));
 
-  res.json({ services: loggable });
+    res.json({ containers: loggable });
+  } catch (err) {
+    logger.error(`[Logs] Failed to list containers: ${err.message}`);
+    res.json({ containers: [] });
+  }
 });
 
 /**
- * GET /logs/:id
+ * GET /logs/:containerName
  * Streams container logs as Server-Sent Events.
+ * :containerName is the Docker container name (e.g. "prism-service", "mongo").
+ * Optionally ?device=synology to disambiguate if the same name exists on multiple hosts.
  * Each SSE event is a single log line: `data: <line>\n\n`
  * Sends `event: connected` on handshake and `event: error` on failure.
  */
-router.get("/:id", (req, res) => {
-  const { id } = req.params;
-  const svc = PROJECTS[id];
+router.get("/:containerName", async (req, res) => {
+  const { containerName } = req.params;
+  const deviceFilter = req.query.device || null;
 
-  if (!svc) {
-    return res.status(404).json({ error: `Unknown service: ${id}` });
+  // Look up the container in the live stats cache
+  let containers;
+  try {
+    containers = await DockerStatsService.getAll(deviceFilter || undefined);
+  } catch (err) {
+    logger.error(`[Logs] Failed to query containers: ${err.message}`);
+    return res.status(500).json({ error: "Failed to query Docker containers" });
   }
 
-  if (!svc.dockerProject) {
-    return res
-      .status(400)
-      .json({ error: `${svc.name} is not a containerized service` });
+  const match = containers.find((c) => c.name === containerName);
+
+  if (!match) {
+    return res.status(404).json({ error: `Container not found: ${containerName}` });
   }
 
-  const device = DEVICES[svc.device];
+  const device = DEVICES[match.device];
+  if (!device) {
+    return res.status(400).json({ error: `Unknown device for container: ${match.device}` });
+  }
+
   const tail = Math.min(Math.max(parseInt(req.query.tail, 10) || 200, 1), 5000);
   const follow = req.query.follow === "1";
 
@@ -63,8 +80,9 @@ router.get("/:id", (req, res) => {
   // Handshake event
   res.write(
     `event: connected\ndata: ${JSON.stringify({
-      service: svc.name,
-      container: svc.dockerProject,
+      container: containerName,
+      device: match.device,
+      deviceName: device.name,
       tail,
       follow,
     })}\n\n`,
@@ -95,24 +113,20 @@ router.get("/:id", (req, res) => {
     res.end();
   }
 
-  // ── Choose strategy: Docker socket (local) or SSH (remote) ──
-  if (device?.sshAlias) {
-    // NAS or any device with sshAlias — use Docker Engine API via Unix socket
-    // when the API container is on the same host (docker.sock is mounted)
-    streamViaDockerSocket(svc, tail, follow, sendLine, sendError, () => cleanup(null), req, res);
+  // ── Stream via Docker socket or TCP ──────────────────────────
+  if (device.dockerApi) {
+    streamViaDockerApi(device, containerName, tail, follow, sendLine, sendError, () => cleanup(null), req, res);
   } else {
-    // No SSH alias, no docker socket — can't stream
-    sendError(`No log streaming method available for device: ${svc.device}`);
+    sendError(`No Docker API configured for device: ${match.device}`);
     cleanup(null);
   }
 });
 
 /**
- * Stream logs via Docker Engine API over the mounted Unix socket.
+ * Stream logs via Docker Engine API (Unix socket or TCP).
  * This is a direct HTTP request to /containers/<name>/logs.
  */
-function streamViaDockerSocket(svc, tail, follow, sendLine, sendError, cleanup, clientReq, clientRes) {
-  const container = svc.dockerProject;
+function streamViaDockerApi(device, containerName, tail, follow, sendLine, sendError, cleanup, clientReq, clientRes) {
   const qs = new URLSearchParams({
     stdout: "1",
     stderr: "1",
@@ -121,14 +135,30 @@ function streamViaDockerSocket(svc, tail, follow, sendLine, sendError, cleanup, 
     timestamps: "1",
   });
 
-  const path = `/containers/${container}/logs?${qs}`;
+  const path = `/containers/${containerName}/logs?${qs}`;
 
   logger.info(`[Logs] Docker API → ${path}`);
 
+  // Parse transport from device.dockerApi
+  let transport;
+  if (device.dockerApi.startsWith("unix://")) {
+    transport = { socketPath: device.dockerApi.slice(7), path };
+  } else if (device.dockerApi.startsWith("tcp://")) {
+    const url = new URL(device.dockerApi.replace("tcp://", "http://"));
+    transport = {
+      hostname: url.hostname,
+      port: parseInt(url.port, 10) || 2375,
+      path,
+    };
+  } else {
+    sendError(`Unsupported Docker API protocol: ${device.dockerApi}`);
+    cleanup();
+    return;
+  }
+
   const dockerReq = http.request(
     {
-      socketPath: DOCKER_SOCKET,
-      path,
+      ...transport,
       method: "GET",
     },
     (dockerRes) => {
@@ -176,7 +206,7 @@ function streamViaDockerSocket(svc, tail, follow, sendLine, sendError, cleanup, 
       });
 
       dockerRes.on("end", () => {
-        logger.info(`[Logs] Docker stream ended for ${svc.name}`);
+        logger.info(`[Logs] Docker stream ended for ${containerName}`);
         if (!clientRes.writableEnded) {
           clientRes.write(`event: end\ndata: ${JSON.stringify({ code: 0 })}\n\n`);
         }
@@ -184,14 +214,14 @@ function streamViaDockerSocket(svc, tail, follow, sendLine, sendError, cleanup, 
       });
 
       dockerRes.on("error", (err) => {
-        logger.error(`[Logs] Docker stream error for ${svc.name}: ${err.message}`);
+        logger.error(`[Logs] Docker stream error for ${containerName}: ${err.message}`);
         sendError(err.message);
         cleanup();
       });
 
       // Client disconnect — abort the Docker API request
       clientReq.on("close", () => {
-        logger.info(`[Logs] Client disconnected from ${svc.name} log stream`);
+        logger.info(`[Logs] Client disconnected from ${containerName} log stream`);
         dockerRes.destroy();
         cleanup();
       });
@@ -199,7 +229,7 @@ function streamViaDockerSocket(svc, tail, follow, sendLine, sendError, cleanup, 
   );
 
   dockerReq.on("error", (err) => {
-    logger.error(`[Logs] Docker socket error for ${svc.name}: ${err.message}`);
+    logger.error(`[Logs] Docker socket error for ${containerName}: ${err.message}`);
     sendError(err.message);
     cleanup();
   });
