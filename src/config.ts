@@ -11,6 +11,8 @@ export const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT;
 export const MINIO_ACCESS_KEY = process.env.MINIO_ACCESS_KEY;
 export const MINIO_SECRET_KEY = process.env.MINIO_SECRET_KEY;
 
+export const GITHUB_PAT = process.env.GITHUB_PAT || "";
+
 // ── Devices ────────────────────────────────────────────────────
 // Physical machines / hosts that run projects.
 // Populated from the registry's `devices` section at boot.
@@ -34,14 +36,15 @@ function inferProjectType(id: string, svc: any) {
  * Infer the deploy tier from the project type when the registry
  * entry doesn't carry an explicit `deployTier` override.
  *   Tier 0 — Foundation (Infrastructure, vault-service)
- *   Tier 1 — Services
- *   Tier 2 — Clients, Bots, Libraries, Kits, Tools
+ *   Tier 1 — Services & Clients
+ *   Tier 2 — Bots
  */
 function inferDeployTier(projectType: string) {
   switch (projectType) {
     case "Infrastructure": return 0;
     case "Service":        return 1;
-    default:               return 2; // Client, Bot, Library, Kit, Tool
+    case "Client":         return 1;
+    default:               return 2; // Bot, Library, Kit, Tool
   }
 }
 

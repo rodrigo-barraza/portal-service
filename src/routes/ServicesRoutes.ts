@@ -5,7 +5,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import ServiceRegistryService from "../services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
 import DockerStatsService from "../services/DockerStatsService.js";
-import { PROJECTS, DEVICES, PROJECT_TYPE_COLORS, DEPLOY_TIER_COLORS } from "../config.js";
+import { PROJECTS, DEVICES, PROJECT_TYPE_COLORS, DEPLOY_TIER_COLORS, GITHUB_PAT } from "../config.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
@@ -495,16 +495,26 @@ router.get("/sizes", asyncHandler(async (_req: Request, res: Response, next: Nex
         const timeout = setTimeout(() => controller.abort(), 5000);
 
         try {
+          const headers: Record<string, string> = {
+            Accept: "application/vnd.github.v3+json",
+            "User-Agent": "portal-service",
+          };
+          if (GITHUB_PAT) {
+            headers.Authorization = `Bearer ${GITHUB_PAT}`;
+          }
+
           const resp = await fetch(`https://api.github.com/repos/${slug}`, {
-            headers: {
-              Accept: "application/vnd.github.v3+json",
-              "User-Agent": "portal-service",
-            },
+            headers,
             signal: controller.signal,
           });
           clearTimeout(timeout);
 
-          if (!resp.ok) return;
+          if (!resp.ok) {
+            if (!GITHUB_PAT && resp.status === 403) {
+              logger.warn(`[Sizes] GitHub 403 for ${slug} — set GITHUB_PAT for private repo access`);
+            }
+            return;
+          }
 
           const data: any = await resp.json();
           sizes[id] = {

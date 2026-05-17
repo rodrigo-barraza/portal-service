@@ -21,6 +21,7 @@ import integrationsRouter from "./routes/IntegrationsRoutes.js";
 import storageRouter from "./routes/StorageRoutes.js";
 import googleAnalyticsRouter from "./routes/GoogleAnalyticsRoutes.js";
 import devicesRouter from "./routes/DevicesRoutes.js";
+import containersRouter from "./routes/ContainersRoutes.js";
 
 // ─── Express App ───────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ app.use(requestLoggerMiddleware);
 // ─── Endpoint Registry ────────────────────────────────────────────
 
 const ENDPOINTS = {
-  rest: ["/health", "/services", "/devices", "/stats", "/logs", "/integrations", "/object-store", "/google-analytics"],
+  rest: ["/health", "/services", "/devices", "/containers", "/stats", "/logs", "/integrations", "/object-store", "/google-analytics"],
 };
 
 // ─── Root Health Check ─────────────────────────────────────────────
@@ -81,6 +82,7 @@ app.use("/object-store", storageRouter);
 app.use("/google-analytics", googleAnalyticsRouter);
 
 app.use("/devices", devicesRouter);
+app.use("/containers", containersRouter);
 
 // ─── Error Handler (must be last) ──────────────────────────────────
 
