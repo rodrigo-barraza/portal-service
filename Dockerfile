@@ -34,4 +34,4 @@ EXPOSE 4001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget --no-verbose --tries=1 -O /dev/null http://127.0.0.1:4001/health || exit 1
 
-CMD ["node", "src/boot.js"]
+CMD ["node", "src/boot.ts"]
