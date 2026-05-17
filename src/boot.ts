@@ -39,7 +39,7 @@ for (let attempt = 1; attempt <= REGISTRY_RETRIES; attempt++) {
   }
 }
 
-const { initializeRegistry } = await import("./config.ts");
+const { initializeRegistry } = await import("./config.js");
 initializeRegistry(registry);
 
 // Export vault client so index.js can schedule a deferred re-fetch
@@ -47,4 +47,4 @@ initializeRegistry(registry);
 export { vault };
 
 // ── 3. Start the server ───────────────────────────────────────
-await import("./index.ts");
+await import("./index.js");
