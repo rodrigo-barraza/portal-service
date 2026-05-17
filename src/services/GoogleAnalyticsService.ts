@@ -36,34 +36,6 @@ const REPORT_TTL = 60_000;
 
 // ── Client Initialization ──────────────────────────────────────
 
-let client: any = null;
-
-function getClient() {
-  if (client) return client;
-
-  if (!GOOGLE_ANALYTICS_CREDENTIALS) {
-    throw new Error("GOOGLE_ANALYTICS_CREDENTIALS is not set");
-  }
-
-  try {
-    const decoded = Buffer.from(GOOGLE_ANALYTICS_CREDENTIALS, "base64").toString("utf-8");
-    const credentials = JSON.parse(decoded);
-
-    client = new BetaAnalyticsDataClient({
-      credentials: {
-        client_email: credentials.client_email,
-        private_key: credentials.private_key,
-      },
-      projectId: credentials.project_id,
-    });
-
-    logger.success("[GoogleAnalytics] Client initialized");
-    return client;
-  } catch (error: any) {
-    throw new Error(`Failed to initialize GA client: ${error.message}`);
-  }
-}
-
 function getProperties() {
   return ANALYTICS_PROPERTIES;
 }
@@ -117,6 +89,34 @@ function formatRows(response: any, dimensionNames: string[], metricNames: string
 // ── Public API ─────────────────────────────────────────────────
 
 export default class GoogleAnalyticsService {
+  static client: any = null;
+
+  static _getClient() {
+    if (GoogleAnalyticsService.client) return GoogleAnalyticsService.client;
+
+    if (!GOOGLE_ANALYTICS_CREDENTIALS) {
+      throw new Error("GOOGLE_ANALYTICS_CREDENTIALS is not set");
+    }
+
+    try {
+      const decoded = Buffer.from(GOOGLE_ANALYTICS_CREDENTIALS, "base64").toString("utf-8");
+      const credentials = JSON.parse(decoded);
+
+      GoogleAnalyticsService.client = new BetaAnalyticsDataClient({
+        credentials: {
+          client_email: credentials.client_email,
+          private_key: credentials.private_key,
+        },
+        projectId: credentials.project_id,
+      });
+
+      logger.success("[GoogleAnalytics] Client initialized");
+      return GoogleAnalyticsService.client;
+    } catch (error: any) {
+      throw new Error(`Failed to initialize GA client: ${error.message}`);
+    }
+  }
+
   /**
    * List configured GA4 properties.
    */
@@ -130,7 +130,7 @@ export default class GoogleAnalyticsService {
   static async getRealtimeReport(propertyId: string) {
     const key = `realtime:${propertyId}`;
     return cached(key, REALTIME_TTL, async () => {
-      const analyticsClient = getClient();
+      const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runRealtimeReport({
         property: `properties/${propertyId}`,
@@ -157,7 +157,7 @@ export default class GoogleAnalyticsService {
   static async getOverviewReport(propertyId: string, period: any = "30d") {
     const key = `overview:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
-      const analyticsClient = getClient();
+      const analyticsClient = GoogleAnalyticsService._getClient();
 
       const metricNames = [
         "sessions", "screenPageViews", "activeUsers", "totalUsers",
@@ -222,7 +222,7 @@ export default class GoogleAnalyticsService {
   static async getTopPages(propertyId: string, period: any = "30d") {
     const key = `pages:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
-      const analyticsClient = getClient();
+      const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
@@ -261,7 +261,7 @@ export default class GoogleAnalyticsService {
   static async getTrafficSources(propertyId: string, period: any = "30d") {
     const key = `sources:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
-      const analyticsClient = getClient();
+      const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
@@ -299,7 +299,7 @@ export default class GoogleAnalyticsService {
   static async getGeography(propertyId: string, period: any = "30d") {
     const key = `geo:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
-      const analyticsClient = getClient();
+      const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
@@ -336,7 +336,7 @@ export default class GoogleAnalyticsService {
   static async getDevices(propertyId: string, period: any = "30d") {
     const key = `devices:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
-      const analyticsClient = getClient();
+      const analyticsClient = GoogleAnalyticsService._getClient();
 
       // Device categories
       const [catResponse] = await analyticsClient.runReport({
@@ -413,7 +413,7 @@ export default class GoogleAnalyticsService {
   static async getTimeSeries(propertyId: string, period: any = "30d") {
     const key = `timeseries:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
-      const analyticsClient = getClient();
+      const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
@@ -453,7 +453,7 @@ export default class GoogleAnalyticsService {
   static async getChannelGrouping(propertyId: string, period: any = "30d") {
     const key = `channels:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
-      const analyticsClient = getClient();
+      const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
@@ -489,7 +489,7 @@ export default class GoogleAnalyticsService {
   static async getLandingPages(propertyId: string, period: any = "30d") {
     const key = `landing:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
-      const analyticsClient = getClient();
+      const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
@@ -526,7 +526,7 @@ export default class GoogleAnalyticsService {
   static async getHourlyHeatmap(propertyId: string, period: any = "30d") {
     const key = `heatmap:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
-      const analyticsClient = getClient();
+      const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
@@ -564,7 +564,7 @@ export default class GoogleAnalyticsService {
   static async getNewVsReturning(propertyId: string, period: any = "30d") {
     const key = `retention:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
-      const analyticsClient = getClient();
+      const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
@@ -598,7 +598,7 @@ export default class GoogleAnalyticsService {
   static async getTopEvents(propertyId: string, period: any = "30d") {
     const key = `events:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
-      const analyticsClient = getClient();
+      const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,

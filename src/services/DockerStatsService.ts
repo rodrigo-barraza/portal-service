@@ -31,7 +31,6 @@ const cpuCounterMap = new Map();
 const historyMap = new Map();
 
 /** Timer reference for cleanup on shutdown. */
-let collectorTimer: any = null;
 
 // ── Transport Parsing ────────────────────────────────────────────
 
@@ -172,14 +171,16 @@ export default class DockerStatsService {
     }
   }
 
+  static collectorTimer: any = null;
+
   /**
    * Start the background collector that populates ring buffers for all hosts.
    */
   static startCollector() {
-    if (collectorTimer) return;
+    if (DockerStatsService.collectorTimer) return;
 
     DockerStatsService._collectSnapshot();
-    collectorTimer = setInterval(
+    DockerStatsService.collectorTimer = setInterval(
       () => DockerStatsService._collectSnapshot(),
       HISTORY_INTERVAL_MS,
     );
@@ -192,9 +193,9 @@ export default class DockerStatsService {
    * Stop the background collector.
    */
   static stopCollector() {
-    if (collectorTimer) {
-      clearInterval(collectorTimer);
-      collectorTimer = null;
+    if (DockerStatsService.collectorTimer) {
+      clearInterval(DockerStatsService.collectorTimer);
+      DockerStatsService.collectorTimer = null;
     }
   }
 
@@ -552,17 +553,17 @@ export default class DockerStatsService {
       const df = JSON.parse(dfBody as string);
 
       // ── Image disk usage ────────────────────────────────────
-      const images = (df.Images || []).map((img: any) => ({
-        id: img.Id?.substring(0, 12) || "unknown",
-        tags: img.RepoTags || [],
-        size: img.Size || 0,
-        sharedSize: img.SharedSize || 0,
-        created: img.Created,
-        containers: img.Containers || 0,
+      const images = (df.Images || []).map((image: any) => ({
+        id: image.Id?.substring(0, 12) || "unknown",
+        tags: image.RepoTags || [],
+        size: image.Size || 0,
+        sharedSize: image.SharedSize || 0,
+        created: image.Created,
+        containers: image.Containers || 0,
       }));
 
-      const totalImageSize = images.reduce((sum: any, img: any) => sum + img.size, 0);
-      const totalImageShared = images.reduce((sum: any, img: any) => sum + img.sharedSize, 0);
+      const totalImageSize = images.reduce((sum: any, image: any) => sum + image.size, 0);
+      const totalImageShared = images.reduce((sum: any, image: any) => sum + image.sharedSize, 0);
 
       // ── Volume disk usage ───────────────────────────────────
       const volumes = (df.Volumes || []).map((vol: any) => ({

@@ -264,7 +264,7 @@ export default class ServiceRegistryService {
 
       const publicHealthUrl = `${svc.url}${svc.healthPath || "/"}`;
       const healthUrl = toLocalHealthUrl(publicHealthUrl, svc);
-      const res = await fetch(healthUrl, {
+      const response = await fetch(healthUrl, {
         signal: controller.signal,
         headers: { Accept: "application/json" },
       });
@@ -274,7 +274,7 @@ export default class ServiceRegistryService {
       let metadata: any = null;
 
       try {
-        metadata = await res.json();
+        metadata = await response.json();
       } catch {
         // Not all services return JSON at root
       }
@@ -299,10 +299,10 @@ export default class ServiceRegistryService {
         essential: svc.essential || false,
         restartable: !!svc.dockerProject,
         dockerProject: svc.dockerProject || null,
-        healthy: res.ok,
+        healthy: response.ok,
         responseTimeMs,
         metadata,
-        error: res.ok ? null : `HTTP ${res.status}`,
+        error: response.ok ? null : `HTTP ${response.status}`,
         checkedAt: new Date().toISOString(),
       };
     } catch (error: any) {

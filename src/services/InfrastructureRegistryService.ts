@@ -267,11 +267,11 @@ export default class InfrastructureRegistryService {
     const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
 
     try {
-      const res = await fetch(url, { signal: controller.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       try {
-        return await res.json();
+        return await response.json();
       } catch {
         return { status: "ok" };
       }

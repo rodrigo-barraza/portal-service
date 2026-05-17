@@ -163,9 +163,9 @@ router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, nex
         message: "Container restarted",
       });
     } else {
-      const msg = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
-      logger.error(`[Restart] Failed for ${svc.name}: ${msg}`);
-      res.status(502).json({ error: msg });
+      const message = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
+      logger.error(`[Restart] Failed for ${svc.name}: ${message}`);
+      res.status(502).json({ error: message });
     }
   } catch (error: any) {
     logger.error(`[Restart] Failed: ${error.message}`);
@@ -216,9 +216,9 @@ router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: 
         message: (result as any).statusCode === 304 ? "Container already stopped" : "Container stopped",
       });
     } else {
-      const msg = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
-      logger.error(`[Stop] Failed for ${svc.name}: ${msg}`);
-      res.status(502).json({ error: msg });
+      const message = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
+      logger.error(`[Stop] Failed for ${svc.name}: ${message}`);
+      res.status(502).json({ error: message });
     }
   } catch (error: any) {
     logger.error(`[Stop] Failed: ${error.message}`);
@@ -269,9 +269,9 @@ router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next:
         message: (result as any).statusCode === 304 ? "Container already running" : "Container started",
       });
     } else {
-      const msg = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
-      logger.error(`[Start] Failed for ${svc.name}: ${msg}`);
-      res.status(502).json({ error: msg });
+      const message = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
+      logger.error(`[Start] Failed for ${svc.name}: ${message}`);
+      res.status(502).json({ error: message });
     }
   } catch (error: any) {
     logger.error(`[Start] Failed: ${error.message}`);
@@ -400,9 +400,9 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
       `/images/${encodeURIComponent(previousTag)}/tag?repo=${encodeURIComponent(imageName)}&tag=latest`,
     );
     if ((tagLatest as any).statusCode !== 201) {
-      const msg = tryParseDockerError((tagLatest as any).body) || `Failed to tag :previous as :latest (${(tagLatest as any).statusCode})`;
-      logger.error(`[Rollback] ${msg}`);
-      return res.status(502).json({ error: msg });
+      const message = tryParseDockerError((tagLatest as any).body) || `Failed to tag :previous as :latest (${(tagLatest as any).statusCode})`;
+      logger.error(`[Rollback] ${message}`);
+      return res.status(502).json({ error: message });
     }
 
     // 4. Tag :rollback-backup → :previous (enable roll-forward)
@@ -440,9 +440,9 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
         message: "Rolled back to previous image and restarted",
       });
     } else {
-      const msg = tryParseDockerError((restartResult as any).body) || `Restart after rollback failed: ${(restartResult as any).statusCode}`;
-      logger.error(`[Rollback] ${msg}`);
-      res.status(502).json({ error: msg });
+      const message = tryParseDockerError((restartResult as any).body) || `Restart after rollback failed: ${(restartResult as any).statusCode}`;
+      logger.error(`[Rollback] ${message}`);
+      res.status(502).json({ error: message });
     }
   } catch (error: any) {
     logger.error(`[Rollback] Failed: ${error.message}`);
@@ -455,15 +455,31 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
  * Returns GitHub repository sizes for all projects with a repo field.
  * Results are cached for 5 minutes to avoid GitHub API rate limits.
  */
-let sizeCache: any = null;
-let sizeCacheAt = 0;
 const SIZE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function createSizeCache() {
+  let cache: any = null;
+  let cacheAt = 0;
+  return {
+    get: (now: number) => {
+      if (cache && now - cacheAt < SIZE_CACHE_TTL_MS) return cache;
+      return null;
+    },
+    set: (data: any, now: number) => {
+      cache = data;
+      cacheAt = now;
+    }
+  };
+}
+
+const sizeCache = createSizeCache();
 
 router.get("/sizes", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const now = Date.now();
-    if (sizeCache && now - sizeCacheAt < SIZE_CACHE_TTL_MS) {
-      return res.json(sizeCache);
+    const cachedSize = sizeCache.get(now);
+    if (cachedSize) {
+      return res.json(cachedSize);
     }
 
     const entries = Object.entries(PROJECTS).filter(([, svc]: any) => svc.repo);
@@ -502,8 +518,7 @@ router.get("/sizes", asyncHandler(async (_req: Request, res: Response, next: Nex
     );
 
     const response = { sizes, fetchedAt: new Date().toISOString() };
-    sizeCache = response;
-    sizeCacheAt = now;
+    sizeCache.set(response, now);
 
     res.json(response);
   } catch (error: any) {

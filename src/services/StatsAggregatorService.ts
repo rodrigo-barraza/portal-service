@@ -119,17 +119,17 @@ export default class StatsAggregatorService {
     const timeout = setTimeout(() => controller.abort(), 5000);
 
     try {
-      const res = await fetch(url, {
+      const response = await fetch(url, {
         signal: controller.signal,
         headers: { Accept: "application/json" },
       });
       clearTimeout(timeout);
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
 
-      return res.json();
+      return response.json();
     } catch (error: any) {
       clearTimeout(timeout);
       throw error;

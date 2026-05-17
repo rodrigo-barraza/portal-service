@@ -8,39 +8,38 @@ import {
 } from "../config.js";
 import logger from "../utils/logger.js";
 
-let client: any = null;
-
-/**
- * Ensure the MinIO client is initialized.
- * @returns {Client}
- */
-function getClient() {
-  if (client) return client;
-
-  if (!MINIO_ENDPOINT) {
-    throw new Error("No MINIO_ENDPOINT configured");
-  }
-
-  const url = new URL(MINIO_ENDPOINT);
-  client = new Client({
-    endPoint: url.hostname,
-    port: parseInt(url.port, 10) || (url.protocol === "https:" ? 443 : 80),
-    useSSL: url.protocol === "https:",
-    accessKey: MINIO_ACCESS_KEY || "",
-    secretKey: MINIO_SECRET_KEY || "",
-  });
-
-  logger.info(`[MinioService] Client initialized → ${MINIO_ENDPOINT}`);
-  return client;
-}
-
 export default class MinioService {
+  static client: any = null;
+
+  /**
+   * Ensure the MinIO client is initialized.
+   * @returns {Client}
+   */
+  static _getClient() {
+    if (MinioService.client) return MinioService.client;
+
+    if (!MINIO_ENDPOINT) {
+      throw new Error("No MINIO_ENDPOINT configured");
+    }
+
+    const url = new URL(MINIO_ENDPOINT);
+    MinioService.client = new Client({
+      endPoint: url.hostname,
+      port: parseInt(url.port, 10) || (url.protocol === "https:" ? 443 : 80),
+      useSSL: url.protocol === "https:",
+      accessKey: MINIO_ACCESS_KEY || "",
+      secretKey: MINIO_SECRET_KEY || "",
+    });
+
+    logger.info(`[MinioService] Client initialized → ${MINIO_ENDPOINT}`);
+    return MinioService.client;
+  }
   /**
    * List all buckets with creation dates and object counts.
    * @returns {Promise<Array<{ name: string, creationDate: string, objectCount: number, totalSize: number }>>}
    */
   static async listBuckets() {
-    const mc = getClient();
+    const mc = MinioService._getClient();
     const rawBuckets = await mc.listBuckets();
 
     // Gather object counts + total sizes in parallel
@@ -52,9 +51,9 @@ export default class MinioService {
         try {
           await new Promise((resolve: any, reject: any) => {
             const stream = mc.listObjectsV2(bucket.name, "", true);
-            stream.on("data", (obj: any) => {
+            stream.on("data", (object: any) => {
               objectCount++;
-              totalSize += obj.size || 0;
+              totalSize += object.size || 0;
             });
             stream.on("end", resolve);
             stream.on("error", reject);
@@ -82,7 +81,7 @@ export default class MinioService {
    * @yields {{ name: string, creationDate: string, objectCount: number, totalSize: number }}
    */
   static async *streamBuckets() {
-    const mc = getClient();
+    const mc = MinioService._getClient();
     const rawBuckets = await mc.listBuckets();
 
     // Yield the total count first so the client knows how many to expect
@@ -95,9 +94,9 @@ export default class MinioService {
       try {
         await new Promise((resolve: any, reject: any) => {
           const stream = mc.listObjectsV2(bucket.name, "", true);
-          stream.on("data", (obj: any) => {
+          stream.on("data", (object: any) => {
             objectCount++;
-            totalSize += obj.size || 0;
+            totalSize += object.size || 0;
           });
           stream.on("end", resolve);
           stream.on("error", reject);
@@ -127,7 +126,7 @@ export default class MinioService {
    * @returns {Promise<{ objects: Array, prefixes: string[] }>}
    */
   static async listObjects(bucketName: any, prefix: any = "", recursive: any = false) {
-    const mc = getClient();
+    const mc = MinioService._getClient();
 
     return new Promise((resolve: any, reject: any) => {
       const objects: any[] = [];
@@ -167,7 +166,7 @@ export default class MinioService {
    * @returns {Promise<object>}
    */
   static async statObject(bucketName: any, objectName: any) {
-    const mc = getClient();
+    const mc = MinioService._getClient();
     return mc.statObject(bucketName, objectName);
   }
 
@@ -178,7 +177,7 @@ export default class MinioService {
    * @returns {Promise<import('stream').Readable>}
    */
   static async getObject(bucketName: any, objectName: any) {
-    const mc = getClient();
+    const mc = MinioService._getClient();
     return mc.getObject(bucketName, objectName);
   }
 
@@ -189,7 +188,7 @@ export default class MinioService {
    * @returns {Promise<void>}
    */
   static async deleteObject(bucketName: any, objectName: any) {
-    const mc = getClient();
+    const mc = MinioService._getClient();
     return mc.removeObject(bucketName, objectName);
   }
 }
