@@ -2,7 +2,7 @@
 
 Backend-for-frontend (BFF) aggregator for the developer portal dashboard. Federates data from Prism, Tools API, and other services to provide unified health monitoring, log streaming, usage statistics, device topology, and API integration auditing across the entire ecosystem.
 
-**Port:** `4001` · **Runtime:** Node.js (ES Modules) · **Framework:** Express 5 · **DB:** MongoDB
+**Port:** `4001` · **Runtime:** Node.js (TypeScript) · **Framework:** Express 5 · **DB:** MongoDB
 
 ## Architecture
 
@@ -89,7 +89,7 @@ Container lifecycle operations (restart, stop, start) and log streaming are perf
 
 ## Prerequisites
 
-- **Node.js** v20+ (ES Modules)
+- **Node.js** v20+ (TypeScript)
 - **MongoDB** — service snapshot persistence
 - **Vault Service** — registry and secrets at boot
 - **Docker socket mount** — for container management and log streaming
@@ -110,8 +110,8 @@ Container lifecycle operations (restart, stop, start) and log streaming are perf
 npm install
 
 # 2. Configure secrets
-cp secrets.example.js secrets.js
-# Edit secrets.js with your MongoDB URI, Vault credentials, etc.
+cp secrets.example.ts secrets.ts
+# Edit secrets.ts with your MongoDB URI, Vault credentials, etc.
 
 # 3. Start the server
 npm run dev        # Development (auto-reload with nodemon)
