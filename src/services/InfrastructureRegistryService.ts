@@ -64,13 +64,13 @@ function deriveHost(url: any, infra: any) {
  * @property {boolean} isInfrastructure
  */
 
-/** @type {Map<string, InfraStatus>} */
+
 const statusCache = new Map();
 
 export default class InfrastructureRegistryService {
   /**
    * Get all infrastructure services with their current status.
-   * @returns {InfraStatus[]}
+
    */
   static list() {
     return Object.entries(INFRASTRUCTURE).map(([id, infra]: any) => {
@@ -100,7 +100,7 @@ export default class InfrastructureRegistryService {
 
   /**
    * Poll all infrastructure services and update cache.
-   * @returns {Promise<InfraStatus[]>}
+
    */
   static async checkAll() {
     const results = await Promise.all(
@@ -116,11 +116,6 @@ export default class InfrastructureRegistryService {
     return results;
   }
 
-  /**
-   * @param {string} id
-   * @param {object} infra
-   * @returns {Promise<InfraStatus>}
-   */
   static async _checkInfra(id: any, infra: any) {
     const base = {
       id,
@@ -176,7 +171,7 @@ export default class InfrastructureRegistryService {
    * MongoDB health check — connects, runs admin ping, disconnects.
    * Uses a short-lived client to avoid leaking connections.
    * Gracefully handles limited privileges — ping is sufficient for liveness.
-   * @returns {Promise<object>}
+
    */
   static async _checkMongo() {
     if (!MONGO_URI) throw new Error("No MONGO_URI configured");
@@ -220,7 +215,7 @@ export default class InfrastructureRegistryService {
 
   /**
    * MinIO health check — connects, lists buckets, disconnects.
-   * @returns {Promise<object>}
+
    */
   static async _checkMinio() {
     if (!MINIO_ENDPOINT) throw new Error("No MINIO_ENDPOINT configured");
@@ -254,8 +249,8 @@ export default class InfrastructureRegistryService {
   /**
    * Generic HTTP health check — hits url + healthPath.
    * Used for inference servers (LM Studio) and any future HTTP-based infra.
-   * @param {object} infra
-   * @returns {Promise<object>}
+
+
    */
   static async _checkHttp(infra: any) {
     const baseUrl = infra.url;

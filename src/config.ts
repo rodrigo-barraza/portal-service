@@ -51,8 +51,8 @@ function inferDeployTier(projectType: string) {
 /**
  * Normalize a GitHub repository URL to HTTPS format.
  * Converts SSH URLs (git@github.com:owner/repo.git) to HTTPS.
- * @param {string|null} repo
- * @returns {string|null}
+
+
  */
 function normalizeRepoUrl(repo: string | null) {
   if (!repo) return null;

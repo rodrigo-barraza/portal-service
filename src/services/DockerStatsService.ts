@@ -27,7 +27,7 @@ const systemCacheMap = new Map();
 /** @type {Map<string, Map<string, { cpuTotal: number, systemTotal: number }>>} */
 const cpuCounterMap = new Map();
 
-/** @type {Map<string, Array<object>>} */
+
 const historyMap = new Map();
 
 /** Timer reference for cleanup on shutdown. */
@@ -36,8 +36,8 @@ const historyMap = new Map();
 
 /**
  * Parse a dockerApi URL into http.request options.
- * @param {string} dockerApi - "unix:///var/run/docker.sock" or "tcp://host:port"
- * @param {string} path - Docker API path
+
+
  * @returns {{ socketPath?: string, hostname?: string, port?: number, path: string }}
  */
 function parseTransport(dockerApi: any, path: any) {
@@ -71,8 +71,8 @@ export default class DockerStatsService {
   /**
    * Get resource stats for all containers across all Docker hosts,
    * or filtered to a single device.
-   * @param {string} [deviceId] - Optional device filter
-   * @returns {Promise<object[]>}
+
+
    */
   static async getAll(deviceId: any) {
     const devices = getDockerDevices();
@@ -98,9 +98,8 @@ export default class DockerStatsService {
 
   /**
    * Get stats for a single Docker host. Uses per-device cache.
-   * @param {string} deviceId
-   * @param {object} device
-   * @returns {Promise<object[]>}
+
+
    */
   static async _getAllForDevice(deviceId: any, device: any) {
     const cached = statsCacheMap.get(deviceId);
@@ -142,8 +141,8 @@ export default class DockerStatsService {
 
   /**
    * Get the historical time-series ring buffer.
-   * @param {string} [deviceId] - Optional device filter
-   * @returns {object}
+
+
    */
   static getHistory(deviceId: any) {
     if (deviceId) {
@@ -159,7 +158,7 @@ export default class DockerStatsService {
 
   /**
    * Invalidate all caches (or for a specific device).
-   * @param {string} [deviceId]
+
    */
   static invalidate(deviceId: any) {
     if (deviceId) {
@@ -258,8 +257,8 @@ export default class DockerStatsService {
 
   /**
    * List all containers (running + stopped) on a device.
-   * @param {object} device
-   * @returns {Promise<object[]>}
+
+
    */
   static async _listContainers(device: any) {
     const body = await DockerStatsService._dockerGet(
@@ -271,10 +270,8 @@ export default class DockerStatsService {
 
   /**
    * Get one-shot stats for a single container.
-   * @param {object} container
-   * @param {object} device
-   * @param {string} deviceId
-   * @returns {Promise<object|null>}
+
+
    */
   static async _getContainerStats(container: any, device: any, deviceId: any) {
     try {
@@ -294,9 +291,8 @@ export default class DockerStatsService {
 
   /**
    * Build a zeroed-stats skeleton for a stopped/exited container.
-   * @param {object} container
-   * @param {string} deviceId
-   * @returns {object}
+
+
    */
   static _buildStoppedSkeleton(container: any, deviceId: any) {
     const name = (container.Names?.[0] || "unknown").replace(/^\//, "");
@@ -349,10 +345,8 @@ export default class DockerStatsService {
   /**
    * Parse raw Docker stats into a clean, displayable format.
    * Uses per-device cached previous counters for CPU delta computation.
-   * @param {object} container
-   * @param {object} raw
-   * @param {string} deviceId
-   * @returns {object}
+
+
    */
   static _parseStats(container: any, raw: any, deviceId: any) {
     // ── CPU (self-tracked deltas) ──────────────────────────────
@@ -506,8 +500,8 @@ export default class DockerStatsService {
 
   /**
    * Get Docker system-level information and disk usage for a device.
-   * @param {string} [deviceId] - Optional device filter (returns first match or all)
-   * @returns {Promise<object|object[]>}
+
+
    */
   static async getSystemInfo(deviceId: any) {
     const devices = getDockerDevices();
@@ -533,9 +527,8 @@ export default class DockerStatsService {
 
   /**
    * Get system info for a single Docker host. Uses per-device cache.
-   * @param {string} deviceId
-   * @param {object} device
-   * @returns {Promise<object>}
+
+
    */
   static async _getSystemInfoForDevice(deviceId: any, device: any) {
     const cached = systemCacheMap.get(deviceId);
@@ -668,10 +661,8 @@ export default class DockerStatsService {
   /**
    * HTTP GET helper for the Docker Engine API.
    * Dispatches to Unix socket or TCP based on device.dockerApi.
-   * @param {object} device - Device object with dockerApi field
-   * @param {string} path - Docker API path
-   * @param {number} [timeoutMs]
-   * @returns {Promise<string>}
+
+
    */
   static _dockerGet(device: any, path: string, timeoutMs: any = REQUEST_TIMEOUT_MS) {
     return new Promise((resolve: any, reject: any) => {
@@ -711,9 +702,8 @@ export default class DockerStatsService {
 
   /**
    * HTTP POST/DELETE helper for Docker Engine API (container actions).
-   * @param {object} device - Device object with dockerApi field
-   * @param {string} method - HTTP method
-   * @param {string} path - Docker API path
+
+
    * @param {{ timeout?: number }} [opts]
    * @returns {Promise<{ statusCode: number, body: string }>}
    */
@@ -745,10 +735,8 @@ export default class DockerStatsService {
 
   /**
    * Public wrapper for _dockerGet — read-only Docker Engine API calls.
-   * @param {object} device - Device object with dockerApi field
-   * @param {string} path - Docker API path
-   * @param {number} [timeoutMs]
-   * @returns {Promise<string>}
+
+
    */
   static dockerGet(device: any, path: string, timeoutMs?: number) {
     return DockerStatsService._dockerGet(device, path, timeoutMs);

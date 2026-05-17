@@ -13,7 +13,7 @@ export default class MinioService {
 
   /**
    * Ensure the MinIO client is initialized.
-   * @returns {Client}
+
    */
   static _getClient() {
     if (MinioService.client) return MinioService.client;
@@ -120,9 +120,8 @@ export default class MinioService {
   /**
    * List objects in a bucket, optionally filtered by prefix.
    * Returns a flat list with virtual "folder" grouping via commonPrefixes.
-   * @param {string} bucketName
-   * @param {string} [prefix=""]
-   * @param {boolean} [recursive=false]
+
+
    * @returns {Promise<{ objects: Array, prefixes: string[] }>}
    */
   static async listObjects(bucketName: any, prefix: any = "", recursive: any = false) {
@@ -161,9 +160,8 @@ export default class MinioService {
 
   /**
    * Get metadata for a single object.
-   * @param {string} bucketName
-   * @param {string} objectName
-   * @returns {Promise<object>}
+
+
    */
   static async statObject(bucketName: any, objectName: any) {
     const mc = MinioService._getClient();
@@ -172,9 +170,8 @@ export default class MinioService {
 
   /**
    * Get a readable stream for an object.
-   * @param {string} bucketName
-   * @param {string} objectName
-   * @returns {Promise<import('stream').Readable>}
+
+
    */
   static async getObject(bucketName: any, objectName: any) {
     const mc = MinioService._getClient();
@@ -183,9 +180,8 @@ export default class MinioService {
 
   /**
    * Delete an object from a bucket.
-   * @param {string} bucketName
-   * @param {string} objectName
-   * @returns {Promise<void>}
+
+
    */
   static async deleteObject(bucketName: any, objectName: any) {
     const mc = MinioService._getClient();

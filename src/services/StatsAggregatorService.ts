@@ -9,13 +9,13 @@ import logger from "../utils/logger.js";
  * @property {number} fetchedAt - Unix timestamp ms
  */
 
-/** @type {Map<string, CacheEntry>} */
+
 const cache = new Map();
 
 export default class StatsAggregatorService {
   /**
    * Get aggregate stats from Prism. Results are cached with a TTL.
-   * @returns {Promise<object>}
+
    */
   static async getOverview() {
     const cached = cache.get("overview");
@@ -50,9 +50,8 @@ export default class StatsAggregatorService {
 
   /**
    * Get request breakdown stats from Prism admin.
-   * @param {object} [params]
-   * @param {string} [params.period] - "24h", "7d", "30d"
-   * @returns {Promise<object>}
+
+
    */
   static async getRequestBreakdown(params: any = {}) {
     const cacheKey = `breakdown:${params.period || "24h"}`;
@@ -83,7 +82,7 @@ export default class StatsAggregatorService {
 
   /**
    * Get per-project stats.
-   * @returns {Promise<object>}
+
    */
   static async getProjectStats() {
     const cacheKey = "projects";
@@ -111,8 +110,8 @@ export default class StatsAggregatorService {
 
   /**
    * Fetch helper with timeout.
-   * @param {string} url
-   * @returns {Promise<any>}
+
+
    */
   static async _fetch(url: any) {
     const controller = new AbortController();

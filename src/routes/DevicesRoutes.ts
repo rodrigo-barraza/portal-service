@@ -86,8 +86,8 @@ router.get("/", (_req: any, res: any) => {
 
 /**
  * Extract port from a URL string. Returns null if parsing fails.
- * @param {string} url
- * @returns {number|null}
+
+
  */
 function extractPort(url: any) {
   try {

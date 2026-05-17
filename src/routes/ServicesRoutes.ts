@@ -13,7 +13,7 @@ const router = Router();
 /**
  * Resolve the device object for a project's Docker host.
  * Returns the device entry from the registry that has dockerApi configured.
- * @param {object} svc - Project entry from PROJECTS
+
  * @returns {{ id: string, device: object } | null}
  */
 function resolveDockerDevice(svc: any) {

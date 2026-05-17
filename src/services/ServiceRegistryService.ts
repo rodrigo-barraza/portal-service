@@ -115,13 +115,13 @@ function toLocalHealthUrl(url: any, svc: any) {
  * @property {string} checkedAt - ISO timestamp
  */
 
-/** @type {Map<string, ServiceStatus>} */
+
 const statusCache = new Map();
 
 export default class ServiceRegistryService {
   /**
    * Get all registered services with their current status.
-   * @returns {ServiceStatus[]}
+
    */
   static list() {
     return Object.entries(PROJECTS).map(([id, svc]: any) => {
@@ -157,7 +157,7 @@ export default class ServiceRegistryService {
 
   /**
    * Poll all services and update the status cache.
-   * @returns {Promise<ServiceStatus[]>}
+
    */
   static async checkAll() {
     const results = await Promise.all(
@@ -187,9 +187,9 @@ export default class ServiceRegistryService {
    * Retries once after a short delay if the first attempt fails,
    * which handles the window where a service (e.g. LM Studio) is
    * still binding its HTTP listener after startup.
-   * @param {string} id
+
    * @param {{ name: string, url: string }} svc
-   * @returns {Promise<ServiceStatus>}
+
    */
   static async _checkService(id: any, svc: any) {
     if (!svc.url) {
@@ -248,9 +248,8 @@ export default class ServiceRegistryService {
 
   /**
    * Single health-check attempt against a service endpoint.
-   * @param {string} id
-   * @param {object} svc
-   * @returns {Promise<ServiceStatus>}
+
+
    */
   static async _attemptHealthCheck(id: any, svc: any) {
     const start = Date.now();
@@ -341,8 +340,8 @@ export default class ServiceRegistryService {
    * Extract a meaningful error message from a fetch failure.
    * Node's undici wraps the real cause (ECONNREFUSED, EHOSTUNREACH, etc.)
    * inside error.cause, while error.message is just the opaque "fetch failed".
-   * @param {Error} err
-   * @returns {string}
+
+
    */
   static _extractErrorDetail(error: any) {
     if (error.name === "AbortError") return "Timeout";

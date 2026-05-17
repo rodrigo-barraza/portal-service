@@ -13,7 +13,7 @@ const router = Router();
 
 /**
  * Resolve the device object from a device ID.
- * @param {string} deviceId
+
  * @returns {{ id: string, device: object } | null}
  */
 function resolveDevice(deviceId: string) {
