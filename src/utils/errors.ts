@@ -1,7 +1,7 @@
 // ─── Express Error Handler ──────────────────────────────────
 
 import { Request, Response, NextFunction } from "express";
-import logger from "./logger.js";
+import logger from "./logger.ts";
 
 export function errorHandler(error: any, _req: Request, res: Response, _next: NextFunction) {
   logger.error(`Unhandled error: ${error.message}`);

@@ -1,8 +1,8 @@
 // ─── Service Registry Service ───────────────────────────────
 
 import os from "os";
-import { PROJECTS, DEVICES, HEALTH_CHECK_TIMEOUT_MS } from "../config.js";
-import logger from "../utils/logger.js";
+import { PROJECTS, DEVICES, HEALTH_CHECK_TIMEOUT_MS } from "../config.ts";
+import logger from "../utils/logger.ts";
 
 /**
  * Detect the device key that this API instance is running on.

@@ -2,12 +2,12 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Services Route ─────────────────────────────────────────
 
 import { Router, Request, Response, NextFunction } from "express";
-import ServiceRegistryService from "../services/ServiceRegistryService.js";
-import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
-import DockerStatsService from "../services/DockerStatsService.js";
-import CodeAnalysisService from "../services/CodeAnalysisService.js";
-import { PROJECTS, DEVICES, PROJECT_TYPE_COLORS, DEPLOY_TIER_COLORS, GITHUB_PAT } from "../config.js";
-import logger from "../utils/logger.js";
+import ServiceRegistryService from "../services/ServiceRegistryService.ts";
+import InfrastructureRegistryService from "../services/InfrastructureRegistryService.ts";
+import DockerStatsService from "../services/DockerStatsService.ts";
+import CodeAnalysisService from "../services/CodeAnalysisService.ts";
+import { PROJECTS, DEVICES, PROJECT_TYPE_COLORS, DEPLOY_TIER_COLORS, GITHUB_PAT } from "../config.ts";
+import logger from "../utils/logger.ts";
 
 const router = Router();
 

@@ -2,9 +2,9 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Stats Route ────────────────────────────────────────────
 
 import { Router, Request, Response, NextFunction } from "express";
-import StatsAggregatorService from "../services/StatsAggregatorService.js";
-import DockerStatsService from "../services/DockerStatsService.js";
-import MinioService from "../services/MinioService.js";
+import StatsAggregatorService from "../services/StatsAggregatorService.ts";
+import DockerStatsService from "../services/DockerStatsService.ts";
+import MinioService from "../services/MinioService.ts";
 
 const router = Router();
 

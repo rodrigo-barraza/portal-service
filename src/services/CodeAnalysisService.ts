@@ -6,8 +6,8 @@
 // Owner/scope are derived at runtime from the repo URLs already
 // in the project registry — no hard-coded GitHub username needed.
 
-import { PROJECTS, GITHUB_PAT } from "../config.js";
-import logger from "../utils/logger.js";
+import { PROJECTS, GITHUB_PAT } from "../config.ts";
+import logger from "../utils/logger.ts";
 
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const GITHUB_API = "https://api.github.com";

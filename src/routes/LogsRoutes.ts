@@ -3,9 +3,9 @@
 import { Router, Request, Response } from "express";
 import http from "http";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import { DEVICES } from "../config.js";
-import DockerStatsService from "../services/DockerStatsService.js";
-import logger from "../utils/logger.js";
+import { DEVICES } from "../config.ts";
+import DockerStatsService from "../services/DockerStatsService.ts";
+import logger from "../utils/logger.ts";
 
 const router = Router();
 

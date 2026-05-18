@@ -1,7 +1,7 @@
 // ─── MongoDB Connection Wrapper ─────────────────────────────
 
 import { MongoClient, Db } from "mongodb";
-import logger from "../utils/logger.js";
+import logger from "../utils/logger.ts";
 
 const clients: Record<string, MongoClient> = {};
 const dbs: Record<string, Db> = {};

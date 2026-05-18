@@ -1,6 +1,6 @@
 // ─── Runtime Configuration ──────────────────────────────────
 
-import logger from "./utils/logger.js";
+import logger from "./utils/logger.ts";
 
 export const PORT = process.env.PORTAL_SERVICE_PORT;
 

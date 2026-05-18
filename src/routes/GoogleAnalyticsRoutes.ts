@@ -2,7 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Google Analytics Routes ────────────────────────────────
 
 import { Router, Request, Response, NextFunction } from "express";
-import GoogleAnalyticsService from "../services/GoogleAnalyticsService.js";
+import GoogleAnalyticsService from "../services/GoogleAnalyticsService.ts";
 
 const router = Router();
 

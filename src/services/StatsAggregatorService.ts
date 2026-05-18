@@ -1,7 +1,7 @@
 // ─── Stats Aggregator Service ───────────────────────────────
 
-import { PROJECTS, STATS_CACHE_TTL_MS } from "../config.js";
-import logger from "../utils/logger.js";
+import { PROJECTS, STATS_CACHE_TTL_MS } from "../config.ts";
+import logger from "../utils/logger.ts";
 
 /**
  * @typedef {object} CacheEntry

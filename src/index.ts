@@ -3,25 +3,25 @@
 import express from "express";
 import cors from "cors";
 
-import { errorHandler } from "./utils/errors.js";
-import logger from "./utils/logger.js";
-import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.js";
-import MongoWrapper from "./wrappers/MongoWrapper.js";
-import { PORT, MONGO_URI, MONGO_DB_NAME, PROJECTS } from "./config.js";
-import { COLLECTIONS } from "./constants.js";
-import ServiceRegistryService from "./services/ServiceRegistryService.js";
-import InfrastructureRegistryService from "./services/InfrastructureRegistryService.js";
+import { errorHandler } from "./utils/errors.ts";
+import logger from "./utils/logger.ts";
+import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
+import MongoWrapper from "./wrappers/MongoWrapper.ts";
+import { PORT, MONGO_URI, MONGO_DB_NAME, PROJECTS } from "./config.ts";
+import { COLLECTIONS } from "./constants.ts";
+import ServiceRegistryService from "./services/ServiceRegistryService.ts";
+import InfrastructureRegistryService from "./services/InfrastructureRegistryService.ts";
 
 // Routes
-import healthRouter from "./routes/HealthRoutes.js";
-import servicesRouter from "./routes/ServicesRoutes.js";
-import statsRouter from "./routes/StatsRoutes.js";
-import logsRouter from "./routes/LogsRoutes.js";
-import integrationsRouter from "./routes/IntegrationsRoutes.js";
-import storageRouter from "./routes/StorageRoutes.js";
-import googleAnalyticsRouter from "./routes/GoogleAnalyticsRoutes.js";
-import devicesRouter from "./routes/DevicesRoutes.js";
-import containersRouter from "./routes/ContainersRoutes.js";
+import healthRouter from "./routes/HealthRoutes.ts";
+import servicesRouter from "./routes/ServicesRoutes.ts";
+import statsRouter from "./routes/StatsRoutes.ts";
+import logsRouter from "./routes/LogsRoutes.ts";
+import integrationsRouter from "./routes/IntegrationsRoutes.ts";
+import storageRouter from "./routes/StorageRoutes.ts";
+import googleAnalyticsRouter from "./routes/GoogleAnalyticsRoutes.ts";
+import devicesRouter from "./routes/DevicesRoutes.ts";
+import containersRouter from "./routes/ContainersRoutes.ts";
 
 // ─── Express App ───────────────────────────────────────────────────
 

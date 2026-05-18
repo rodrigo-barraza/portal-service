@@ -1,11 +1,11 @@
 // ─── Google Analytics Service ───────────────────────────────
 
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
-import logger from "../utils/logger.js";
+import logger from "../utils/logger.ts";
 import {
   GOOGLE_ANALYTICS_CREDENTIALS,
   ANALYTICS_PROPERTIES,
-} from "../config.js";
+} from "../config.ts";
 
 // ── TTL Cache ──────────────────────────────────────────────────
 

@@ -5,8 +5,8 @@ import {
   MINIO_ENDPOINT,
   MINIO_ACCESS_KEY,
   MINIO_SECRET_KEY,
-} from "../config.js";
-import logger from "../utils/logger.js";
+} from "../config.ts";
+import logger from "../utils/logger.ts";
 
 export default class MinioService {
   static client: any = null;

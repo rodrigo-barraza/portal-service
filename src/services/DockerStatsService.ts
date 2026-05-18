@@ -3,8 +3,8 @@
 import http from "http";
 import { execSync } from "child_process";
 import os from "os";
-import logger from "../utils/logger.js";
-import { DEVICES } from "../config.js";
+import logger from "../utils/logger.ts";
+import { DEVICES } from "../config.ts";
 
 const STATS_CACHE_TTL_MS = 10_000;
 const SYSTEM_CACHE_TTL_MS = 60_000;

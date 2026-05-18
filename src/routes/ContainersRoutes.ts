@@ -4,10 +4,10 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // Used for containers that may not have a PROJECTS registry entry.
 
 import { Router, Request, Response, NextFunction } from "express";
-import DockerStatsService from "../services/DockerStatsService.js";
-import ServiceRegistryService from "../services/ServiceRegistryService.js";
-import { DEVICES } from "../config.js";
-import logger from "../utils/logger.js";
+import DockerStatsService from "../services/DockerStatsService.ts";
+import ServiceRegistryService from "../services/ServiceRegistryService.ts";
+import { DEVICES } from "../config.ts";
+import logger from "../utils/logger.ts";
 
 const router = Router();
 

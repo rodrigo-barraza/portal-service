@@ -10,8 +10,8 @@ import {
   MINIO_ACCESS_KEY,
   MINIO_SECRET_KEY,
   MONGO_URI,
-} from "../config.js";
-import logger from "../utils/logger.js";
+} from "../config.ts";
+import logger from "../utils/logger.ts";
 
 /**
  * Build a reverse lookup: hostname/IP → device name.

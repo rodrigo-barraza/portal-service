@@ -1,9 +1,9 @@
 // ─── Devices Route ──────────────────────────────────────────
 
 import { Router } from "express";
-import { DEVICES, PROJECTS, INFRASTRUCTURE } from "../config.js";
-import ServiceRegistryService from "../services/ServiceRegistryService.js";
-import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
+import { DEVICES, PROJECTS, INFRASTRUCTURE } from "../config.ts";
+import ServiceRegistryService from "../services/ServiceRegistryService.ts";
+import InfrastructureRegistryService from "../services/InfrastructureRegistryService.ts";
 
 const router = Router();
 

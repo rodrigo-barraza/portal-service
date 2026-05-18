@@ -2,8 +2,8 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Object Store Route ─────────────────────────────────────
 
 import { Router, Request, Response, NextFunction } from "express";
-import MinioService from "../services/MinioService.js";
-import logger from "../utils/logger.js";
+import MinioService from "../services/MinioService.ts";
+import logger from "../utils/logger.ts";
 
 const router = Router();
 
