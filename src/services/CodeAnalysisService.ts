@@ -16,34 +16,40 @@ const FETCH_TIMEOUT_MS = 8000;
 /** Config file paths to try, in priority order */
 const CONFIG_PATHS = ["config.ts", "src/config.ts", "config.js", "src/config.js"];
 
-/**
- * Derive the GitHub owner and npm scope from the project registry.
- * Scans all repo URLs for the most common github.com/{owner} pattern.
- * This means the service auto-adapts when someone forks the ecosystem
- * and updates their repo URLs in projects.json — no code changes needed.
- */
-function deriveEcosystemOwner(): { githubOwner: string; scopePrefix: string } {
-  const ownerCounts = new Map<string, number>();
+interface EcosystemOwners {
+  /** All unique GitHub owners found in the registry, with npm scope prefixes */
+  owners: Set<string>;
+  scopePrefixes: Set<string>;
+  /** Per-project owner extracted from its repo URL */
+  projectOwners: Map<string, string>;
+}
 
-  for (const svc of Object.values(PROJECTS) as any[]) {
+/**
+ * Derive ALL GitHub owners and npm scopes from the project registry.
+ * Supports multi-owner ecosystems (e.g., user's own repos + shared repos).
+ * Each project's owner is extracted from its repo URL for attribution.
+ */
+function deriveEcosystemOwners(): EcosystemOwners {
+  const owners = new Set<string>();
+  const scopePrefixes = new Set<string>();
+  const projectOwners = new Map<string, string>();
+
+  for (const [id, svc] of Object.entries(PROJECTS) as [string, any][]) {
     if (!svc.repo) continue;
     const match = svc.repo.match(/github\.com\/([^/]+)\//);
     if (match) {
       const owner = match[1];
-      ownerCounts.set(owner, (ownerCounts.get(owner) || 0) + 1);
+      owners.add(owner);
+      scopePrefixes.add(`@${owner}/`);
+      projectOwners.set(id, owner);
     }
   }
 
-  if (ownerCounts.size === 0) {
+  if (owners.size === 0) {
     logger.warn("[CodeAnalysis] No GitHub repo URLs found in registry — analysis will be limited");
-    return { githubOwner: "", scopePrefix: "" };
   }
 
-  // Pick the most common owner (handles mixed ownership gracefully)
-  const [githubOwner] = [...ownerCounts.entries()].sort((a, b) => b[1] - a[1])[0];
-  const scopePrefix = `@${githubOwner}/`;
-
-  return { githubOwner, scopePrefix };
+  return { owners, scopePrefixes, projectOwners };
 }
 
 // ── Types ───────────────────────────────────────────────────
@@ -66,6 +72,8 @@ interface ProjectAnalysis {
 interface AnalysisResult {
   dependencies: Record<string, ProjectAnalysis>;
   repoSizes: Record<string, { sizeKB: number; sizeBytes: number }>;
+  /** Per-project GitHub owner attribution */
+  owners: Record<string, string>;
   analyzedAt: string;
 }
 
@@ -89,8 +97,8 @@ export default class CodeAnalysisService {
     logger.info("[CodeAnalysis] Starting ecosystem analysis...");
     const start = Date.now();
 
-    const { githubOwner, scopePrefix } = deriveEcosystemOwner();
-    logger.info(`[CodeAnalysis] Detected ecosystem owner: ${githubOwner || "(none)"}`);
+    const ecosystem = deriveEcosystemOwners();
+    logger.info(`[CodeAnalysis] Detected ${ecosystem.owners.size} owner(s): ${[...ecosystem.owners].join(", ") || "(none)"}`);
 
     const projectIds = new Set(Object.keys(PROJECTS));
     const dependencies: Record<string, ProjectAnalysis> = {};
@@ -105,7 +113,7 @@ export default class CodeAnalysisService {
 
         try {
           const [imports, apiCalls, size] = await Promise.all([
-            CodeAnalysisService._detectImports(slug, id, projectIds, githubOwner, scopePrefix),
+            CodeAnalysisService._detectImports(slug, id, projectIds, ecosystem),
             CodeAnalysisService._detectApiCalls(slug, id, projectIds),
             CodeAnalysisService._fetchRepoSize(slug),
           ]);
@@ -119,7 +127,10 @@ export default class CodeAnalysisService {
       }),
     );
 
-    const result: AnalysisResult = { dependencies, repoSizes, analyzedAt: new Date().toISOString() };
+    // Build per-project owner map for the response
+    const owners: Record<string, string> = Object.fromEntries(ecosystem.projectOwners);
+
+    const result: AnalysisResult = { dependencies, repoSizes, owners, analyzedAt: new Date().toISOString() };
     cache = result;
     cacheAt = now;
 
@@ -168,7 +179,7 @@ export default class CodeAnalysisService {
 
   private static async _detectImports(
     slug: string, selfId: string, projectIds: Set<string>,
-    githubOwner: string, scopePrefix: string,
+    ecosystem: EcosystemOwners,
   ): Promise<ImportEdge[]> {
     const content = await CodeAnalysisService._fetchFile(slug, "package.json");
     if (!content) return [];
@@ -179,7 +190,7 @@ export default class CodeAnalysisService {
       const imports: ImportEdge[] = [];
 
       for (const [name, version] of Object.entries(allDeps)) {
-        const targetId = CodeAnalysisService._resolveEcosystemId(name, version, githubOwner, scopePrefix);
+        const targetId = CodeAnalysisService._resolveEcosystemId(name, version, ecosystem);
         if (targetId && targetId !== selfId && projectIds.has(targetId)) {
           imports.push({ target: targetId, package: name });
         }
@@ -193,26 +204,30 @@ export default class CodeAnalysisService {
 
   /**
    * Resolve a package name + version specifier to an ecosystem project ID.
-   * Owner/scope are derived at runtime from the project registry.
+   * Checks against ALL ecosystem owners — supports multi-owner setups.
    *
    * Handles:
-   *   @{owner}/utilities-library              → utilities-library
-   *   github:{owner}/service-library           → service-library
-   *   git+https://github.com/{owner}/lib.git   → lib
-   *   file:../utilities-library                → utilities-library
+   *   @{any-owner}/utilities-library            → utilities-library
+   *   github:{any-owner}/service-library        → service-library
+   *   git+https://github.com/{any-owner}/lib    → lib
+   *   file:../utilities-library                 → utilities-library
    */
   private static _resolveEcosystemId(
-    name: string, version: string, githubOwner: string, scopePrefix: string,
+    name: string, version: string, ecosystem: EcosystemOwners,
   ): string | null {
-    if (scopePrefix && name.startsWith(scopePrefix)) {
-      return name.slice(scopePrefix.length);
+    // Check scoped packages against all ecosystem owners
+    for (const prefix of ecosystem.scopePrefixes) {
+      if (name.startsWith(prefix)) {
+        return name.slice(prefix.length);
+      }
     }
 
-    if (githubOwner) {
-      const ghShort = version.match(new RegExp(`^github:${githubOwner}/(.+?)$`));
+    // Check GitHub URL patterns against all ecosystem owners
+    for (const owner of ecosystem.owners) {
+      const ghShort = version.match(new RegExp(`^github:${owner}/(.+?)$`));
       if (ghShort) return ghShort[1];
 
-      const ghHttps = version.match(new RegExp(`github\\.com/${githubOwner}/(.+?)(?:\\.git)?$`));
+      const ghHttps = version.match(new RegExp(`github\\.com/${owner}/(.+?)(?:\\.git)?$`));
       if (ghHttps) return ghHttps[1];
     }
 
