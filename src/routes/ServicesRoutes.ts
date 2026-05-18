@@ -556,6 +556,104 @@ router.get("/analysis", asyncHandler(async (req: Request, res: Response, next: N
 }, "Services_Analysis"));
 
 /**
+ * GET /services/languages
+ * Returns GitHub language breakdown for each project with a repo URL.
+ * Uses the GitHub Linguist-powered /repos/{owner}/{repo}/languages endpoint.
+ * Results are cached for 15 minutes to stay within API rate limits.
+ */
+const LANG_CACHE_TTL_MS = 15 * 60 * 1000;
+
+function createLangCache() {
+  let cache: any = null;
+  let cacheAt = 0;
+  return {
+    get: (now: number) => {
+      if (cache && now - cacheAt < LANG_CACHE_TTL_MS) return cache;
+      return null;
+    },
+    set: (data: any, now: number) => {
+      cache = data;
+      cacheAt = now;
+    }
+  };
+}
+
+const langCache = createLangCache();
+
+router.get("/languages", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const now = Date.now();
+    const cached = langCache.get(now);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    const entries = Object.entries(PROJECTS).filter(([, svc]: any) => svc.repo);
+    const languages: Record<string, any> = {};
+
+    await Promise.allSettled(
+      entries.map(async ([id, svc]: any) => {
+        const match = svc.repo.match(/github\.com\/(.+?)(?:\.git)?$/);
+        if (!match) return;
+
+        const slug = match[1];
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+
+        try {
+          const headers: Record<string, string> = {
+            Accept: "application/vnd.github.v3+json",
+            "User-Agent": "portal-service",
+          };
+          if (GITHUB_PAT) {
+            headers.Authorization = `Bearer ${GITHUB_PAT}`;
+          }
+
+          const resp = await fetch(`https://api.github.com/repos/${slug}/languages`, {
+            headers,
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+
+          if (!resp.ok) {
+            if (!GITHUB_PAT && resp.status === 403) {
+              logger.warn(`[Languages] GitHub 403 for ${slug} — set GITHUB_PAT for private repo access`);
+            }
+            return;
+          }
+
+          const data: Record<string, number> = await resp.json() as any;
+          const totalBytes = Object.values(data).reduce((sum, b) => sum + b, 0);
+
+          // Sort by bytes descending
+          const sorted = Object.entries(data).sort(([, a], [, b]) => b - a);
+          const primary = sorted.length > 0 ? sorted[0][0] : null;
+
+          languages[id] = {
+            primary,
+            breakdown: sorted.map(([lang, bytes]) => ({
+              language: lang,
+              bytes,
+              percent: totalBytes > 0 ? Math.round((bytes / totalBytes) * 1000) / 10 : 0,
+            })),
+            totalBytes,
+          };
+        } catch {
+          clearTimeout(timeout);
+        }
+      }),
+    );
+
+    const response = { languages, fetchedAt: new Date().toISOString() };
+    langCache.set(response, now);
+
+    res.json(response);
+  } catch (error: any) {
+    next(error);
+  }
+}, "Services_Languages"));
+
+/**
  * Try to extract a message from a Docker API error response body.
  */
 function tryParseDockerError(body: string) {
