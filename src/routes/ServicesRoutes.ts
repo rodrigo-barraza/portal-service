@@ -5,6 +5,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import ServiceRegistryService from "../services/ServiceRegistryService.js";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.js";
 import DockerStatsService from "../services/DockerStatsService.js";
+import CodeAnalysisService from "../services/CodeAnalysisService.js";
 import { PROJECTS, DEVICES, PROJECT_TYPE_COLORS, DEPLOY_TIER_COLORS, GITHUB_PAT } from "../config.js";
 import logger from "../utils/logger.js";
 
@@ -535,6 +536,24 @@ router.get("/sizes", asyncHandler(async (_req: Request, res: Response, next: Nex
     next(error);
   }
 }, "Services_Sizes"));
+
+/**
+ * GET /services/analysis
+ * Returns auto-detected ecosystem dependencies:
+ *   - Library imports (from package.json)
+ *   - API call references (from config files)
+ *   - Repository sizes (from GitHub API)
+ * Results are cached for 15 minutes. Pass ?refresh=true to force re-analysis.
+ */
+router.get("/analysis", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const forceRefresh = req.query.refresh === "true";
+    const result = await CodeAnalysisService.analyze(forceRefresh);
+    res.json(result);
+  } catch (error: any) {
+    next(error);
+  }
+}, "Services_Analysis"));
 
 /**
  * Try to extract a message from a Docker API error response body.
