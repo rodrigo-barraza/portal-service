@@ -2,6 +2,9 @@
 // Auto-detects ecosystem dependencies by scanning project source
 // files via GitHub API. Replaces hand-maintained dependsOn arrays
 // with real detected relationships.
+//
+// Owner/scope are derived at runtime from the repo URLs already
+// in the project registry — no hard-coded GitHub username needed.
 
 import { PROJECTS, GITHUB_PAT } from "../config.js";
 import logger from "../utils/logger.js";
@@ -9,11 +12,39 @@ import logger from "../utils/logger.js";
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const GITHUB_API = "https://api.github.com";
 const FETCH_TIMEOUT_MS = 8000;
-const GITHUB_OWNER = "rodrigo-barraza";
-const SCOPE_PREFIX = "@rodrigo-barraza/";
 
 /** Config file paths to try, in priority order */
 const CONFIG_PATHS = ["config.ts", "src/config.ts", "config.js", "src/config.js"];
+
+/**
+ * Derive the GitHub owner and npm scope from the project registry.
+ * Scans all repo URLs for the most common github.com/{owner} pattern.
+ * This means the service auto-adapts when someone forks the ecosystem
+ * and updates their repo URLs in projects.json — no code changes needed.
+ */
+function deriveEcosystemOwner(): { githubOwner: string; scopePrefix: string } {
+  const ownerCounts = new Map<string, number>();
+
+  for (const svc of Object.values(PROJECTS) as any[]) {
+    if (!svc.repo) continue;
+    const match = svc.repo.match(/github\.com\/([^/]+)\//);
+    if (match) {
+      const owner = match[1];
+      ownerCounts.set(owner, (ownerCounts.get(owner) || 0) + 1);
+    }
+  }
+
+  if (ownerCounts.size === 0) {
+    logger.warn("[CodeAnalysis] No GitHub repo URLs found in registry — analysis will be limited");
+    return { githubOwner: "", scopePrefix: "" };
+  }
+
+  // Pick the most common owner (handles mixed ownership gracefully)
+  const [githubOwner] = [...ownerCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const scopePrefix = `@${githubOwner}/`;
+
+  return { githubOwner, scopePrefix };
+}
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -58,6 +89,9 @@ export default class CodeAnalysisService {
     logger.info("[CodeAnalysis] Starting ecosystem analysis...");
     const start = Date.now();
 
+    const { githubOwner, scopePrefix } = deriveEcosystemOwner();
+    logger.info(`[CodeAnalysis] Detected ecosystem owner: ${githubOwner || "(none)"}`);
+
     const projectIds = new Set(Object.keys(PROJECTS));
     const dependencies: Record<string, ProjectAnalysis> = {};
     const repoSizes: Record<string, { sizeKB: number; sizeBytes: number }> = {};
@@ -71,7 +105,7 @@ export default class CodeAnalysisService {
 
         try {
           const [imports, apiCalls, size] = await Promise.all([
-            CodeAnalysisService._detectImports(slug, id, projectIds),
+            CodeAnalysisService._detectImports(slug, id, projectIds, githubOwner, scopePrefix),
             CodeAnalysisService._detectApiCalls(slug, id, projectIds),
             CodeAnalysisService._fetchRepoSize(slug),
           ]);
@@ -134,6 +168,7 @@ export default class CodeAnalysisService {
 
   private static async _detectImports(
     slug: string, selfId: string, projectIds: Set<string>,
+    githubOwner: string, scopePrefix: string,
   ): Promise<ImportEdge[]> {
     const content = await CodeAnalysisService._fetchFile(slug, "package.json");
     if (!content) return [];
@@ -144,7 +179,7 @@ export default class CodeAnalysisService {
       const imports: ImportEdge[] = [];
 
       for (const [name, version] of Object.entries(allDeps)) {
-        const targetId = CodeAnalysisService._resolveEcosystemId(name, version);
+        const targetId = CodeAnalysisService._resolveEcosystemId(name, version, githubOwner, scopePrefix);
         if (targetId && targetId !== selfId && projectIds.has(targetId)) {
           imports.push({ target: targetId, package: name });
         }
@@ -158,23 +193,28 @@ export default class CodeAnalysisService {
 
   /**
    * Resolve a package name + version specifier to an ecosystem project ID.
+   * Owner/scope are derived at runtime from the project registry.
    *
    * Handles:
-   *   @rodrigo-barraza/utilities-library          → utilities-library
-   *   github:rodrigo-barraza/service-library      → service-library
-   *   git+https://github.com/.../comp-lib.git     → comp-lib
-   *   file:../utilities-library                   → utilities-library
+   *   @{owner}/utilities-library              → utilities-library
+   *   github:{owner}/service-library           → service-library
+   *   git+https://github.com/{owner}/lib.git   → lib
+   *   file:../utilities-library                → utilities-library
    */
-  private static _resolveEcosystemId(name: string, version: string): string | null {
-    if (name.startsWith(SCOPE_PREFIX)) {
-      return name.slice(SCOPE_PREFIX.length);
+  private static _resolveEcosystemId(
+    name: string, version: string, githubOwner: string, scopePrefix: string,
+  ): string | null {
+    if (scopePrefix && name.startsWith(scopePrefix)) {
+      return name.slice(scopePrefix.length);
     }
 
-    const ghShort = version.match(new RegExp(`^github:${GITHUB_OWNER}/(.+?)$`));
-    if (ghShort) return ghShort[1];
+    if (githubOwner) {
+      const ghShort = version.match(new RegExp(`^github:${githubOwner}/(.+?)$`));
+      if (ghShort) return ghShort[1];
 
-    const ghHttps = version.match(new RegExp(`github\\.com/${GITHUB_OWNER}/(.+?)(?:\\.git)?$`));
-    if (ghHttps) return ghHttps[1];
+      const ghHttps = version.match(new RegExp(`github\\.com/${githubOwner}/(.+?)(?:\\.git)?$`));
+      if (ghHttps) return ghHttps[1];
+    }
 
     const fileLink = version.match(/^file:\.\.\/(.+?)$/);
     if (fileLink) return fileLink[1];
