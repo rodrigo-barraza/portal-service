@@ -7,7 +7,7 @@
 # ============================================================
 
 # ── Stage 1: Install dependencies ─────────────────────────────
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN apk add --no-cache git
@@ -22,7 +22,7 @@ RUN npm run build
 RUN npm prune --omit=dev
 
 # ── Stage 3: Runtime ──────────────────────────────────────────
-FROM node:22-alpine
+FROM node:26-alpine
 WORKDIR /app
 
 # Copy production node_modules and compiled dist
