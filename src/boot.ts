@@ -5,10 +5,7 @@ import { createLogger } from "@rodrigo-barraza/utilities-library/node";
 
 const bootLogger = createLogger("portal");
 
-const vault = createVaultClient({
-  localEnvFile: "./.env",
-  fallbackEnvFile: "../vault-service/.env",
-});
+const vault = createVaultClient();
 
 // ── 1. Fetch secrets → process.env ────────────────────────────
 const secrets = await vault.fetch();
@@ -39,12 +36,12 @@ for (let attempt = 1; attempt <= REGISTRY_RETRIES; attempt++) {
   }
 }
 
-const { initializeRegistry } = await import("./config.js");
+const { initializeRegistry } = await import("./config.ts");
 initializeRegistry(registry);
 
-// Export vault client so index.js can schedule a deferred re-fetch
+// Export vault client so index.ts can schedule a deferred re-fetch
 // if the registry was empty at boot time.
 export { vault };
 
 // ── 3. Start the server ───────────────────────────────────────
-await import("./index.js");
+await import("./index.ts");
