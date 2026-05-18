@@ -5,6 +5,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import StatsAggregatorService from "../services/StatsAggregatorService.ts";
 import DockerStatsService from "../services/DockerStatsService.ts";
 import MinioService from "../services/MinioService.ts";
+import ContainerMetricsService from "../services/ContainerMetricsService.ts";
 
 const router = Router();
 
@@ -78,6 +79,29 @@ router.get("/containers/history", (req: Request, res: Response) => {
   const samples = Object.values(history).reduce((sum: any, buf: any) => sum + buf.length, 0);
   res.json({ history, samples });
 });
+
+/**
+ * GET /stats/containers/metrics
+ * Returns persistent container metrics from MongoDB time-series collection.
+ * Supports flexible time ranges and per-container/device filtering.
+ * ?range=1h|6h|24h|7d — time range (default: 1h)
+ * ?container=prism-service — filter to a single container
+ * ?device=synology — filter to a single Docker host
+ * ?limit=120 — max samples per container (default: 120)
+ */
+router.get("/containers/metrics", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await ContainerMetricsService.getHistory({
+      container: (req.query.container as string) || undefined,
+      device: (req.query.device as string) || undefined,
+      range: (req.query.range as string) || "1h",
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 120,
+    });
+    res.json(data);
+  } catch (error: any) {
+    next(error);
+  }
+}, "Stats_ContainerMetrics"));
 
 /**
  * POST /stats/invalidate

@@ -5,6 +5,7 @@ import { execSync } from "child_process";
 import os from "os";
 import logger from "../utils/logger.ts";
 import { DEVICES } from "../config.ts";
+import ContainerMetricsService from "./ContainerMetricsService.ts";
 
 const STATS_CACHE_TTL_MS = 10_000;
 const SYSTEM_CACHE_TTL_MS = 60_000;
@@ -29,6 +30,9 @@ const cpuCounterMap = new Map();
 
 
 const historyMap = new Map();
+
+/** @type {Map<string, number>} — per-device last-persist timestamp for throttling writes */
+const lastPersistMap = new Map();
 
 /** Timer reference for cleanup on shutdown. */
 
@@ -247,6 +251,16 @@ export default class DockerStatsService {
       history.push(snapshot);
       while (history.length > HISTORY_MAX_SAMPLES) {
         history.shift();
+      }
+
+      // ── Persist to MongoDB (throttled to 30s intervals) ────────
+      const now = Date.now();
+      const lastPersist = lastPersistMap.get(deviceId) || 0;
+      if (now - lastPersist >= ContainerMetricsService.persistIntervalMs) {
+        lastPersistMap.set(deviceId, now);
+        ContainerMetricsService.persistSnapshot(deviceId, stats).catch((err: any) => {
+          logger.warn(`[DockerStats:${deviceId}] Metrics persist failed: ${err.message}`);
+        });
       }
     } catch (error: any) {
       logger.warn(`[DockerStats:${deviceId}] Snapshot failed: ${error.message}`);

@@ -11,6 +11,7 @@ import { PORT, MONGO_URI, MONGO_DB_NAME, PROJECTS } from "./config.ts";
 import { COLLECTIONS } from "./constants.ts";
 import ServiceRegistryService from "./services/ServiceRegistryService.ts";
 import InfrastructureRegistryService from "./services/InfrastructureRegistryService.ts";
+import ContainerMetricsService from "./services/ContainerMetricsService.ts";
 
 // Routes
 import healthRouter from "./routes/HealthRoutes.ts";
@@ -104,6 +105,9 @@ app.use(errorHandler);
           .createIndex({ timestamp: -1 }),
       ]);
       logger.success("Database indexes ensured");
+
+      // Ensure time-series collection for container metrics
+      await ContainerMetricsService.ensureCollection();
     }
   } catch (error: any) {
     logger.error(`Failed to ensure indexes: ${error.message}`);
