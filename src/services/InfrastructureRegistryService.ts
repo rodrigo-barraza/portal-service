@@ -1,7 +1,7 @@
 // ─── Infrastructure Registry Service ────────────────────────
 
 import { MongoClient } from "mongodb";
-import { Client as MinioClient } from "minio";
+import { Client as MinioClient, type BucketItemFromList } from "minio";
 import {
   INFRASTRUCTURE,
   DEVICES,
@@ -230,19 +230,19 @@ export default class InfrastructureRegistryService {
     });
 
     // listBuckets is the lightest authenticated S3 call
-    const buckets = await Promise.race([
+    const buckets = await Promise.race<BucketItemFromList[]>([
       client.listBuckets(),
-      new Promise((_: any, reject: any) =>
+      new Promise<BucketItemFromList[]>((_, reject) =>
         setTimeout(
           () => reject(new Error("Timeout")),
           HEALTH_CHECK_TIMEOUT_MS,
         ),
       ),
-    ]) as any[];
+    ]);
 
     return {
       buckets: buckets.length,
-      bucketNames: buckets.map((b: any) => b.name),
+      bucketNames: buckets.map((b) => b.name),
     };
   }
 

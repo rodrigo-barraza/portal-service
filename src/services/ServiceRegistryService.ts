@@ -3,6 +3,7 @@
 import os from "os";
 import { PROJECTS, DEVICES, HEALTH_CHECK_TIMEOUT_MS } from "../config.ts";
 import logger from "../utils/logger.ts";
+import { ERROR_CODE_LABELS } from "../types.ts";
 
 /**
  * Detect the device key that this API instance is running on.
@@ -351,16 +352,7 @@ export default class ServiceRegistryService {
     while (cause) {
       if (cause.code) {
         const code = cause.code;
-        const labels = {
-          ECONNREFUSED: "Connection refused",
-          EHOSTUNREACH: "Host unreachable",
-          ENETUNREACH: "Network unreachable",
-          ECONNRESET: "Connection reset",
-          ETIMEDOUT: "Connection timed out",
-          ENOTFOUND: "DNS lookup failed",
-          EPIPE: "Broken pipe",
-        };
-        return (labels as Record<string, string>)[code] || `${code}: ${cause.message || error.message}`;
+        return ERROR_CODE_LABELS[code] || `${code}: ${cause.message || error.message}`;
       }
       cause = cause.cause;
     }

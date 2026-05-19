@@ -58,7 +58,7 @@ router.post("/:name/restart", asyncHandler(async (req: Request, res: Response, n
       target.device, "POST", `/containers/${name}/restart?t=10`,
     );
 
-    if ((result as any).statusCode === 204) {
+    if (result.statusCode === 204) {
       logger.success(`[Container:Restart] ${name} restarted successfully`);
 
       setTimeout(() => {
@@ -72,7 +72,7 @@ router.post("/:name/restart", asyncHandler(async (req: Request, res: Response, n
         message: "Container restarted",
       });
     } else {
-      const message = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
+      const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
       logger.error(`[Container:Restart] Failed for ${name}: ${message}`);
       res.status(502).json({ error: message });
     }
@@ -107,7 +107,7 @@ router.post("/:name/stop", asyncHandler(async (req: Request, res: Response, next
       target.device, "POST", `/containers/${name}/stop?t=10`,
     );
 
-    if ((result as any).statusCode === 204 || (result as any).statusCode === 304) {
+    if (result.statusCode === 204 || result.statusCode === 304) {
       logger.success(`[Container:Stop] ${name} stopped successfully`);
 
       setTimeout(() => {
@@ -118,10 +118,10 @@ router.post("/:name/stop", asyncHandler(async (req: Request, res: Response, next
         success: true,
         container: name,
         device: target.id,
-        message: (result as any).statusCode === 304 ? "Container already stopped" : "Container stopped",
+        message: result.statusCode === 304 ? "Container already stopped" : "Container stopped",
       });
     } else {
-      const message = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
+      const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
       logger.error(`[Container:Stop] Failed for ${name}: ${message}`);
       res.status(502).json({ error: message });
     }
@@ -156,7 +156,7 @@ router.post("/:name/start", asyncHandler(async (req: Request, res: Response, nex
       target.device, "POST", `/containers/${name}/start`,
     );
 
-    if ((result as any).statusCode === 204 || (result as any).statusCode === 304) {
+    if (result.statusCode === 204 || result.statusCode === 304) {
       logger.success(`[Container:Start] ${name} started successfully`);
 
       setTimeout(() => {
@@ -167,10 +167,10 @@ router.post("/:name/start", asyncHandler(async (req: Request, res: Response, nex
         success: true,
         container: name,
         device: target.id,
-        message: (result as any).statusCode === 304 ? "Container already running" : "Container started",
+        message: result.statusCode === 304 ? "Container already running" : "Container started",
       });
     } else {
-      const message = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
+      const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
       logger.error(`[Container:Start] Failed for ${name}: ${message}`);
       res.status(502).json({ error: message });
     }

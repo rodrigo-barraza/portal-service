@@ -8,6 +8,7 @@ import DockerStatsService from "../services/DockerStatsService.ts";
 import CodeAnalysisService from "../services/CodeAnalysisService.ts";
 import { PROJECTS, DEVICES, PROJECT_TYPE_COLORS, DEPLOY_TIER_COLORS, GITHUB_PAT } from "../config.ts";
 import logger from "../utils/logger.ts";
+import type { ProjectEntry, EnrichedDependency, TtlCache } from "../types.ts";
 
 const router = Router();
 
@@ -17,7 +18,7 @@ const router = Router();
 
  * @returns {{ id: string, device: object } | null}
  */
-function resolveDockerDevice(svc: any) {
+function resolveDockerDevice(svc: ProjectEntry) {
   const deviceId = svc.device || "synology";
   const device = DEVICES[deviceId];
 
@@ -32,21 +33,21 @@ function resolveDockerDevice(svc: any) {
  * Build a lookup map (id → name) and compute the inverse dependency graph.
  * Returns both `dependsOn` (resolved to {id, name}) and `dependedOnBy`.
  */
-function enrichWithDependencies(services: any[], infrastructure: any[]) {
-  const all = [...services, ...infrastructure];
+function enrichWithDependencies(services: Record<string, unknown>[], infrastructure: Record<string, unknown>[]) {
+  const all = [...services, ...infrastructure] as Array<Record<string, unknown> & { id: string; name: string; dependsOn?: Array<string | { id: string; criticality?: string }>; dependedOnBy?: EnrichedDependency[] }>;
 
   // id → name lookup
-  const nameMap = Object.fromEntries(all.map((s: any) => [s.id, s.name]));
+  const nameMap = Object.fromEntries(all.map((s) => [s.id, s.name]));
 
   // Normalize a dependency entry — handles raw string IDs,
   // structured { id, criticality } objects, and already-enriched
   // { id, name, criticality } objects from cached status.
-  const rawId = (dep: any) => (typeof dep === "string" ? dep : dep.id);
-  const rawCriticality = (dep: any) =>
+  const rawId = (dep: string | { id: string }) => (typeof dep === "string" ? dep : dep.id);
+  const rawCriticality = (dep: string | { id: string; criticality?: string }) =>
     typeof dep === "string" ? "required" : dep.criticality || "required";
 
   // Compute inverse: dependedOnBy[targetId] = [{ id, name, criticality }, ...]
-  const inverseMap: Record<string, any[]> = {};
+  const inverseMap: Record<string, EnrichedDependency[]> = {};
   for (const item of all) {
     for (const dep of item.dependsOn || []) {
       const id = rawId(dep);
@@ -61,7 +62,7 @@ function enrichWithDependencies(services: any[], infrastructure: any[]) {
 
   // Enrich each item — resolve names and carry criticality
   for (const item of all) {
-    item.dependsOn = (item.dependsOn || []).map((dep: any) => {
+    item.dependsOn = (item.dependsOn || []).map((dep) => {
       const id = rawId(dep);
       return {
         id,
@@ -149,7 +150,7 @@ router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, nex
       target.device, "POST", `/containers/${container}/restart?t=10`,
     );
 
-    if ((result as any).statusCode === 204) {
+    if (result.statusCode === 204) {
       logger.success(`[Restart] ${svc.name} restarted successfully`);
 
       // Trigger a fresh health check after a short delay
@@ -164,7 +165,7 @@ router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, nex
         message: "Container restarted",
       });
     } else {
-      const message = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
+      const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
       logger.error(`[Restart] Failed for ${svc.name}: ${message}`);
       res.status(502).json({ error: message });
     }
@@ -203,7 +204,7 @@ router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: 
       target.device, "POST", `/containers/${container}/stop?t=10`,
     );
 
-    if ((result as any).statusCode === 204 || (result as any).statusCode === 304) {
+    if (result.statusCode === 204 || result.statusCode === 304) {
       logger.success(`[Stop] ${svc.name} stopped successfully`);
 
       setTimeout(() => {
@@ -214,10 +215,10 @@ router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: 
         success: true,
         service: svc.name,
         device: target.id,
-        message: (result as any).statusCode === 304 ? "Container already stopped" : "Container stopped",
+        message: result.statusCode === 304 ? "Container already stopped" : "Container stopped",
       });
     } else {
-      const message = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
+      const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
       logger.error(`[Stop] Failed for ${svc.name}: ${message}`);
       res.status(502).json({ error: message });
     }
@@ -256,7 +257,7 @@ router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next:
       target.device, "POST", `/containers/${container}/start`,
     );
 
-    if ((result as any).statusCode === 204 || (result as any).statusCode === 304) {
+    if (result.statusCode === 204 || result.statusCode === 304) {
       logger.success(`[Start] ${svc.name} started successfully`);
 
       setTimeout(() => {
@@ -267,10 +268,10 @@ router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next:
         success: true,
         service: svc.name,
         device: target.id,
-        message: (result as any).statusCode === 304 ? "Container already running" : "Container started",
+        message: result.statusCode === 304 ? "Container already running" : "Container started",
       });
     } else {
-      const message = tryParseDockerError((result as any).body) || `Docker API error: ${(result as any).statusCode}`;
+      const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
       logger.error(`[Start] Failed for ${svc.name}: ${message}`);
       res.status(502).json({ error: message });
     }
@@ -308,7 +309,7 @@ router.get("/:id/rollback-status", asyncHandler(async (req: Request, res: Respon
 
     try {
       const body = await DockerStatsService.dockerGet(
-        target.device,
+        target.device!,
         `/images/${encodeURIComponent(previousTag)}/json`,
         undefined
       ) as string;
@@ -391,8 +392,8 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
       target.device, "POST",
       `/images/${encodeURIComponent(latestTag)}/tag?repo=${encodeURIComponent(imageName)}&tag=rollback-backup`,
     );
-    if ((tagBackup as any).statusCode !== 201) {
-      logger.warn(`[Rollback] Failed to back up current :latest (${(tagBackup as any).statusCode}), proceeding anyway`);
+    if (tagBackup.statusCode !== 201) {
+      logger.warn(`[Rollback] Failed to back up current :latest (${tagBackup.statusCode}), proceeding anyway`);
     }
 
     // 3. Tag :previous → :latest
@@ -400,8 +401,8 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
       target.device, "POST",
       `/images/${encodeURIComponent(previousTag)}/tag?repo=${encodeURIComponent(imageName)}&tag=latest`,
     );
-    if ((tagLatest as any).statusCode !== 201) {
-      const message = tryParseDockerError((tagLatest as any).body) || `Failed to tag :previous as :latest (${(tagLatest as any).statusCode})`;
+    if (tagLatest.statusCode !== 201) {
+      const message = tryParseDockerError(tagLatest.body) || `Failed to tag :previous as :latest (${tagLatest.statusCode})`;
       logger.error(`[Rollback] ${message}`);
       return res.status(502).json({ error: message });
     }
@@ -411,8 +412,8 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
       target.device, "POST",
       `/images/${encodeURIComponent(backupTag)}/tag?repo=${encodeURIComponent(imageName)}&tag=previous`,
     );
-    if ((tagPrevious as any).statusCode !== 201) {
-      logger.warn(`[Rollback] Failed to set new :previous for roll-forward (${(tagPrevious as any).statusCode})`);
+    if (tagPrevious.statusCode !== 201) {
+      logger.warn(`[Rollback] Failed to set new :previous for roll-forward (${tagPrevious.statusCode})`);
     }
 
     // Cleanup :rollback-backup tag
@@ -427,7 +428,7 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
       target.device, "POST", `/containers/${svc.dockerProject}/restart?t=10`,
     );
 
-    if ((restartResult as any).statusCode === 204) {
+    if (restartResult.statusCode === 204) {
       logger.success(`[Rollback] ${svc.name} rolled back and restarted successfully`);
 
       setTimeout(() => {
@@ -441,7 +442,7 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
         message: "Rolled back to previous image and restarted",
       });
     } else {
-      const message = tryParseDockerError((restartResult as any).body) || `Restart after rollback failed: ${(restartResult as any).statusCode}`;
+      const message = tryParseDockerError(restartResult.body) || `Restart after rollback failed: ${restartResult.statusCode}`;
       logger.error(`[Rollback] ${message}`);
       res.status(502).json({ error: message });
     }
@@ -458,22 +459,22 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
  */
 const SIZE_CACHE_TTL_MS = 5 * 60 * 1000;
 
-function createSizeCache() {
-  let cache: any = null;
+function createTtlCache<T>(ttlMs: number): TtlCache<T> {
+  let cache: T | null = null;
   let cacheAt = 0;
   return {
     get: (now: number) => {
-      if (cache && now - cacheAt < SIZE_CACHE_TTL_MS) return cache;
+      if (cache && now - cacheAt < ttlMs) return cache;
       return null;
     },
-    set: (data: any, now: number) => {
+    set: (data: T, now: number) => {
       cache = data;
       cacheAt = now;
     }
   };
 }
 
-const sizeCache = createSizeCache();
+const sizeCache = createTtlCache<{ sizes: Record<string, { sizeKB: number; sizeBytes: number }>; fetchedAt: string }>(SIZE_CACHE_TTL_MS);
 
 router.get("/sizes", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -483,12 +484,12 @@ router.get("/sizes", asyncHandler(async (_req: Request, res: Response, next: Nex
       return res.json(cachedSize);
     }
 
-    const entries = Object.entries(PROJECTS).filter(([, svc]: any) => svc.repo);
-    const sizes: Record<string, any> = {};
+    const entries = Object.entries(PROJECTS).filter(([, svc]) => svc.repo);
+    const sizes: Record<string, { sizeKB: number; sizeBytes: number }> = {};
 
     await Promise.allSettled(
-      entries.map(async ([id, svc]: any) => {
-        const match = svc.repo.match(/github\.com\/(.+?)(?:\.git)?$/);
+      entries.map(async ([id, svc]) => {
+        const match = svc.repo?.match(/github\.com\/(.+?)(?:\.git)?$/);
         if (!match) return;
 
         const slug = match[1];
@@ -517,7 +518,7 @@ router.get("/sizes", asyncHandler(async (_req: Request, res: Response, next: Nex
             return;
           }
 
-          const data: any = await resp.json();
+          const data = await resp.json() as Record<string, number>;
           sizes[id] = {
             sizeKB: data.size,
             sizeBytes: data.size * 1024,
@@ -563,22 +564,13 @@ router.get("/analysis", asyncHandler(async (req: Request, res: Response, next: N
  */
 const LANG_CACHE_TTL_MS = 15 * 60 * 1000;
 
-function createLangCache() {
-  let cache: any = null;
-  let cacheAt = 0;
-  return {
-    get: (now: number) => {
-      if (cache && now - cacheAt < LANG_CACHE_TTL_MS) return cache;
-      return null;
-    },
-    set: (data: any, now: number) => {
-      cache = data;
-      cacheAt = now;
-    }
-  };
+interface LanguageBreakdown {
+  primary: string | null;
+  breakdown: Array<{ language: string; bytes: number; percent: number }>;
+  totalBytes: number;
 }
 
-const langCache = createLangCache();
+const langCache = createTtlCache<{ languages: Record<string, LanguageBreakdown>; fetchedAt: string }>(LANG_CACHE_TTL_MS);
 
 router.get("/languages", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -588,12 +580,12 @@ router.get("/languages", asyncHandler(async (_req: Request, res: Response, next:
       return res.json(cached);
     }
 
-    const entries = Object.entries(PROJECTS).filter(([, svc]: any) => svc.repo);
-    const languages: Record<string, any> = {};
+    const entries = Object.entries(PROJECTS).filter(([, svc]) => svc.repo);
+    const languages: Record<string, LanguageBreakdown> = {};
 
     await Promise.allSettled(
-      entries.map(async ([id, svc]: any) => {
-        const match = svc.repo.match(/github\.com\/(.+?)(?:\.git)?$/);
+      entries.map(async ([id, svc]) => {
+        const match = svc.repo?.match(/github\.com\/(.+?)(?:\.git)?$/);
         if (!match) return;
 
         const slug = match[1];
@@ -622,7 +614,7 @@ router.get("/languages", asyncHandler(async (_req: Request, res: Response, next:
             return;
           }
 
-          const data: Record<string, number> = await resp.json() as any;
+          const data = await resp.json() as Record<string, number>;
           const totalBytes = Object.values(data).reduce((sum, b) => sum + b, 0);
 
           // Sort by bytes descending

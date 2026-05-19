@@ -4,6 +4,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response, NextFunction } from "express";
 import MinioService from "../services/MinioService.ts";
 import logger from "../utils/logger.ts";
+import type { ObjectListResult } from "../types.ts";
 
 const router = Router();
 
@@ -74,7 +75,7 @@ router.get("/buckets/stream", asyncHandler(async (req: Request, res: Response) =
   try {
     for await (const event of MinioService.streamBuckets()) {
       if (req.closed) break;
-      res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.type === "bucket" ? (event as any).bucket : event)}\n\n`);
+      res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.type === "bucket" ? event.bucket : event)}\n\n`);
     }
 
     if (!req.closed) {
@@ -102,8 +103,8 @@ router.get("/buckets/:name", asyncHandler(async (req: Request, res: Response, ne
     const { name } = req.params;
     const prefix = (req.query.prefix as string) || "";
     const recursive = req.query.recursive === "true";
-    const result = await MinioService.listObjects(name, prefix, recursive);
-    res.json({ bucket: name, prefix, ...(result as any) });
+    const result = await MinioService.listObjects(name, prefix, recursive) as ObjectListResult;
+    res.json({ bucket: name, prefix, ...result });
   } catch (error: any) {
     logger.error(`[ObjectStore] listObjects failed: ${error.message}`);
     next(error);
