@@ -101,7 +101,7 @@ router.get("/buckets/stream", asyncHandler(async (req: Request, res: Response) =
 router.get("/buckets/:name", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name } = req.params;
-    const prefix = (req.query.prefix as string) || "";
+    const prefix = typeof req.query.prefix === "string" ? req.query.prefix : "";
     const recursive = req.query.recursive === "true";
     const result = await MinioService.listObjects(name, prefix, recursive) as ObjectListResult;
     res.json({ bucket: name, prefix, ...result });
@@ -118,7 +118,7 @@ router.get("/buckets/:name", asyncHandler(async (req: Request, res: Response, ne
 router.get("/buckets/:name/stat/*objectPath", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bucketName = req.params.name;
-    const objectName = (req.params.objectPath as string) || req.params[0] || "";
+    const objectName = String(req.params.objectPath || req.params[0] || "");
 
     if (!objectName) {
       return res.status(400).json({ error: "Object name required" });
@@ -152,7 +152,7 @@ router.get("/buckets/:name/stat/*objectPath", asyncHandler(async (req: Request, 
 router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bucketName = req.params.name;
-    const objectName = (req.params.objectPath as string) || req.params[0] || "";
+    const objectName = String(req.params.objectPath || req.params[0] || "");
 
     if (!objectName) {
       return res.status(400).json({ error: "Object name required" });
@@ -187,7 +187,7 @@ router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req: Reque
 router.delete("/buckets/:name/*objectPath", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bucketName = req.params.name;
-    const objectName = (req.params.objectPath as string) || req.params[0] || "";
+    const objectName = String(req.params.objectPath || req.params[0] || "");
 
     if (!objectName) {
       return res.status(400).json({ error: "Object name required" });

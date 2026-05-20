@@ -41,7 +41,7 @@ function tryParseDockerError(body: string) {
 router.post("/:name/restart", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name } = req.params;
-    const deviceId = req.query.device as string;
+    const deviceId = typeof req.query.device === "string" ? req.query.device : undefined;
 
     if (!deviceId) {
       return res.status(400).json({ error: "Missing required query parameter: device" });
@@ -90,7 +90,7 @@ router.post("/:name/restart", asyncHandler(async (req: Request, res: Response, n
 router.post("/:name/stop", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name } = req.params;
-    const deviceId = req.query.device as string;
+    const deviceId = typeof req.query.device === "string" ? req.query.device : undefined;
 
     if (!deviceId) {
       return res.status(400).json({ error: "Missing required query parameter: device" });
@@ -139,7 +139,7 @@ router.post("/:name/stop", asyncHandler(async (req: Request, res: Response, next
 router.post("/:name/start", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name } = req.params;
-    const deviceId = req.query.device as string;
+    const deviceId = typeof req.query.device === "string" ? req.query.device : undefined;
 
     if (!deviceId) {
       return res.status(400).json({ error: "Missing required query parameter: device" });

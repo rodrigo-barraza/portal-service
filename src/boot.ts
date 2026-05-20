@@ -1,3 +1,4 @@
+import type { VaultRegistry } from "./types.ts";
 // ─── Boot Sequence ──────────────────────────────────────────
 
 import { createVaultClient } from "@rodrigo-barraza/utilities-library/vault";
@@ -22,17 +23,17 @@ for (const [key, value] of Object.entries(secrets)) {
 const REGISTRY_RETRIES = 5;
 const REGISTRY_RETRY_DELAY_MS = 2_000;
 
-let registry: any = null;
+let registry: VaultRegistry | null = null;
 
 for (let attempt = 1; attempt <= REGISTRY_RETRIES; attempt++) {
   vault.clearRegistryCache();
-  registry = await vault.fetchRegistry();
+  registry = await vault.fetchRegistry() as unknown as VaultRegistry;
 
-  if (registry.projects?.length > 0) break;
+  if (registry?.projects?.length > 0) break;
 
   if (attempt < REGISTRY_RETRIES) {
     bootLogger.warn(`Registry empty (attempt ${attempt}/${REGISTRY_RETRIES}) — retrying in ${REGISTRY_RETRY_DELAY_MS}ms…`);
-    await new Promise((r: any) => setTimeout(r, REGISTRY_RETRY_DELAY_MS));
+    await new Promise((r) => setTimeout(r, REGISTRY_RETRY_DELAY_MS));
   }
 }
 

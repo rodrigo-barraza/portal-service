@@ -34,7 +34,7 @@ function deriveEcosystemOwners(): EcosystemOwners {
   const scopePrefixes = new Set<string>();
   const projectOwners = new Map<string, string>();
 
-  for (const [id, svc] of Object.entries(PROJECTS) as [string, any][]) {
+  for (const [id, svc] of Object.entries(PROJECTS)) {
     if (!svc.repo) continue;
     const match = svc.repo.match(/github\.com\/([^/]+)\//);
     if (match) {
@@ -104,10 +104,11 @@ export default class CodeAnalysisService {
     const dependencies: Record<string, ProjectAnalysis> = {};
     const repoSizes: Record<string, { sizeKB: number; sizeBytes: number }> = {};
 
-    const entries = Object.entries(PROJECTS).filter(([, svc]: any) => svc.repo);
+    const entries = Object.entries(PROJECTS).filter(([, svc]) => svc.repo);
 
     await Promise.allSettled(
-      entries.map(async ([id, svc]: any) => {
+      entries.map(async ([id, svc]) => {
+        if (!svc.repo) return;
         const slug = CodeAnalysisService._extractSlug(svc.repo);
         if (!slug) return;
 

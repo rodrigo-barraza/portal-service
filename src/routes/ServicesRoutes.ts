@@ -128,7 +128,7 @@ router.post("/check", asyncHandler(async (_req: Request, res: Response, next: Ne
 router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[id as string];
+    const svc = PROJECTS[String(id)];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
@@ -182,7 +182,7 @@ router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, nex
 router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[id as string];
+    const svc = PROJECTS[String(id)];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
@@ -235,7 +235,7 @@ router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: 
 router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[id as string];
+    const svc = PROJECTS[String(id)];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
@@ -289,7 +289,7 @@ router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next:
 router.get("/:id/rollback-status", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[id as string];
+    const svc = PROJECTS[String(id)];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
@@ -354,7 +354,7 @@ router.get("/:id/rollback-status", asyncHandler(async (req: Request, res: Respon
 router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[id as string];
+    const svc = PROJECTS[String(id)];
 
     if (!svc) {
       return res.status(404).json({ error: `Unknown service: ${id}` });

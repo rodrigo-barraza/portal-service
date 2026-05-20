@@ -1,3 +1,4 @@
+import type { ContainerStats, DeviceEntry } from "../types.ts";
 // ─── Logs Route ─────────────────────────────────────────────
 
 import { Router, Request, Response } from "express";
@@ -18,7 +19,7 @@ router.get("/", asyncHandler(async (_req: Request, res: Response) => {
   try {
     const containers = await DockerStatsService.getAll(undefined);
 
-    const loggable = containers.map((c: any) => ({
+    const loggable = containers.map((c: ContainerStats) => ({
       id: c.name,
       name: c.name,
       image: c.image,
@@ -45,18 +46,18 @@ router.get("/", asyncHandler(async (_req: Request, res: Response) => {
  */
 router.get("/:containerName", asyncHandler(async (req: Request, res: Response) => {
   const { containerName } = req.params;
-  const deviceFilter = req.query.device || null;
+  const deviceFilter = typeof req.query.device === "string" ? req.query.device : undefined;
 
   // Look up the container in the live stats cache
   let containers;
   try {
-    containers = await DockerStatsService.getAll(deviceFilter as string | undefined);
+    containers = await DockerStatsService.getAll(deviceFilter);
   } catch (error: any) {
     logger.error(`[Logs] Failed to query containers: ${error.message}`);
     return res.status(500).json({ error: "Failed to query Docker containers" });
   }
 
-  const match = containers.find((c: any) => c.name === containerName);
+  const match = containers.find((c: ContainerStats) => c.name === containerName);
 
   if (!match) {
     return res.status(404).json({ error: `Container not found: ${containerName}` });
@@ -67,7 +68,8 @@ router.get("/:containerName", asyncHandler(async (req: Request, res: Response) =
     return res.status(400).json({ error: `Unknown device for container: ${match.device}` });
   }
 
-  const tail = Math.min(Math.max(parseInt(req.query.tail as string, 10) || 200, 1), 5000);
+  const tailStr = typeof req.query.tail === "string" ? req.query.tail : "";
+  const tail = Math.min(Math.max(parseInt(tailStr, 10) || 200, 1), 5000);
   const follow = req.query.follow === "1";
 
   // ── SSE headers ──────────────────────────────────────────────
@@ -116,7 +118,8 @@ router.get("/:containerName", asyncHandler(async (req: Request, res: Response) =
 
   // ── Stream via Docker socket or TCP ──────────────────────────
   if (device.dockerApi) {
-    streamViaDockerApi(device, containerName as string, tail, follow, sendLine, sendError, () => cleanup(null), req, res);
+    const safeContainerName = typeof containerName === "string" ? containerName : String(containerName);
+    streamViaDockerApi(device, safeContainerName, tail, follow, sendLine, sendError, () => cleanup(null), req, res);
   } else {
     sendError(`No Docker API configured for device: ${match.device}`);
     cleanup(null);
@@ -127,7 +130,7 @@ router.get("/:containerName", asyncHandler(async (req: Request, res: Response) =
  * Stream logs via Docker Engine API (Unix socket or TCP).
  * This is a direct HTTP request to /containers/<name>/logs.
  */
-function streamViaDockerApi(device: any, containerName: string, tail: number, follow: boolean, sendLine: (l: string) => void, sendError: (e: string) => void, cleanup: () => void, clientReq: Request, clientRes: Response) {
+function streamViaDockerApi(device: DeviceEntry, containerName: string, tail: number, follow: boolean, sendLine: (l: string) => void, sendError: (e: string) => void, cleanup: () => void, clientReq: Request, clientRes: Response) {
   const qs = new URLSearchParams({
     stdout: "1",
     stderr: "1",
@@ -139,6 +142,12 @@ function streamViaDockerApi(device: any, containerName: string, tail: number, fo
   const path = `/containers/${containerName}/logs?${qs}`;
 
   logger.info(`[Logs] Docker API → ${path}`);
+
+  if (!device.dockerApi) {
+    sendError(`No Docker API configured for device`);
+    cleanup();
+    return;
+  }
 
   // Parse transport from device.dockerApi
   let transport;
@@ -162,10 +171,10 @@ function streamViaDockerApi(device: any, containerName: string, tail: number, fo
       ...transport,
       method: "GET",
     },
-    (dockerRes: any) => {
+    (dockerRes: import("http").IncomingMessage) => {
       if (dockerRes.statusCode !== 200) {
         let body = "";
-        dockerRes.on("data", (chunk: any) => (body += chunk));
+        dockerRes.on("data", (chunk: Buffer) => (body += chunk));
         dockerRes.on("end", () => {
           logger.error(`[Logs] Docker API error ${dockerRes.statusCode}: ${body}`);
           try {
@@ -185,7 +194,7 @@ function streamViaDockerApi(device: any, containerName: string, tail: number, fo
       // We need to strip these headers to get clean log lines.
       let buffer = Buffer.alloc(0);
 
-      dockerRes.on("data", (chunk: any) => {
+      dockerRes.on("data", (chunk: Buffer) => {
         buffer = Buffer.concat([buffer, chunk]);
 
         // Process all complete frames in the buffer

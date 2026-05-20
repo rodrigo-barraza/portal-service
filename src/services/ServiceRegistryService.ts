@@ -1,3 +1,4 @@
+import type { ProjectEntry } from "../types.ts";
 // ─── Service Registry Service ───────────────────────────────
 
 import os from "os";
@@ -71,7 +72,7 @@ const HOSTNAME_TO_DEVICE = buildHostnameToDeviceMap();
  * to return the friendly device name (e.g. "Synology NAS").
  * Falls back to the configured `device` field when no match is found.
  */
-function deriveHost(url: any, svc: any) {
+function deriveHost(url: string, svc: ProjectEntry) {
   if (!url) return DEVICES[svc.device]?.name || svc.device || "Unknown";
   try {
     const parsed = new URL(url);
@@ -89,7 +90,7 @@ function deriveHost(url: any, svc: any) {
  * the same device.  WSL2 can reach Windows apps via localhost but
  * not always via the LAN IP (apps that bind to 127.0.0.1 only).
  */
-function toLocalHealthUrl(url: any, svc: any) {
+function toLocalHealthUrl(url: string, svc: ProjectEntry) {
   if (!LOCAL_DEVICE_KEY || svc.device !== LOCAL_DEVICE_KEY) return url;
   try {
     const parsed = new URL(url);
@@ -125,7 +126,7 @@ export default class ServiceRegistryService {
 
    */
   static list() {
-    return Object.entries(PROJECTS).map(([id, svc]: any) => {
+    return Object.entries(PROJECTS).map(([id, svc]) => {
       const cached = statusCache.get(id);
       return cached || {
         id,
@@ -162,7 +163,7 @@ export default class ServiceRegistryService {
    */
   static async checkAll() {
     const results = await Promise.all(
-      Object.entries(PROJECTS).map(([id, svc]: any) =>
+      Object.entries(PROJECTS).map(([id, svc]) =>
         ServiceRegistryService._checkService(id, svc),
       ),
     );
@@ -192,7 +193,7 @@ export default class ServiceRegistryService {
    * @param {{ name: string, url: string }} svc
 
    */
-  static async _checkService(id: any, svc: any) {
+  static async _checkService(id: string, svc: ProjectEntry) {
     if (!svc.url) {
       return {
         id,
@@ -231,7 +232,7 @@ export default class ServiceRegistryService {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       if (attempt > 1) {
-        await new Promise((r: any) => setTimeout(r, ServiceRegistryService.HEALTH_CHECK_RETRY_DELAY_MS));
+        await new Promise((r) => setTimeout(r, ServiceRegistryService.HEALTH_CHECK_RETRY_DELAY_MS));
       }
 
       lastResult = await ServiceRegistryService._attemptHealthCheck(id, svc);
@@ -252,7 +253,7 @@ export default class ServiceRegistryService {
 
 
    */
-  static async _attemptHealthCheck(id: any, svc: any) {
+  static async _attemptHealthCheck(id: string, svc: ProjectEntry) {
     const start = Date.now();
 
     try {
@@ -271,10 +272,10 @@ export default class ServiceRegistryService {
       clearTimeout(timeout);
 
       const responseTimeMs = Date.now() - start;
-      let metadata: any = null;
+      let metadata: Record<string, unknown> | null = null;
 
       try {
-        metadata = await response.json();
+        metadata = await response.json() as Record<string, unknown>;
       } catch {
         // Not all services return JSON at root
       }

@@ -1,6 +1,7 @@
 // ─── Runtime Configuration ──────────────────────────────────
 
 import logger from "./utils/logger.ts";
+import type { ProjectEntry, InfrastructureEntry, DeviceEntry, AnalyticsProperty } from "./types.ts";
 
 export const PORT = process.env.PORTAL_SERVICE_PORT;
 
@@ -16,7 +17,7 @@ export const GITHUB_PAT = process.env.GITHUB_PAT || "";
 // ── Devices ────────────────────────────────────────────────────
 // Physical machines / hosts that run projects.
 // Populated from the registry's `devices` section at boot.
-export let DEVICES: Record<string, any> = {};
+export let DEVICES: Record<string, DeviceEntry> = {};
 
 /**
  * Infer the project type label from the project ID.
@@ -64,11 +65,11 @@ function normalizeRepoUrl(repo: string | null) {
 // ── Registry Hydration ─────────────────────────────────────────
 // Populated at boot time by initializeRegistry().
 // Until then, PROJECTS and INFRASTRUCTURE are empty objects.
-export let PROJECTS: Record<string, any> = {};
-export let INFRASTRUCTURE: Record<string, any> = {};
+export let PROJECTS: Record<string, ProjectEntry> = {};
+export let INFRASTRUCTURE: Record<string, InfrastructureEntry> = {};
 export let PROJECT_TYPE_COLORS: Record<string, string> = {};
 export let DEPLOY_TIER_COLORS: Record<string, string> = {};
-export let ANALYTICS_PROPERTIES: any[] = [];
+export let ANALYTICS_PROPERTIES: AnalyticsProperty[] = [];
 
 /**
  * Build the PROJECTS, INFRASTRUCTURE, and DEVICES maps from the Vault registry.
@@ -82,8 +83,7 @@ export function initializeRegistry(registry: any) {
     return;
   }
 
-  // ── Projects ─────────────────────────────────────────────────
-  const projects: Record<string, any> = {};
+  const projects: Record<string, ProjectEntry> = {};
 
   for (const svc of registry.projects) {
     projects[svc.id] = {
@@ -125,8 +125,7 @@ export function initializeRegistry(registry: any) {
       serviceId: svc.id,
     }));
 
-  // ── Infrastructure ───────────────────────────────────────────
-  const infra: Record<string, any> = {};
+  const infra: Record<string, InfrastructureEntry> = {};
 
   const infraTypeLabels: Record<string, string> = { database: "Database", "object-store": "Store", inference: "Inference" };
 
@@ -155,8 +154,7 @@ export function initializeRegistry(registry: any) {
   // ── Deploy Tier Colors ──────────────────────────────────────
   DEPLOY_TIER_COLORS = registry.deployTierColors || {};
 
-  // ── Devices ─────────────────────────────────────────────────
-  const devices: Record<string, any> = {};
+  const devices: Record<string, DeviceEntry> = {};
 
   for (const dev of registry.devices || []) {
     devices[dev.id] = {

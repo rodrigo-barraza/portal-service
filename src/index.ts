@@ -1,3 +1,4 @@
+import { Request, Response } from "express";
 // ─── Entry Point ────────────────────────────────────────────
 
 import express from "express";
@@ -37,7 +38,7 @@ const ALLOWED_ORIGINS = [
 
 app.use(
   cors({
-    origin(origin: any, callback: any) {
+    origin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
       // Allow requests with no origin (server-to-server, curl, health checks)
       if (!origin) return callback(null, true);
       // Allow any localhost port (local development)
@@ -62,7 +63,7 @@ const ENDPOINTS = {
 
 // ─── Root Health Check ─────────────────────────────────────────────
 
-app.get("/", (_req: any, res: any) => {
+app.get("/", (_req: Request, res: Response) => {
   res.json({
     name: "API",
     version: "1.0.0",
@@ -93,11 +94,11 @@ app.use(errorHandler);
 
 (async () => {
   // Connect to MongoDB
-  await MongoWrapper.createClient(MONGO_DB_NAME as string, MONGO_URI as string);
+  await MongoWrapper.createClient(String(MONGO_DB_NAME), String(MONGO_URI));
 
   // Ensure indexes for query performance
   try {
-    const db = MongoWrapper.getDb(MONGO_DB_NAME as string);
+    const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
     if (db) {
       await Promise.all([
         db
@@ -162,7 +163,7 @@ app.use(errorHandler);
     ServiceRegistryService.checkAll(),
     InfrastructureRegistryService.checkAll(),
   ])
-    .then(([svcResults, infraResults]: any) => {
+    .then(([svcResults, infraResults]) => {
       const svcHealthy = svcResults.filter((s: any) => s && s.healthy).length;
       const infraHealthy = infraResults.filter((s: any) => s && s.healthy).length;
       logger.info(
@@ -185,7 +186,7 @@ app.use(errorHandler);
   // Start server
   app.listen(PORT, () => {
     logger.success(`API is running on port ${PORT}`);
-    ENDPOINTS.rest.forEach((ep: any) =>
+    ENDPOINTS.rest.forEach((ep: string) =>
       logger.info(`  REST  →  http://localhost:${PORT}${ep}`),
     );
   });

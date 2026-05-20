@@ -1,6 +1,6 @@
 // ─── Devices Route ──────────────────────────────────────────
 
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { DEVICES, PROJECTS, INFRASTRUCTURE } from "../config.ts";
 import ServiceRegistryService from "../services/ServiceRegistryService.ts";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.ts";
@@ -13,7 +13,7 @@ const router = Router();
  * Each device includes a list of services it hosts, enriched with live health data.
  * Infrastructure backing stores (MongoDB, MinIO) are included as a separate array.
  */
-router.get("/", (_req: any, res: any) => {
+router.get("/", (_req: Request, res: Response) => {
   // Build service → health lookup from the registry cache
   const serviceStatuses = ServiceRegistryService.list();
   const statusMap = new Map(serviceStatuses.map((s: any) => [s.id, s]));

@@ -23,7 +23,7 @@ export default class ContainerMetricsService {
    * Called once during startup after MongoDB is connected.
    */
   static async ensureCollection(): Promise<void> {
-    const db = MongoWrapper.getDb(MONGO_DB_NAME as string);
+    const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
     if (!db) {
       logger.warn("[ContainerMetrics] MongoDB not connected — skipping collection setup");
       return;
@@ -72,7 +72,7 @@ export default class ContainerMetricsService {
   static async persistSnapshot(deviceId: string, containers: any[]): Promise<void> {
     if (!ContainerMetricsService._initialized) return;
 
-    const db = MongoWrapper.getDb(MONGO_DB_NAME as string);
+    const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
     if (!db) return;
 
     const col = db.collection(COLLECTIONS.CONTAINER_METRICS);
@@ -125,7 +125,7 @@ export default class ContainerMetricsService {
     range?: string;
     limit?: number;
   } = {}): Promise<any> {
-    const db = MongoWrapper.getDb(MONGO_DB_NAME as string);
+    const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
     if (!db) return { containers: {}, range, samples: 0 };
 
     const col = db.collection(COLLECTIONS.CONTAINER_METRICS);

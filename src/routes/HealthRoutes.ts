@@ -1,10 +1,10 @@
 // ─── Health Route ───────────────────────────────────────────
 
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 
 const router = Router();
 
-router.get("/", (_req: any, res: any) => {
+router.get("/", (_req: Request, res: Response) => {
   res.json({
     status: "ok",
     uptime: process.uptime(),

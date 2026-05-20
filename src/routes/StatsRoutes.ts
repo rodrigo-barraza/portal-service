@@ -1,3 +1,4 @@
+import type { BucketInfo } from "../types.ts";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Stats Route ────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ router.get("/", asyncHandler(async (_req: Request, res: Response, next: NextFunc
 router.get("/breakdown", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await StatsAggregatorService.getRequestBreakdown({
-      period: req.query.period as string,
+      period: typeof req.query.period === "string" ? req.query.period : undefined,
     });
     res.json(data);
   } catch (error: any) {
@@ -58,7 +59,7 @@ router.get("/projects", asyncHandler(async (_req: Request, res: Response, next: 
  */
 router.get("/containers", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const deviceId = (req.query.device as string) || undefined;
+    const deviceId = (typeof req.query.device === "string" ? req.query.device : undefined) || undefined;
     const data = await DockerStatsService.getAll(deviceId);
     res.json({ containers: data, fetchedAt: new Date().toISOString() });
   } catch (error: any) {
@@ -73,10 +74,10 @@ router.get("/containers", asyncHandler(async (req: Request, res: Response, next:
  * ?device=synology — filter to a single Docker host.
  */
 router.get("/containers/history", (req: Request, res: Response) => {
-  const deviceId = (req.query.device as string) || undefined;
+  const deviceId = (typeof req.query.device === "string" ? req.query.device : undefined) || undefined;
   const history = DockerStatsService.getHistory(deviceId);
   // Compute total sample count across all devices
-  const samples = Object.values(history).reduce((sum: any, buf: any) => sum + buf.length, 0);
+  const samples = Object.values(history).reduce((sum: number, buf: any[]) => sum + buf.length, 0);
   res.json({ history, samples });
 });
 
@@ -92,10 +93,10 @@ router.get("/containers/history", (req: Request, res: Response) => {
 router.get("/containers/metrics", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await ContainerMetricsService.getHistory({
-      container: (req.query.container as string) || undefined,
-      device: (req.query.device as string) || undefined,
-      range: (req.query.range as string) || "1h",
-      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 120,
+      container: (typeof req.query.container === "string" ? req.query.container : undefined) || undefined,
+      device: (typeof req.query.device === "string" ? req.query.device : undefined) || undefined,
+      range: typeof req.query.range === "string" ? req.query.range : "1h",
+      limit: req.query.limit ? parseInt(typeof req.query.limit === "string" ? req.query.limit : "", 10) : 120,
     });
     res.json(data);
   } catch (error: any) {
@@ -121,7 +122,7 @@ router.post("/invalidate", (_req: Request, res: Response) => {
  */
 router.get("/system", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const deviceId = (req.query.device as string) || undefined;
+    const deviceId = (typeof req.query.device === "string" ? req.query.device : undefined) || undefined;
     const data = await DockerStatsService.getSystemInfo(deviceId);
     res.json(data);
   } catch (error: any) {
@@ -136,8 +137,8 @@ router.get("/system", asyncHandler(async (req: Request, res: Response, next: Nex
 router.get("/storage", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const buckets = await MinioService.listBuckets();
-    const totalObjects = buckets.reduce((sum: any, b: any) => sum + b.objectCount, 0);
-    const totalSize = buckets.reduce((sum: any, b: any) => sum + b.totalSize, 0);
+    const totalObjects = buckets.reduce((sum: number, b: BucketInfo) => sum + b.objectCount, 0);
+    const totalSize = buckets.reduce((sum: number, b: BucketInfo) => sum + b.totalSize, 0);
     res.json({ buckets, totalObjects, totalSize, fetchedAt: new Date().toISOString() });
   } catch (error: any) {
     next(error);
