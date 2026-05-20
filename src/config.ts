@@ -1,7 +1,7 @@
 // ─── Runtime Configuration ──────────────────────────────────
 
 import logger from "./utils/logger.ts";
-import type { ProjectEntry, InfrastructureEntry, DeviceEntry, AnalyticsProperty } from "./types.ts";
+import type { ProjectEntry, InfrastructureEntry, DeviceEntry, AnalyticsProperty, VaultRegistry, VaultRegistryProject } from "./types.ts";
 
 export const PORT = process.env.PORTAL_SERVICE_PORT;
 
@@ -25,7 +25,7 @@ export let DEVICES: Record<string, DeviceEntry> = {};
  * Otherwise: projects ending in "-client" are "Client", "-bot" are "Bot",
  * entries without repo/docker are "Infrastructure", rest are "Service".
  */
-function inferProjectType(id: string, svc: any) {
+function inferProjectType(id: string, svc: VaultRegistryProject) {
   if (svc.projectType) return svc.projectType;
   if (!svc.repo && !svc.dockerProject) return "Infrastructure";
   if (id.endsWith("-client")) return "Client";
@@ -74,10 +74,8 @@ export let ANALYTICS_PROPERTIES: AnalyticsProperty[] = [];
 /**
  * Build the PROJECTS, INFRASTRUCTURE, and DEVICES maps from the Vault registry.
  * Called once from boot.js after the registry is loaded.
- *
- * @param {{ projects: any[], infrastructure: any[], devices: any[], projectTypeColors?: any, deployTierColors?: any }} registry
  */
-export function initializeRegistry(registry: any) {
+export function initializeRegistry(registry: VaultRegistry) {
   if (!registry || !registry.projects) {
     logger.warn("No registry data — PROJECTS and INFRASTRUCTURE will be empty");
     return;
@@ -97,14 +95,14 @@ export function initializeRegistry(registry: any) {
       description: svc.description || null,
       db: svc.db || null,
       minioBucket: svc.minioBucket || null,
-      repo: normalizeRepoUrl(svc.repo),
+      repo: normalizeRepoUrl(svc.repo || null),
       npmPackage: svc.npmPackage || null,
       device: svc.device || "synology",
       domain: svc.domain || null,
       dockerProject: svc.dockerProject || null,
       deployTier: svc.deployTier ?? inferDeployTier(inferProjectType(svc.id, svc)),
       essential: svc.essential || false,
-      dependsOn: (svc.dependsOn || []).map((dep: any) => ({
+      dependsOn: (svc.dependsOn || []).map((dep: { id: string; criticality?: string }) => ({
         id: dep.id,
         criticality: dep.criticality || "required",
       })),
@@ -117,9 +115,9 @@ export function initializeRegistry(registry: any) {
   // Derive GA4 properties from project entries that declare an
   // analyticsPropertyId — replaces the old GOOGLE_ANALYTICS_PROPERTIES env var.
   ANALYTICS_PROPERTIES = (registry.projects || [])
-    .filter((svc: any) => svc.analyticsPropertyId)
-    .map((svc: any) => ({
-      id: svc.analyticsPropertyId,
+    .filter((svc: VaultRegistryProject) => svc.analyticsPropertyId)
+    .map((svc: VaultRegistryProject) => ({
+      id: svc.analyticsPropertyId!,
       label: svc.label,
       measurementId: svc.analyticsMeasurementId || "",
       serviceId: svc.id,

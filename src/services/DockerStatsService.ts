@@ -8,6 +8,40 @@ import { DEVICES } from "../config.ts";
 import ContainerMetricsService from "./ContainerMetricsService.ts";
 import type { DockerActionResponse, DockerTransport, DeviceEntry, ContainerStats, ContainerSnapshot, NetworkInterfaceStats } from "../types.ts";
 
+// ── Docker API response sub-structures ───────────────────────────
+interface DockerCpuUsage {
+  total_usage: number;
+  percpu_usage?: number[];
+}
+interface DockerCpuStats {
+  cpu_usage: DockerCpuUsage;
+  system_cpu_usage: number;
+  online_cpus?: number;
+  throttling_data?: { periods?: number; throttled_periods?: number; throttled_time?: number };
+}
+interface DockerMemoryStats {
+  usage?: number;
+  limit?: number;
+  max_usage?: number;
+  stats?: {
+    cache?: number;
+    inactive_file?: number;
+    rss?: number;
+    swap?: number;
+    active_anon?: number;
+    inactive_anon?: number;
+    pgfault?: number;
+    pgmajfault?: number;
+  };
+}
+interface DockerBlkioEntry { op: string; value: number }
+interface DockerBlkioStats {
+  io_service_bytes_recursive?: DockerBlkioEntry[];
+}
+interface DockerPidsStats {
+  current?: number;
+}
+
 const STATS_CACHE_TTL_MS = 10_000;
 const SYSTEM_CACHE_TTL_MS = 60_000;
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -43,7 +77,6 @@ const lastPersistMap = new Map();
  * Parse a dockerApi URL into http.request options.
 
 
- * @returns {{ socketPath?: string, hostname?: string, port?: number, path: string }}
  */
 function parseTransport(dockerApi: string, path: string): DockerTransport {
   if (dockerApi.startsWith("unix://")) {
@@ -64,7 +97,6 @@ function parseTransport(dockerApi: string, path: string): DockerTransport {
 
 /**
  * Get the list of device entries that have Docker API configured.
- * @returns {Array<{ id: string, device: object }>}
  */
 function getDockerDevices(): Array<{ id: string; device: DeviceEntry }> {
   return Object.entries(DEVICES)
@@ -315,13 +347,13 @@ export default class DockerStatsService {
   static _buildStoppedSkeleton(container: Record<string, unknown>, deviceId: string): ContainerStats {
     const name = ((container.Names as string[] | undefined)?.[0] || "unknown").replace(/^\//, "");
     const command = (container.Command as string) || "";
-    const ports = ((container.Ports as any[]) || []).map((p: Record<string, unknown>) => ({
+    const ports = ((container.Ports as Record<string, unknown>[]) || []).map((p: Record<string, unknown>) => ({
       ip: (p.IP as string) || "",
       privatePort: p.PrivatePort as number,
       publicPort: p.PublicPort as number,
       type: p.Type as string,
     }));
-    const mounts = ((container.Mounts as any[]) || []).map((m: Record<string, unknown>) => ({
+    const mounts = ((container.Mounts as Record<string, unknown>[]) || []).map((m: Record<string, unknown>) => ({
       type: m.Type as string,
       name: (m.Name as string) || "",
       source: m.Source as string,
@@ -368,7 +400,7 @@ export default class DockerStatsService {
    */
   static _parseStats(container: Record<string, unknown>, raw: Record<string, unknown>, deviceId: string): ContainerStats {
     // ── CPU (self-tracked deltas) ──────────────────────────────
-    const cpuStats = raw.cpu_stats as any;
+    const cpuStats = raw.cpu_stats as DockerCpuStats;
     const currentCpuTotal = cpuStats?.cpu_usage?.total_usage || 0;
     const currentSystemTotal = cpuStats?.system_cpu_usage || 0;
     const numCpus =
@@ -398,7 +430,7 @@ export default class DockerStatsService {
     });
 
     // ── Memory ─────────────────────────────────────────────────
-    const memStats = raw.memory_stats as any;
+    const memStats = raw.memory_stats as DockerMemoryStats;
     const memUsage = memStats?.usage || 0;
     const memCache = memStats?.stats?.cache || memStats?.stats?.inactive_file || 0;
     const memActual = memUsage - memCache;
@@ -434,7 +466,7 @@ export default class DockerStatsService {
 
     // ── Block I/O ──────────────────────────────────────────────
     let blockRead = 0, blockWrite = 0;
-    const blkioStats = raw.blkio_stats as any;
+    const blkioStats = raw.blkio_stats as DockerBlkioStats;
     if (blkioStats?.io_service_bytes_recursive) {
       for (const entry of blkioStats.io_service_bytes_recursive) {
         if (entry.op === "read" || entry.op === "Read") blockRead += entry.value || 0;
@@ -443,7 +475,7 @@ export default class DockerStatsService {
     }
 
     // ── PIDs ───────────────────────────────────────────────────
-    const pidsStats = raw.pids_stats as any;
+    const pidsStats = raw.pids_stats as DockerPidsStats;
     const pids = pidsStats?.current || 0;
 
     // ── Memory Detail ─────────────────────────────────────────
@@ -468,13 +500,13 @@ export default class DockerStatsService {
 
     // ── Container Metadata ────────────────────────────────────
     const command = (container.Command as string) || "";
-    const ports = ((container.Ports as any[]) || []).map((p: Record<string, unknown>) => ({
+    const ports = ((container.Ports as Record<string, unknown>[]) || []).map((p: Record<string, unknown>) => ({
       ip: (p.IP as string) || "",
       privatePort: p.PrivatePort as number,
       publicPort: p.PublicPort as number,
       type: p.Type as string,
     }));
-    const mounts = ((container.Mounts as any[]) || []).map((m: Record<string, unknown>) => ({
+    const mounts = ((container.Mounts as Record<string, unknown>[]) || []).map((m: Record<string, unknown>) => ({
       type: m.Type as string,
       name: (m.Name as string) || "",
       source: m.Source as string,
@@ -568,7 +600,7 @@ export default class DockerStatsService {
       const df = JSON.parse(dfBody);
 
       // ── Image disk usage ────────────────────────────────────
-      const images = ((df.Images as any[]) || []).map((image: Record<string, unknown>) => ({
+      const images = ((df.Images as Record<string, unknown>[]) || []).map((image: Record<string, unknown>) => ({
         id: (image.Id as string)?.substring(0, 12) || "unknown",
         tags: (image.RepoTags as string[]) || [],
         size: (image.Size as number) || 0,
@@ -581,7 +613,7 @@ export default class DockerStatsService {
       const totalImageShared = images.reduce((sum: number, image: { sharedSize: number }) => sum + image.sharedSize, 0);
 
       // ── Volume disk usage ───────────────────────────────────
-      const volumes = ((df.Volumes as any[]) || []).map((vol: Record<string, unknown>) => ({
+      const volumes = ((df.Volumes as Record<string, unknown>[]) || []).map((vol: Record<string, unknown>) => ({
         name: vol.Name as string,
         driver: vol.Driver as string,
         size: (vol.UsageData as Record<string, number>)?.Size || 0,
@@ -591,14 +623,14 @@ export default class DockerStatsService {
       const totalVolumeSize = volumes.reduce((sum: number, vol: { size: number }) => sum + vol.size, 0);
 
       // ── Build cache disk usage ──────────────────────────────
-      const buildCache = (df.BuildCache as any[]) || [];
+      const buildCache = (df.BuildCache as Record<string, unknown>[]) || [];
       const totalBuildCacheSize = buildCache.reduce(
         (sum: number, entry: Record<string, unknown>) => sum + ((entry.Size as number) || 0),
         0,
       );
 
       // ── Container disk usage ────────────────────────────────
-      const containersDf = ((df.Containers as any[]) || []).map((c: Record<string, unknown>) => ({
+      const containersDf = ((df.Containers as Record<string, unknown>[]) || []).map((c: Record<string, unknown>) => ({
         id: (c.Id as string)?.substring(0, 12) || "unknown",
         names: (c.Names as string[]) || [],
         sizeRw: (c.SizeRw as number) || 0,
@@ -727,8 +759,6 @@ export default class DockerStatsService {
    * HTTP POST/DELETE helper for Docker Engine API (container actions).
 
 
-   * @param {{ timeout?: number }} [opts]
-   * @returns {Promise<{ statusCode: number, body: string }>}
    */
   static dockerRequest(device: DeviceEntry, method: string, path: string, { timeout = 30_000 }: { timeout?: number } = {}): Promise<DockerActionResponse> {
     return new Promise<DockerActionResponse>((resolve, reject) => {

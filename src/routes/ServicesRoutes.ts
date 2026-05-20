@@ -16,7 +16,6 @@ const router = Router();
  * Resolve the device object for a project's Docker host.
  * Returns the device entry from the registry that has dockerApi configured.
 
- * @returns {{ id: string, device: object } | null}
  */
 function resolveDockerDevice(svc: ProjectEntry) {
   const deviceId = svc.device || "synology";

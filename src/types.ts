@@ -1,7 +1,6 @@
 // ─── Centralized Types ─────────────────────────────────────
 
 
-
 // ── Docker Engine API ──────────────────────────────────────────
 
 /** Response shape from DockerStatsService.dockerRequest() (POST/DELETE) */

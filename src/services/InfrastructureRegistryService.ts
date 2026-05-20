@@ -49,7 +49,6 @@ function deriveHost(url: string | null | undefined, infra: InfrastructureEntry) 
 
 /**
  * Infrastructure status snapshot.
- * @typedef {object} InfraStatus
  * @property {string} id
  * @property {string} name
  * @property {string} type       - "database" | "object-store"
@@ -256,7 +255,7 @@ export default class InfrastructureRegistryService {
    */
   static async _checkHttp(infra: InfrastructureEntry) {
     const baseUrl = infra.url;
-    const healthPath = (infra as any).healthPath || "/";
+    const healthPath = infra.healthPath || "/";
     if (!baseUrl) throw new Error("No URL configured");
 
     const url = `${baseUrl.replace(/\/+$/, "")}${healthPath}`;

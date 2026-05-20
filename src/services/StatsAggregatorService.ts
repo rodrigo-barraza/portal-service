@@ -3,14 +3,12 @@
 import { PROJECTS, STATS_CACHE_TTL_MS } from "../config.ts";
 import logger from "../utils/logger.ts";
 
-/**
- * @typedef {object} CacheEntry
- * @property {any} data
- * @property {number} fetchedAt - Unix timestamp ms
- */
+interface CacheEntry {
+  data: Record<string, unknown>;
+  fetchedAt: number;
+}
 
-
-const cache = new Map();
+const cache = new Map<string, CacheEntry>();
 
 export default class StatsAggregatorService {
   /**
@@ -40,11 +38,12 @@ export default class StatsAggregatorService {
 
       cache.set("overview", { data, fetchedAt: Date.now() });
       return data;
-    } catch (error: any) {
-      logger.error(`[StatsAggregator] Failed to fetch overview: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.error(`[StatsAggregator] Failed to fetch overview: ${err.message}`);
       // Return stale cache if available
       if (cached) return { ...cached.data, stale: true };
-      return { error: error.message };
+      return { error: err.message };
     }
   }
 
@@ -53,7 +52,7 @@ export default class StatsAggregatorService {
 
 
    */
-  static async getRequestBreakdown(params: any = {}) {
+  static async getRequestBreakdown(params: { period?: string } = {}) {
     const cacheKey = `breakdown:${params.period || "24h"}`;
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.fetchedAt < STATS_CACHE_TTL_MS) {
@@ -73,10 +72,11 @@ export default class StatsAggregatorService {
 
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
-    } catch (error: any) {
-      logger.error(`[StatsAggregator] Breakdown fetch failed: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.error(`[StatsAggregator] Breakdown fetch failed: ${err.message}`);
       if (cached) return { ...cached.data, stale: true };
-      return { error: error.message };
+      return { error: err.message };
     }
   }
 
@@ -101,10 +101,11 @@ export default class StatsAggregatorService {
 
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
-    } catch (error: any) {
-      logger.error(`[StatsAggregator] Project stats failed: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.error(`[StatsAggregator] Project stats failed: ${err.message}`);
       if (cached) return { ...cached.data, stale: true };
-      return { error: error.message };
+      return { error: err.message };
     }
   }
 
@@ -113,7 +114,7 @@ export default class StatsAggregatorService {
 
 
    */
-  static async _fetch(url: any) {
+  static async _fetch(url: string) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 
@@ -128,8 +129,8 @@ export default class StatsAggregatorService {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      return response.json();
-    } catch (error: any) {
+      return response.json() as Promise<Record<string, unknown>>;
+    } catch (error: unknown) {
       clearTimeout(timeout);
       throw error;
     }

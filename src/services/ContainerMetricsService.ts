@@ -109,11 +109,6 @@ export default class ContainerMetricsService {
 
   /**
    * Query historical metrics for all containers, or filtered by container/device.
-   *
-   * @param options.container - Filter by container name
-   * @param options.device    - Filter by device ID
-   * @param options.range     - Time range: "1h", "6h", "24h", "7d" (default: "1h")
-   * @param options.limit     - Max samples per container (default: 120)
    */
   static async getHistory({
     container,

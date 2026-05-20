@@ -200,7 +200,6 @@ export default class ServiceRegistryService {
    * which handles the window where a service (e.g. LM Studio) is
    * still binding its HTTP listener after startup.
 
-   * @param {{ name: string, url: string }} svc
 
    */
   static async _checkService(id: string, svc: ProjectEntry) {

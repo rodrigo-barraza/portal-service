@@ -136,7 +136,7 @@ app.use(errorHandler);
 
         if (registry.projects?.length > 0) {
           const { initializeRegistry } = await import("./config.js");
-          initializeRegistry(registry);
+          initializeRegistry(registry as unknown as import("./types.ts").VaultRegistry);
 
           // Run initial health checks now that we have services
           ServiceRegistryService.checkAll().catch(() => {});

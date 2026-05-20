@@ -38,7 +38,9 @@ for (let attempt = 1; attempt <= REGISTRY_RETRIES; attempt++) {
 }
 
 const { initializeRegistry } = await import("./config.ts");
-initializeRegistry(registry);
+if (registry) {
+  initializeRegistry(registry);
+}
 
 // Export vault client so index.ts can schedule a deferred re-fetch
 // if the registry was empty at boot time.

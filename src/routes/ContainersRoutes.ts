@@ -14,7 +14,6 @@ const router = Router();
 /**
  * Resolve the device object from a device ID.
 
- * @returns {{ id: string, device: object } | null}
  */
 function resolveDevice(deviceId: string) {
   const device = DEVICES[deviceId];
@@ -76,8 +75,8 @@ router.post("/:name/restart", asyncHandler(async (req: Request, res: Response, n
       logger.error(`[Container:Restart] Failed for ${name}: ${message}`);
       res.status(502).json({ error: message });
     }
-  } catch (error: any) {
-    logger.error(`[Container:Restart] Failed: ${error.message}`);
+  } catch (error: unknown) {
+    logger.error(`[Container:Restart] Failed: ${(error as Error).message}`);
     next(error);
   }
 }, "Containers_Restart"));
@@ -125,8 +124,8 @@ router.post("/:name/stop", asyncHandler(async (req: Request, res: Response, next
       logger.error(`[Container:Stop] Failed for ${name}: ${message}`);
       res.status(502).json({ error: message });
     }
-  } catch (error: any) {
-    logger.error(`[Container:Stop] Failed: ${error.message}`);
+  } catch (error: unknown) {
+    logger.error(`[Container:Stop] Failed: ${(error as Error).message}`);
     next(error);
   }
 }, "Containers_Stop"));
@@ -174,8 +173,8 @@ router.post("/:name/start", asyncHandler(async (req: Request, res: Response, nex
       logger.error(`[Container:Start] Failed for ${name}: ${message}`);
       res.status(502).json({ error: message });
     }
-  } catch (error: any) {
-    logger.error(`[Container:Start] Failed: ${error.message}`);
+  } catch (error: unknown) {
+    logger.error(`[Container:Start] Failed: ${(error as Error).message}`);
     next(error);
   }
 }, "Containers_Start"));

@@ -8,6 +8,13 @@ import {
 } from "../config.ts";
 import logger from "../utils/logger.ts";
 
+interface MinioObjectEntry {
+  name: string;
+  size: number;
+  lastModified: string | null;
+  etag: string | null;
+}
+
 export default class MinioService {
   static client: Client | null = null;
 
@@ -36,7 +43,6 @@ export default class MinioService {
   }
   /**
    * List all buckets with creation dates and object counts.
-   * @returns {Promise<Array<{ name: string, creationDate: string, objectCount: number, totalSize: number }>>}
    */
   static async listBuckets() {
     const mc = MinioService._getClient();
@@ -58,8 +64,8 @@ export default class MinioService {
             stream.on("end", resolve);
             stream.on("error", reject);
           });
-        } catch (error: any) {
-          logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${error.message}`);
+        } catch (error: unknown) {
+          logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${(error as Error).message}`);
         }
 
         return {
@@ -101,8 +107,8 @@ export default class MinioService {
           stream.on("end", resolve);
           stream.on("error", reject);
         });
-      } catch (error: any) {
-        logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${error.message}`);
+      } catch (error: unknown) {
+        logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${(error as Error).message}`);
       }
 
       yield {
@@ -122,13 +128,12 @@ export default class MinioService {
    * Returns a flat list with virtual "folder" grouping via commonPrefixes.
 
 
-   * @returns {Promise<{ objects: Array, prefixes: string[] }>}
    */
   static async listObjects(bucketName: string, prefix: string = "", recursive: boolean = false) {
     const mc = MinioService._getClient();
 
-    return new Promise<{ objects: any[], prefixes: string[] }>((resolve, reject) => {
-      const objects: any[] = [];
+    return new Promise<{ objects: MinioObjectEntry[], prefixes: string[] }>((resolve, reject) => {
+      const objects: MinioObjectEntry[] = [];
       const prefixes = new Set<string>();
 
       const stream = mc.listObjectsV2(bucketName, prefix, recursive);
@@ -139,7 +144,7 @@ export default class MinioService {
           prefixes.add(item.prefix);
         } else {
           objects.push({
-            name: item.name,
+            name: item.name || "",
             size: item.size,
             lastModified: item.lastModified?.toISOString() || null,
             etag: item.etag || null,
