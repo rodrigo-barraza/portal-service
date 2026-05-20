@@ -103,7 +103,7 @@ router.get("/buckets/:name", asyncHandler(async (req: Request, res: Response, ne
     const { name } = req.params;
     const prefix = typeof req.query.prefix === "string" ? req.query.prefix : "";
     const recursive = req.query.recursive === "true";
-    const result = await MinioService.listObjects(name, prefix, recursive) as ObjectListResult;
+    const result = await MinioService.listObjects(String(name), prefix, recursive) as ObjectListResult;
     res.json({ bucket: name, prefix, ...result });
   } catch (error: any) {
     logger.error(`[ObjectStore] listObjects failed: ${error.message}`);
@@ -124,7 +124,7 @@ router.get("/buckets/:name/stat/*objectPath", asyncHandler(async (req: Request, 
       return res.status(400).json({ error: "Object name required" });
     }
 
-    const stat = await MinioService.statObject(bucketName, objectName);
+    const stat = await MinioService.statObject(String(bucketName), objectName);
     res.json({
       bucket: bucketName,
       object: objectName,
@@ -159,7 +159,7 @@ router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req: Reque
     }
 
     // Get stat for content-type & size
-    const stat = await MinioService.statObject(bucketName, objectName);
+    const stat = await MinioService.statObject(String(bucketName), objectName);
     const contentType = stat.metaData?.["content-type"] || guessMime(objectName);
     const filename = objectName.split("/").pop();
     const disposition = req.query.inline === "true" ? "inline" : "attachment";
@@ -169,7 +169,7 @@ router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req: Reque
     res.setHeader("Content-Disposition", `${disposition}; filename="${filename}"`);
     res.setHeader("ETag", stat.etag);
 
-    const stream = await MinioService.getObject(bucketName, objectName);
+    const stream = await MinioService.getObject(String(bucketName), objectName);
     stream.pipe(res);
   } catch (error: any) {
     if (error.code === "NotFound" || error.message?.includes("Not Found")) {
@@ -193,7 +193,7 @@ router.delete("/buckets/:name/*objectPath", asyncHandler(async (req: Request, re
       return res.status(400).json({ error: "Object name required" });
     }
 
-    await MinioService.deleteObject(bucketName, objectName);
+    await MinioService.deleteObject(String(bucketName), objectName);
     logger.info(`[ObjectStore] Deleted ${bucketName}/${objectName}`);
     res.json({ success: true, bucket: bucketName, object: objectName });
   } catch (error: any) {

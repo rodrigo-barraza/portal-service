@@ -12,7 +12,7 @@ function validateProperty(req: Request, res: Response, next: NextFunction) {
   const { propertyId } = req.params;
   const properties = GoogleAnalyticsService.listProperties();
 
-  if (!properties.find((p: any) => p.id === propertyId)) {
+  if (!properties.find((p: { id: string }) => p.id === propertyId)) {
     return res.status(404).json({ error: `Unknown property: ${propertyId}` });
   }
 
@@ -32,7 +32,7 @@ router.get("/:propertyId/realtime", validateProperty, asyncHandler(async (req: R
   try {
     const data = await GoogleAnalyticsService.getRealtimeReport(String(req.params.propertyId));
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "GoogleAnalytics_Realtime"));
@@ -46,7 +46,7 @@ router.get("/:propertyId/overview", validateProperty, asyncHandler(async (req: R
       typeof req.query.period === "string" ? req.query.period : undefined,
     );
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "GoogleAnalytics_Overview"));
@@ -60,7 +60,7 @@ router.get("/:propertyId/pages", validateProperty, asyncHandler(async (req: Requ
       typeof req.query.period === "string" ? req.query.period : undefined,
     );
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "GoogleAnalytics_Pages"));
@@ -74,7 +74,7 @@ router.get("/:propertyId/sources", validateProperty, asyncHandler(async (req: Re
       typeof req.query.period === "string" ? req.query.period : undefined,
     );
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "GoogleAnalytics_Sources"));
@@ -88,7 +88,7 @@ router.get("/:propertyId/geography", validateProperty, asyncHandler(async (req: 
       typeof req.query.period === "string" ? req.query.period : undefined,
     );
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "GoogleAnalytics_Geography"));
@@ -102,7 +102,7 @@ router.get("/:propertyId/devices", validateProperty, asyncHandler(async (req: Re
       typeof req.query.period === "string" ? req.query.period : undefined,
     );
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "GoogleAnalytics_Devices"));
@@ -116,7 +116,7 @@ router.get("/:propertyId/timeseries", validateProperty, asyncHandler(async (req:
       typeof req.query.period === "string" ? req.query.period : undefined,
     );
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "GoogleAnalytics_Timeseries"));
@@ -130,7 +130,7 @@ router.get("/:propertyId/channels", validateProperty, asyncHandler(async (req: R
       typeof req.query.period === "string" ? req.query.period : undefined,
     );
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "GoogleAnalytics_Channels"));
@@ -144,7 +144,7 @@ router.get("/:propertyId/landing-pages", validateProperty, asyncHandler(async (r
       typeof req.query.period === "string" ? req.query.period : undefined,
     );
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "GoogleAnalytics_LandingPages"));
@@ -158,7 +158,7 @@ router.get("/:propertyId/heatmap", validateProperty, asyncHandler(async (req: Re
       typeof req.query.period === "string" ? req.query.period : undefined,
     );
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "GoogleAnalytics_Heatmap"));
@@ -172,7 +172,7 @@ router.get("/:propertyId/new-vs-returning", validateProperty, asyncHandler(async
       typeof req.query.period === "string" ? req.query.period : undefined,
     );
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "GoogleAnalytics_NewVsReturning"));
@@ -186,7 +186,7 @@ router.get("/:propertyId/events", validateProperty, asyncHandler(async (req: Req
       typeof req.query.period === "string" ? req.query.period : undefined,
     );
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "GoogleAnalytics_Events"));

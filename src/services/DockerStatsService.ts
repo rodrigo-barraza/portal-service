@@ -20,10 +20,10 @@ const HISTORY_MAX_SAMPLES = 60;
 // ── Per-Host State ───────────────────────────────────────────────
 // Each Docker host gets isolated state keyed by device ID.
 
-/** @type {Map<string, { data: any, fetchedAt: number }>} */
+/** @type {Map<string, { data: ContainerStats[], fetchedAt: number }>} */
 const statsCacheMap = new Map();
 
-/** @type {Map<string, { data: any, fetchedAt: number }>} */
+/** @type {Map<string, { data: Record<string, unknown>, fetchedAt: number }>} */
 const systemCacheMap = new Map();
 
 /** @type {Map<string, Map<string, { cpuTotal: number, systemTotal: number }>>} */
@@ -115,7 +115,7 @@ export default class DockerStatsService {
     try {
       const containers = await DockerStatsService._listContainers(device);
       const stats = await Promise.all(
-        containers.map((c: Record<string, any>) => {
+        containers.map((c: Record<string, unknown>) => {
           if (c.State !== "running") {
             return DockerStatsService._buildStoppedSkeleton(c, deviceId);
           }
@@ -128,7 +128,7 @@ export default class DockerStatsService {
       // Prune stale CPU counters for this device
       const counters = cpuCounterMap.get(deviceId);
       if (counters) {
-        const activeIds = new Set(containers.map((c: Record<string, any>) => c.Id));
+        const activeIds = new Set(containers.map((c: Record<string, unknown>) => c.Id));
         for (const id of counters.keys()) {
           if (!activeIds.has(id)) counters.delete(id);
         }
@@ -136,8 +136,9 @@ export default class DockerStatsService {
 
       statsCacheMap.set(deviceId, { data: result, fetchedAt: Date.now() });
       return result;
-    } catch (error: any) {
-      logger.error(`[DockerStats:${deviceId}] Failed to collect stats: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.error(`[DockerStats:${deviceId}] Failed to collect stats: ${err.message}`);
       const stale = statsCacheMap.get(deviceId);
       if (stale) return stale.data;
       return [];
@@ -259,12 +260,13 @@ export default class DockerStatsService {
       const lastPersist = lastPersistMap.get(deviceId) || 0;
       if (now - lastPersist >= ContainerMetricsService.persistIntervalMs) {
         lastPersistMap.set(deviceId, now);
-        ContainerMetricsService.persistSnapshot(deviceId, stats).catch((err: any) => {
-          logger.warn(`[DockerStats:${deviceId}] Metrics persist failed: ${err.message}`);
+        ContainerMetricsService.persistSnapshot(deviceId, stats).catch((err: unknown) => {
+          logger.warn(`[DockerStats:${deviceId}] Metrics persist failed: ${(err as Error).message}`);
         });
       }
-    } catch (error: any) {
-      logger.warn(`[DockerStats:${deviceId}] Snapshot failed: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.warn(`[DockerStats:${deviceId}] Snapshot failed: ${err.message}`);
     }
   }
 
@@ -275,7 +277,7 @@ export default class DockerStatsService {
 
 
    */
-  static async _listContainers(device: DeviceEntry): Promise<Record<string, any>[]> {
+  static async _listContainers(device: DeviceEntry): Promise<Record<string, unknown>[]> {
     const body = await DockerStatsService._dockerGet(
       device,
       "/containers/json?all=true",
@@ -288,7 +290,7 @@ export default class DockerStatsService {
 
 
    */
-  static async _getContainerStats(container: Record<string, any>, device: DeviceEntry, deviceId: string): Promise<ContainerStats | null> {
+  static async _getContainerStats(container: Record<string, unknown>, device: DeviceEntry, deviceId: string): Promise<ContainerStats | null> {
     try {
       const body = await DockerStatsService._dockerGet(
         device,
@@ -296,9 +298,10 @@ export default class DockerStatsService {
       );
       const raw = JSON.parse(body);
       return DockerStatsService._parseStats(container, raw, deviceId);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       logger.warn(
-        `[DockerStats:${deviceId}] Failed to get stats for ${container.Names?.[0]}: ${error.message}`,
+        `[DockerStats:${deviceId}] Failed to get stats for ${(container.Names as string[] | undefined)?.[0]}: ${err.message}`,
       );
       return null;
     }
@@ -309,32 +312,32 @@ export default class DockerStatsService {
 
 
    */
-  static _buildStoppedSkeleton(container: Record<string, any>, deviceId: string): ContainerStats {
-    const name = (container.Names?.[0] || "unknown").replace(/^\//, "");
-    const command = container.Command || "";
-    const ports = (container.Ports || []).map((p: any) => ({
-      ip: p.IP || "",
-      privatePort: p.PrivatePort,
-      publicPort: p.PublicPort,
-      type: p.Type,
+  static _buildStoppedSkeleton(container: Record<string, unknown>, deviceId: string): ContainerStats {
+    const name = ((container.Names as string[] | undefined)?.[0] || "unknown").replace(/^\//, "");
+    const command = (container.Command as string) || "";
+    const ports = ((container.Ports as any[]) || []).map((p: Record<string, unknown>) => ({
+      ip: (p.IP as string) || "",
+      privatePort: p.PrivatePort as number,
+      publicPort: p.PublicPort as number,
+      type: p.Type as string,
     }));
-    const mounts = (container.Mounts || []).map((m: any) => ({
-      type: m.Type,
-      name: m.Name || "",
-      source: m.Source,
-      destination: m.Destination,
-      mode: m.Mode || "rw",
-      rw: m.RW ?? true,
+    const mounts = ((container.Mounts as any[]) || []).map((m: Record<string, unknown>) => ({
+      type: m.Type as string,
+      name: (m.Name as string) || "",
+      source: m.Source as string,
+      destination: m.Destination as string,
+      mode: (m.Mode as string) || "rw",
+      rw: (m.RW as boolean) ?? true,
     }));
-    const labels = container.Labels || {};
+    const labels = (container.Labels as Record<string, string>) || {};
 
     return {
-      id: container.Id.substring(0, 12),
+      id: (container.Id as string).substring(0, 12),
       name,
-      image: container.Image,
-      state: container.State,
-      status: container.Status,
-      created: container.Created,
+      image: container.Image as string,
+      state: container.State as string,
+      status: container.Status as string,
+      created: container.Created as number,
       command,
       ports,
       mounts,
@@ -363,13 +366,14 @@ export default class DockerStatsService {
 
 
    */
-  static _parseStats(container: Record<string, any>, raw: Record<string, any>, deviceId: string): ContainerStats {
+  static _parseStats(container: Record<string, unknown>, raw: Record<string, unknown>, deviceId: string): ContainerStats {
     // ── CPU (self-tracked deltas) ──────────────────────────────
-    const currentCpuTotal = raw.cpu_stats?.cpu_usage?.total_usage || 0;
-    const currentSystemTotal = raw.cpu_stats?.system_cpu_usage || 0;
+    const cpuStats = raw.cpu_stats as any;
+    const currentCpuTotal = cpuStats?.cpu_usage?.total_usage || 0;
+    const currentSystemTotal = cpuStats?.system_cpu_usage || 0;
     const numCpus =
-      raw.cpu_stats?.online_cpus ||
-      raw.cpu_stats?.cpu_usage?.percpu_usage?.length ||
+      cpuStats?.online_cpus ||
+      cpuStats?.cpu_usage?.percpu_usage?.length ||
       1;
 
     // Get or create per-device CPU counter map
@@ -394,10 +398,11 @@ export default class DockerStatsService {
     });
 
     // ── Memory ─────────────────────────────────────────────────
-    const memUsage = raw.memory_stats?.usage || 0;
-    const memCache = raw.memory_stats?.stats?.cache || raw.memory_stats?.stats?.inactive_file || 0;
+    const memStats = raw.memory_stats as any;
+    const memUsage = memStats?.usage || 0;
+    const memCache = memStats?.stats?.cache || memStats?.stats?.inactive_file || 0;
     const memActual = memUsage - memCache;
-    const memLimit = raw.memory_stats?.limit || 0;
+    const memLimit = memStats?.limit || 0;
     const memPercent = memLimit > 0 ? (memActual / memLimit) * 100 : 0;
 
     // ── Network I/O ────────────────────────────────────────────
@@ -405,7 +410,7 @@ export default class DockerStatsService {
     let netRxDropped = 0, netTxDropped = 0, netRxErrors = 0, netTxErrors = 0;
     const networkInterfaces: Record<string, NetworkInterfaceStats> = {};
     if (raw.networks) {
-      for (const [ifaceName, iface] of Object.entries(raw.networks) as [string, any][]) {
+      for (const [ifaceName, iface] of Object.entries(raw.networks) as [string, Record<string, number>][]) {
         netRx += iface.rx_bytes || 0;
         netTx += iface.tx_bytes || 0;
         netRxPackets += iface.rx_packets || 0;
@@ -429,30 +434,32 @@ export default class DockerStatsService {
 
     // ── Block I/O ──────────────────────────────────────────────
     let blockRead = 0, blockWrite = 0;
-    if (raw.blkio_stats?.io_service_bytes_recursive) {
-      for (const entry of raw.blkio_stats.io_service_bytes_recursive) {
+    const blkioStats = raw.blkio_stats as any;
+    if (blkioStats?.io_service_bytes_recursive) {
+      for (const entry of blkioStats.io_service_bytes_recursive) {
         if (entry.op === "read" || entry.op === "Read") blockRead += entry.value || 0;
         if (entry.op === "write" || entry.op === "Write") blockWrite += entry.value || 0;
       }
     }
 
     // ── PIDs ───────────────────────────────────────────────────
-    const pids = raw.pids_stats?.current || 0;
+    const pidsStats = raw.pids_stats as any;
+    const pids = pidsStats?.current || 0;
 
     // ── Memory Detail ─────────────────────────────────────────
     const memoryDetail = {
-      rss: raw.memory_stats?.stats?.rss || 0,
+      rss: memStats?.stats?.rss || 0,
       cache: memCache,
-      swap: raw.memory_stats?.stats?.swap || 0,
-      maxUsage: raw.memory_stats?.max_usage || 0,
-      activeAnon: raw.memory_stats?.stats?.active_anon || 0,
-      inactiveAnon: raw.memory_stats?.stats?.inactive_anon || 0,
-      pgfault: raw.memory_stats?.stats?.pgfault || 0,
-      pgmajfault: raw.memory_stats?.stats?.pgmajfault || 0,
+      swap: memStats?.stats?.swap || 0,
+      maxUsage: memStats?.max_usage || 0,
+      activeAnon: memStats?.stats?.active_anon || 0,
+      inactiveAnon: memStats?.stats?.inactive_anon || 0,
+      pgfault: memStats?.stats?.pgfault || 0,
+      pgmajfault: memStats?.stats?.pgmajfault || 0,
     };
 
     // ── CPU Throttling ────────────────────────────────────────
-    const throttling = raw.cpu_stats?.throttling_data || {};
+    const throttling = cpuStats?.throttling_data || {};
     const cpuThrottling = {
       periods: throttling.periods || 0,
       throttledPeriods: throttling.throttled_periods || 0,
@@ -460,31 +467,31 @@ export default class DockerStatsService {
     };
 
     // ── Container Metadata ────────────────────────────────────
-    const command = container.Command || "";
-    const ports = (container.Ports || []).map((p: any) => ({
-      ip: p.IP || "",
-      privatePort: p.PrivatePort,
-      publicPort: p.PublicPort,
-      type: p.Type,
+    const command = (container.Command as string) || "";
+    const ports = ((container.Ports as any[]) || []).map((p: Record<string, unknown>) => ({
+      ip: (p.IP as string) || "",
+      privatePort: p.PrivatePort as number,
+      publicPort: p.PublicPort as number,
+      type: p.Type as string,
     }));
-    const mounts = (container.Mounts || []).map((m: any) => ({
-      type: m.Type,
-      name: m.Name || "",
-      source: m.Source,
-      destination: m.Destination,
-      mode: m.Mode || "rw",
-      rw: m.RW ?? true,
+    const mounts = ((container.Mounts as any[]) || []).map((m: Record<string, unknown>) => ({
+      type: m.Type as string,
+      name: (m.Name as string) || "",
+      source: m.Source as string,
+      destination: m.Destination as string,
+      mode: (m.Mode as string) || "rw",
+      rw: (m.RW as boolean) ?? true,
     }));
-    const labels = container.Labels || {};
-    const name = (container.Names?.[0] || "unknown").replace(/^\//, "");
+    const labels = (container.Labels as Record<string, string>) || {};
+    const name = ((container.Names as string[] | undefined)?.[0] || "unknown").replace(/^\//, "");
 
     return {
-      id: container.Id.substring(0, 12),
+      id: (container.Id as string).substring(0, 12),
       name,
-      image: container.Image,
-      state: container.State,
-      status: container.Status,
-      created: container.Created,
+      image: container.Image as string,
+      state: container.State as string,
+      status: container.Status as string,
+      created: container.Created as number,
       command,
       ports,
       mounts,
@@ -561,46 +568,46 @@ export default class DockerStatsService {
       const df = JSON.parse(dfBody);
 
       // ── Image disk usage ────────────────────────────────────
-      const images = (df.Images || []).map((image: any) => ({
-        id: image.Id?.substring(0, 12) || "unknown",
-        tags: image.RepoTags || [],
-        size: image.Size || 0,
-        sharedSize: image.SharedSize || 0,
-        created: image.Created,
-        containers: image.Containers || 0,
+      const images = ((df.Images as any[]) || []).map((image: Record<string, unknown>) => ({
+        id: (image.Id as string)?.substring(0, 12) || "unknown",
+        tags: (image.RepoTags as string[]) || [],
+        size: (image.Size as number) || 0,
+        sharedSize: (image.SharedSize as number) || 0,
+        created: image.Created as number,
+        containers: (image.Containers as number) || 0,
       }));
 
       const totalImageSize = images.reduce((sum: number, image: { size: number }) => sum + image.size, 0);
       const totalImageShared = images.reduce((sum: number, image: { sharedSize: number }) => sum + image.sharedSize, 0);
 
       // ── Volume disk usage ───────────────────────────────────
-      const volumes = (df.Volumes || []).map((vol: any) => ({
-        name: vol.Name,
-        driver: vol.Driver,
-        size: vol.UsageData?.Size || 0,
-        refCount: vol.UsageData?.RefCount || 0,
+      const volumes = ((df.Volumes as any[]) || []).map((vol: Record<string, unknown>) => ({
+        name: vol.Name as string,
+        driver: vol.Driver as string,
+        size: (vol.UsageData as Record<string, number>)?.Size || 0,
+        refCount: (vol.UsageData as Record<string, number>)?.RefCount || 0,
       }));
 
       const totalVolumeSize = volumes.reduce((sum: number, vol: { size: number }) => sum + vol.size, 0);
 
       // ── Build cache disk usage ──────────────────────────────
-      const buildCache = df.BuildCache || [];
+      const buildCache = (df.BuildCache as any[]) || [];
       const totalBuildCacheSize = buildCache.reduce(
-        (sum: number, entry: Record<string, any>) => sum + (entry.Size || 0),
+        (sum: number, entry: Record<string, unknown>) => sum + ((entry.Size as number) || 0),
         0,
       );
 
       // ── Container disk usage ────────────────────────────────
-      const containersDf = (df.Containers || []).map((c: any) => ({
-        id: c.Id?.substring(0, 12) || "unknown",
-        names: c.Names || [],
-        sizeRw: c.SizeRw || 0,
-        sizeRootFs: c.SizeRootFs || 0,
-        state: c.State,
+      const containersDf = ((df.Containers as any[]) || []).map((c: Record<string, unknown>) => ({
+        id: (c.Id as string)?.substring(0, 12) || "unknown",
+        names: (c.Names as string[]) || [],
+        sizeRw: (c.SizeRw as number) || 0,
+        sizeRootFs: (c.SizeRootFs as number) || 0,
+        state: c.State as string,
       }));
 
       const totalContainerRw = containersDf.reduce(
-        (sum: number, c: any) => sum + c.sizeRw,
+        (sum: number, c: { sizeRw: number }) => sum + c.sizeRw,
         0,
       );
 
@@ -618,8 +625,8 @@ export default class DockerStatsService {
             const percent = total > 0 ? Math.round((used / total) * 10000) / 100 : 0;
             hostDisk = { total, used, available, percent };
           }
-        } catch (dfErr: any) {
-          logger.warn(`[DockerStats:${deviceId}] Host disk stats failed: ${dfErr.message}`);
+        } catch (dfErr: unknown) {
+          logger.warn(`[DockerStats:${deviceId}] Host disk stats failed: ${(dfErr as Error).message}`);
         }
       }
 
@@ -640,12 +647,12 @@ export default class DockerStatsService {
             count: images.length,
             totalSize: totalImageSize,
             sharedSize: totalImageShared,
-            items: images.sort((a: any, b: any) => b.size - a.size).slice(0, 20),
+            items: images.sort((a: { size: number }, b: { size: number }) => b.size - a.size).slice(0, 20),
           },
           volumes: {
             count: volumes.length,
             totalSize: totalVolumeSize,
-            items: volumes.sort((a: any, b: any) => b.size - a.size),
+            items: volumes.sort((a: { size: number }, b: { size: number }) => b.size - a.size),
           },
           buildCache: {
             count: buildCache.length,
@@ -663,11 +670,12 @@ export default class DockerStatsService {
 
       systemCacheMap.set(deviceId, { data: result, fetchedAt: Date.now() });
       return result;
-    } catch (error: any) {
-      logger.error(`[DockerStats:${deviceId}] System info failed: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.error(`[DockerStats:${deviceId}] System info failed: ${err.message}`);
       const stale = systemCacheMap.get(deviceId);
       if (stale) return stale.data;
-      throw error;
+      throw err;
     }
   }
 

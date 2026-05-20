@@ -2,6 +2,7 @@
 
 import { MongoClient } from "mongodb";
 import { Client as MinioClient, type BucketItemFromList } from "minio";
+import type { InfrastructureEntry, InfraStatus } from "../types.ts";
 import {
   INFRASTRUCTURE,
   DEVICES,
@@ -33,7 +34,7 @@ const HOSTNAME_TO_DEVICE = buildHostnameToDeviceMap();
  * Derive the display device name from a URL.
  * Reverse-looks up the URL hostname against the DEVICES table.
  */
-function deriveHost(url: any, infra: any) {
+function deriveHost(url: string | null | undefined, infra: InfrastructureEntry) {
   if (!url) return DEVICES[infra.device]?.name || infra.device || "Unknown";
   try {
     const parsed = new URL(url);
@@ -72,8 +73,8 @@ export default class InfrastructureRegistryService {
    * Get all infrastructure services with their current status.
 
    */
-  static list() {
-    return Object.entries(INFRASTRUCTURE).map(([id, infra]: any) => {
+  static list(): InfraStatus[] {
+    return Object.entries(INFRASTRUCTURE).map(([id, infra]) => {
       const cached = statusCache.get(id);
       return cached || {
         id,
@@ -102,10 +103,10 @@ export default class InfrastructureRegistryService {
    * Poll all infrastructure services and update cache.
 
    */
-  static async checkAll() {
+  static async checkAll(): Promise<InfraStatus[]> {
     const results = await Promise.all(
-      Object.entries(INFRASTRUCTURE).map(([id, infra]: any) =>
-        InfrastructureRegistryService._checkInfra(id, infra),
+      Object.entries(INFRASTRUCTURE).map(([id, infra]) =>
+        InfrastructureRegistryService._checkInfra(id, infra as InfrastructureEntry),
       ),
     );
 
@@ -116,7 +117,7 @@ export default class InfrastructureRegistryService {
     return results;
   }
 
-  static async _checkInfra(id: any, infra: any) {
+  static async _checkInfra(id: string, infra: InfrastructureEntry): Promise<InfraStatus> {
     const base = {
       id,
       name: infra.name,
@@ -136,14 +137,14 @@ export default class InfrastructureRegistryService {
     const start = Date.now();
 
     try {
-      let metadata: any = null;
+      let metadata: Record<string, unknown> | null = null;
 
       if (infra.type === "database") {
         metadata = await InfrastructureRegistryService._checkMongo();
       } else if (infra.type === "object-store") {
         metadata = await InfrastructureRegistryService._checkMinio();
       } else if (infra.type === "inference") {
-        metadata = await InfrastructureRegistryService._checkHttp(infra);
+        metadata = await InfrastructureRegistryService._checkHttp(infra) as Record<string, unknown>;
       }
 
       return {
@@ -154,16 +155,17 @@ export default class InfrastructureRegistryService {
         error: null,
         checkedAt: new Date().toISOString(),
       };
-    } catch (error: any) {
-      logger.warn(`[InfraRegistry] ${infra.name} unreachable: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.warn(`[InfraRegistry] ${infra.name} unreachable: ${err.message}`);
       return {
         ...base,
         healthy: false,
         responseTimeMs: Date.now() - start,
         metadata: null,
-        error: error.name === "AbortError" ? "Timeout" : error.message,
+        error: err.name === "AbortError" ? "Timeout" : err.message,
         checkedAt: new Date().toISOString(),
-      };
+      } as InfraStatus;
     }
   }
 
@@ -252,9 +254,9 @@ export default class InfrastructureRegistryService {
 
 
    */
-  static async _checkHttp(infra: any) {
+  static async _checkHttp(infra: InfrastructureEntry) {
     const baseUrl = infra.url;
-    const healthPath = infra.healthPath || "/";
+    const healthPath = (infra as any).healthPath || "/";
     if (!baseUrl) throw new Error("No URL configured");
 
     const url = `${baseUrl.replace(/\/+$/, "")}${healthPath}`;

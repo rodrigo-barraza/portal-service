@@ -15,7 +15,7 @@ const TTL_DAYS = 7;                        // Auto-expire after 7 days
 const TTL_SECONDS = TTL_DAYS * 24 * 60 * 60;
 
 export default class ContainerMetricsService {
-  static _timer: any = null;
+  static _timer: ReturnType<typeof setTimeout> | null = null;
   static _initialized = false;
 
   /**
@@ -54,13 +54,14 @@ export default class ContainerMetricsService {
 
       ContainerMetricsService._initialized = true;
       logger.success("[ContainerMetrics] Indexes ensured");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error & { codeName?: string };
       // If collection already exists with different options, that's fine
-      if (error.codeName === "NamespaceExists") {
+      if (err.codeName === "NamespaceExists") {
         ContainerMetricsService._initialized = true;
         logger.info("[ContainerMetrics] Collection already exists");
       } else {
-        logger.error(`[ContainerMetrics] Setup failed: ${error.message}`);
+        logger.error(`[ContainerMetrics] Setup failed: ${err.message}`);
       }
     }
   }
@@ -69,7 +70,7 @@ export default class ContainerMetricsService {
    * Persist a batch of container stats to MongoDB.
    * Called from DockerStatsService after each snapshot collection.
    */
-  static async persistSnapshot(deviceId: string, containers: any[]): Promise<void> {
+  static async persistSnapshot(deviceId: string, containers: Record<string, any>[]): Promise<void> {
     if (!ContainerMetricsService._initialized) return;
 
     const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
@@ -79,8 +80,8 @@ export default class ContainerMetricsService {
     const now = new Date();
 
     const documents = containers
-      .filter((c: any) => c.cpu && c.memory)
-      .map((c: any) => ({
+      .filter((c) => c.cpu && c.memory)
+      .map((c) => ({
         timestamp: now,
         metadata: {
           container: c.name,
@@ -101,8 +102,8 @@ export default class ContainerMetricsService {
 
     try {
       await col.insertMany(documents, { ordered: false });
-    } catch (error: any) {
-      logger.warn(`[ContainerMetrics] Insert failed: ${error.message}`);
+    } catch (error: unknown) {
+      logger.warn(`[ContainerMetrics] Insert failed: ${(error as Error).message}`);
     }
   }
 
@@ -135,7 +136,7 @@ export default class ContainerMetricsService {
     const since = new Date(Date.now() - rangeMs);
 
     // Build match filter
-    const match: any = { timestamp: { $gte: since } };
+    const match: Record<string, any> = { timestamp: { $gte: since } };
     if (container) match["metadata.container"] = container;
     if (device) match["metadata.device"] = device;
 
@@ -143,7 +144,7 @@ export default class ContainerMetricsService {
     const bucketCount = Math.min(limit, 120);
 
     try {
-      const pipeline: any[] = [
+      const pipeline: Record<string, any>[] = [
         { $match: match },
         { $sort: { "metadata.container": 1, timestamp: 1 } },
         {
@@ -183,7 +184,7 @@ export default class ContainerMetricsService {
         const name = doc._id.container;
         containers[name] = {
           device: doc._id.device,
-          points: doc.points.map((p: any) => ({
+          points: doc.points.map((p: Record<string, any>) => ({
             t: p.t,
             cpu: Math.round(p.cpu * 100) / 100,
             mem: p.mem,
@@ -197,8 +198,8 @@ export default class ContainerMetricsService {
       }
 
       return { containers, range, since: since.toISOString(), samples: totalSamples };
-    } catch (error: any) {
-      logger.error(`[ContainerMetrics] Query failed: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error(`[ContainerMetrics] Query failed: ${(error as Error).message}`);
       return { containers: {}, range, samples: 0 };
     }
   }

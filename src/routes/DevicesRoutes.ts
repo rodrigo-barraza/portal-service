@@ -4,6 +4,7 @@ import { Router, Request, Response } from "express";
 import { DEVICES, PROJECTS, INFRASTRUCTURE } from "../config.ts";
 import ServiceRegistryService from "../services/ServiceRegistryService.ts";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.ts";
+import type { ServiceStatus, InfraStatus, ProjectEntry, InfrastructureEntry } from "../types.ts";
 
 const router = Router();
 
@@ -16,18 +17,18 @@ const router = Router();
 router.get("/", (_req: Request, res: Response) => {
   // Build service → health lookup from the registry cache
   const serviceStatuses = ServiceRegistryService.list();
-  const statusMap = new Map(serviceStatuses.map((s: any) => [s.id, s]));
+  const statusMap = new Map(serviceStatuses.map((s: ServiceStatus) => [s.id, s]));
 
   // Build infrastructure → health lookup
   const infraStatuses = InfrastructureRegistryService.list();
-  const infraMap = new Map(infraStatuses.map((s: any) => [s.id, s]));
+  const infraMap = new Map(infraStatuses.map((s: InfraStatus) => [s.id, s]));
 
   // Group services and infrastructure by device
-  const devices = Object.entries(DEVICES).map(([deviceId, device]: any) => {
+  const devices = Object.entries(DEVICES).map(([deviceId, device]) => {
     // Application services on this device
     const hostedServices = Object.entries(PROJECTS)
-      .filter(([, svc]: any) => svc.device === deviceId)
-      .map(([svcId, svc]: any) => {
+      .filter(([, svc]) => (svc as ProjectEntry).device === deviceId)
+      .map(([svcId, svc]) => {
         const status = statusMap.get(svcId);
         return {
           id: svcId,
@@ -47,8 +48,8 @@ router.get("/", (_req: Request, res: Response) => {
 
     // Infrastructure backing stores on this device
     const hostedInfra = Object.entries(INFRASTRUCTURE)
-      .filter(([, infra]: any) => infra.device === deviceId)
-      .map(([infraId, infra]: any) => {
+      .filter(([, infra]) => (infra as InfrastructureEntry).device === deviceId)
+      .map(([infraId, infra]) => {
         const status = infraMap.get(infraId);
         return {
           id: infraId,
@@ -69,7 +70,7 @@ router.get("/", (_req: Request, res: Response) => {
       });
 
     const allItems = [...hostedServices, ...hostedInfra];
-    const healthyCount = allItems.filter((s: any) => s.healthy).length;
+    const healthyCount = allItems.filter((s: { healthy: boolean }) => s.healthy).length;
 
     return {
       id: deviceId,
@@ -89,7 +90,8 @@ router.get("/", (_req: Request, res: Response) => {
 
 
  */
-function extractPort(url: any) {
+function extractPort(url: string | null | undefined) {
+  if (!url) return null;
   try {
     const parsed = new URL(url);
     return parsed.port ? Number(parsed.port) : null;

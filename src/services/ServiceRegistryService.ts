@@ -1,4 +1,4 @@
-import type { ProjectEntry } from "../types.ts";
+import type { ProjectEntry, DependencyRef } from "../types.ts";
 // ─── Service Registry Service ───────────────────────────────
 
 import os from "os";
@@ -101,31 +101,41 @@ function toLocalHealthUrl(url: string, svc: ProjectEntry) {
   }
 }
 
-/**
- * Service status snapshot.
- * @typedef {object} ServiceStatus
- * @property {string} id
- * @property {string} name
- * @property {string} url
- * @property {"Production"|"Development"} environment
- * @property {string} device - Resolved device name (e.g. "Workstation", "Synology NAS")
- * @property {string|null} repo - GitHub repository URL
- * @property {boolean} healthy
- * @property {number|null} responseTimeMs
- * @property {object|null} metadata - Root endpoint JSON (version, endpoints, etc.)
- * @property {string|null} error
- * @property {string} checkedAt - ISO timestamp
- */
+export type ServiceStatus = {
+  id: string;
+  name: string;
+  url: string;
+  port: number | null;
+  environment: string;
+  visibility: string;
+  projectType: string | null;
+  description: string | null;
+  db: string | null;
+  minioBucket: string | null;
+  repo: string | null;
+  npmPackage: string | null;
+  device: string;
+  domain: string | null;
+  dependsOn: DependencyRef[];
+  deployTier: number | null;
+  essential: boolean;
+  restartable: boolean;
+  dockerProject: string | null;
+  healthy: boolean;
+  responseTimeMs: number | null;
+  metadata: Record<string, unknown> | null;
+  error: string | null;
+  checkedAt: string | null;
+}
 
-
-const statusCache = new Map();
+const statusCache = new Map<string, ServiceStatus>();
 
 export default class ServiceRegistryService {
   /**
    * Get all registered services with their current status.
 
    */
-  static list() {
+  static list(): ServiceStatus[] {
     return Object.entries(PROJECTS).map(([id, svc]) => {
       const cached = statusCache.get(id);
       return cached || {
@@ -220,15 +230,15 @@ export default class ServiceRegistryService {
         metadata: null,
         error: "No URL configured",
         checkedAt: new Date().toISOString(),
-      };
+      } as ServiceStatus;
     }
 
-    const wasPreviouslyDown = statusCache.has(id) && !statusCache.get(id).healthy;
+    const wasPreviouslyDown = statusCache.has(id) && !statusCache.get(id)?.healthy;
     const maxAttempts = wasPreviouslyDown
       ? 1 + ServiceRegistryService.HEALTH_CHECK_RETRIES
       : 1;
 
-    let lastResult: any = null;
+    let lastResult: ServiceStatus | null = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       if (attempt > 1) {
@@ -237,7 +247,7 @@ export default class ServiceRegistryService {
 
       lastResult = await ServiceRegistryService._attemptHealthCheck(id, svc);
 
-      if (lastResult.healthy) {
+      if (lastResult?.healthy) {
         if (attempt > 1) {
           logger.info(`[ServiceRegistry] ${svc.name} recovered on retry ${attempt - 1}`);
         }
@@ -245,7 +255,7 @@ export default class ServiceRegistryService {
       }
     }
 
-    return lastResult;
+    return lastResult as ServiceStatus;
   }
 
   /**
@@ -305,8 +315,8 @@ export default class ServiceRegistryService {
         metadata,
         error: response.ok ? null : `HTTP ${response.status}`,
         checkedAt: new Date().toISOString(),
-      };
-    } catch (error: any) {
+      } as ServiceStatus;
+    } catch (error: unknown) {
       const errorDetail = ServiceRegistryService._extractErrorDetail(error);
       logger.warn(`[ServiceRegistry] ${svc.name} unreachable: ${errorDetail}`);
       return {
@@ -334,7 +344,7 @@ export default class ServiceRegistryService {
         metadata: null,
         error: errorDetail,
         checkedAt: new Date().toISOString(),
-      };
+      } as ServiceStatus;
     }
   }
 
@@ -345,19 +355,20 @@ export default class ServiceRegistryService {
 
 
    */
-  static _extractErrorDetail(error: any) {
-    if (error.name === "AbortError") return "Timeout";
+  static _extractErrorDetail(error: unknown) {
+    const err = error as Error & { cause?: unknown, name?: string };
+    if (err.name === "AbortError") return "Timeout";
 
     // Dig into undici's nested cause chain for the real error code
-    let cause = error.cause;
-    while (cause) {
-      if (cause.code) {
-        const code = cause.code;
-        return ERROR_CODE_LABELS[code] || `${code}: ${cause.message || error.message}`;
+    let rootCause = err.cause as { code?: string; message?: string; cause?: unknown } | undefined | null;
+    while (rootCause) {
+      if (rootCause.code) {
+        const code = rootCause.code;
+        return ERROR_CODE_LABELS[code] || `${code}: ${rootCause.message || err.message}`;
       }
-      cause = cause.cause;
+      rootCause = rootCause.cause as { code?: string; message?: string; cause?: unknown } | undefined | null;
     }
 
-    return error.message;
+    return err.message;
   }
 }

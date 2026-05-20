@@ -110,8 +110,9 @@ app.use(errorHandler);
       // Ensure time-series collection for container metrics
       await ContainerMetricsService.ensureCollection();
     }
-  } catch (error: any) {
-    logger.error(`Failed to ensure indexes: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as Error;
+    logger.error(`Failed to ensure indexes: ${err.message}`);
   }
 
   // ── Deferred Registry Recovery ─────────────────────────────────
@@ -149,8 +150,9 @@ app.use(errorHandler);
         } else {
           logger.warn(`[Registry] Deferred attempt ${deferredAttempt}/${MAX_DEFERRED_ATTEMPTS} — still empty`);
         }
-      } catch (error: any) {
-        logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${error.message}`);
+      } catch (error: unknown) {
+        const err = error as Error;
+        logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${err.message}`);
         if (deferredAttempt >= MAX_DEFERRED_ATTEMPTS) {
           clearInterval(deferredTimer);
         }
@@ -164,8 +166,8 @@ app.use(errorHandler);
     InfrastructureRegistryService.checkAll(),
   ])
     .then(([svcResults, infraResults]) => {
-      const svcHealthy = svcResults.filter((s: any) => s && s.healthy).length;
-      const infraHealthy = infraResults.filter((s: any) => s && s.healthy).length;
+      const svcHealthy = svcResults.filter((s) => s && s.healthy).length;
+      const infraHealthy = infraResults.filter((s) => s && s.healthy).length;
       logger.info(
         `[ServiceRegistry] ${svcHealthy}/${svcResults.length} services healthy`,
       );
@@ -173,8 +175,9 @@ app.use(errorHandler);
         `[InfraRegistry] ${infraHealthy}/${infraResults.length} infrastructure healthy`,
       );
     })
-    .catch((error: any) => {
-      logger.warn(`[Registry] Initial check failed: ${error.message}`);
+    .catch((error: unknown) => {
+      const err = error as Error;
+      logger.warn(`[Registry] Initial check failed: ${err.message}`);
     });
 
   // Periodic health checks every 60 seconds

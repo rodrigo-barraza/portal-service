@@ -93,7 +93,7 @@ function maskValue(value: string | undefined | null) {
  * Returns all integration metadata grouped by category.
  */
 router.get("/", (_req: Request, res: Response) => {
-  const integrations = INTEGRATIONS.map((def: any) => {
+  const integrations = INTEGRATIONS.map((def: { envKey: string; provider: string; category: string; docs: string }) => {
     const rawValue = process.env[def.envKey] || "";
     const configured = rawValue.length > 0;
 
@@ -108,7 +108,7 @@ router.get("/", (_req: Request, res: Response) => {
   });
 
   // Group by category
-  const categories: Record<string, any> = {};
+  const categories: Record<string, { category: string; integrations: Record<string, unknown>[]; configuredCount: number; totalCount: number }> = {};
   for (const item of integrations) {
     if (!categories[item.category]) {
       categories[item.category] = {
@@ -123,7 +123,7 @@ router.get("/", (_req: Request, res: Response) => {
     if (item.configured) categories[item.category].configuredCount++;
   }
 
-  const totalConfigured = integrations.filter((i: any) => i.configured).length;
+  const totalConfigured = integrations.filter((i: { configured: boolean }) => i.configured).length;
 
   res.json({
     totalCount: integrations.length,

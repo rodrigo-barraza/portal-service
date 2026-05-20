@@ -9,7 +9,7 @@ import {
 import logger from "../utils/logger.ts";
 
 export default class MinioService {
-  static client: any = null;
+  static client: Client | null = null;
 
   /**
    * Ensure the MinIO client is initialized.
@@ -44,14 +44,14 @@ export default class MinioService {
 
     // Gather object counts + total sizes in parallel
     const enriched = await Promise.all(
-      rawBuckets.map(async (bucket: any) => {
+      rawBuckets.map(async (bucket) => {
         let objectCount = 0;
         let totalSize = 0;
 
         try {
-          await new Promise((resolve: any, reject: any) => {
+          await new Promise<void>((resolve, reject) => {
             const stream = mc.listObjectsV2(bucket.name, "", true);
-            stream.on("data", (object: any) => {
+            stream.on("data", (object) => {
               objectCount++;
               totalSize += object.size || 0;
             });
@@ -92,9 +92,9 @@ export default class MinioService {
       let totalSize = 0;
 
       try {
-        await new Promise((resolve: any, reject: any) => {
+        await new Promise<void>((resolve, reject) => {
           const stream = mc.listObjectsV2(bucket.name, "", true);
-          stream.on("data", (object: any) => {
+          stream.on("data", (object) => {
             objectCount++;
             totalSize += object.size || 0;
           });
@@ -124,16 +124,16 @@ export default class MinioService {
 
    * @returns {Promise<{ objects: Array, prefixes: string[] }>}
    */
-  static async listObjects(bucketName: any, prefix: any = "", recursive: any = false) {
+  static async listObjects(bucketName: string, prefix: string = "", recursive: boolean = false) {
     const mc = MinioService._getClient();
 
-    return new Promise((resolve: any, reject: any) => {
+    return new Promise<{ objects: any[], prefixes: string[] }>((resolve, reject) => {
       const objects: any[] = [];
-      const prefixes = new Set();
+      const prefixes = new Set<string>();
 
       const stream = mc.listObjectsV2(bucketName, prefix, recursive);
 
-      stream.on("data", (item: any) => {
+      stream.on("data", (item) => {
         if (item.prefix) {
           // Virtual directory
           prefixes.add(item.prefix);
@@ -163,7 +163,7 @@ export default class MinioService {
 
 
    */
-  static async statObject(bucketName: any, objectName: any) {
+  static async statObject(bucketName: string, objectName: string) {
     const mc = MinioService._getClient();
     return mc.statObject(bucketName, objectName);
   }
@@ -173,7 +173,7 @@ export default class MinioService {
 
 
    */
-  static async getObject(bucketName: any, objectName: any) {
+  static async getObject(bucketName: string, objectName: string) {
     const mc = MinioService._getClient();
     return mc.getObject(bucketName, objectName);
   }
@@ -183,7 +183,7 @@ export default class MinioService {
 
 
    */
-  static async deleteObject(bucketName: any, objectName: any) {
+  static async deleteObject(bucketName: string, objectName: string) {
     const mc = MinioService._getClient();
     return mc.removeObject(bucketName, objectName);
   }

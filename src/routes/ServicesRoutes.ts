@@ -96,9 +96,9 @@ router.get("/", asyncHandler(async (req: Request, res: Response, next: NextFunct
       infrastructure = InfrastructureRegistryService.list();
     }
 
-    const enriched = enrichWithDependencies(services, infrastructure);
+    const enriched = enrichWithDependencies(services, infrastructure as unknown as Record<string, unknown>[]);
     res.json({ ...enriched, projectTypeColors: PROJECT_TYPE_COLORS, deployTierColors: DEPLOY_TIER_COLORS });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "Services_List"));
@@ -113,9 +113,9 @@ router.post("/check", asyncHandler(async (_req: Request, res: Response, next: Ne
       ServiceRegistryService.checkAll(),
       InfrastructureRegistryService.checkAll(),
     ]);
-    const enriched = enrichWithDependencies(services, infrastructure);
+    const enriched = enrichWithDependencies(services, infrastructure as unknown as Record<string, unknown>[]);
     res.json({ ...enriched, projectTypeColors: PROJECT_TYPE_COLORS, deployTierColors: DEPLOY_TIER_COLORS });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "Services_Check"));
@@ -169,8 +169,8 @@ router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, nex
       logger.error(`[Restart] Failed for ${svc.name}: ${message}`);
       res.status(502).json({ error: message });
     }
-  } catch (error: any) {
-    logger.error(`[Restart] Failed: ${error.message}`);
+  } catch (error: unknown) {
+    logger.error(`[Restart] Failed: ${(error as Error).message}`);
     next(error);
   }
 }, "Services_Restart"));
@@ -222,8 +222,8 @@ router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: 
       logger.error(`[Stop] Failed for ${svc.name}: ${message}`);
       res.status(502).json({ error: message });
     }
-  } catch (error: any) {
-    logger.error(`[Stop] Failed: ${error.message}`);
+  } catch (error: unknown) {
+    logger.error(`[Stop] Failed: ${(error as Error).message}`);
     next(error);
   }
 }, "Services_Stop"));
@@ -275,8 +275,8 @@ router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next:
       logger.error(`[Start] Failed for ${svc.name}: ${message}`);
       res.status(502).json({ error: message });
     }
-  } catch (error: any) {
-    logger.error(`[Start] Failed: ${error.message}`);
+  } catch (error: unknown) {
+    logger.error(`[Start] Failed: ${(error as Error).message}`);
     next(error);
   }
 }, "Services_Start"));
@@ -335,7 +335,7 @@ router.get("/:id/rollback-status", asyncHandler(async (req: Request, res: Respon
       // Image not found → 404 from Docker API
       res.json({ available: false, reason: "No previous image found" });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "Services_RollbackStatus"));
@@ -446,8 +446,8 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
       logger.error(`[Rollback] ${message}`);
       res.status(502).json({ error: message });
     }
-  } catch (error: any) {
-    logger.error(`[Rollback] Failed: ${error.message}`);
+  } catch (error: unknown) {
+    logger.error(`[Rollback] Failed: ${(error as Error).message}`);
     next(error);
   }
 }, "Services_Rollback"));
@@ -533,7 +533,7 @@ router.get("/sizes", asyncHandler(async (_req: Request, res: Response, next: Nex
     sizeCache.set(response, now);
 
     res.json(response);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "Services_Sizes"));
@@ -551,7 +551,7 @@ router.get("/analysis", asyncHandler(async (req: Request, res: Response, next: N
     const forceRefresh = req.query.refresh === "true";
     const result = await CodeAnalysisService.analyze(forceRefresh);
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "Services_Analysis"));
@@ -640,7 +640,7 @@ router.get("/languages", asyncHandler(async (_req: Request, res: Response, next:
     langCache.set(response, now);
 
     res.json(response);
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 }, "Services_Languages"));

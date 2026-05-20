@@ -30,8 +30,8 @@ router.get("/", asyncHandler(async (_req: Request, res: Response) => {
     }));
 
     res.json({ containers: loggable });
-  } catch (error: any) {
-    logger.error(`[Logs] Failed to list containers: ${error.message}`);
+  } catch (error: unknown) {
+    logger.error(`[Logs] Failed to list containers: ${(error as Error).message}`);
     res.json({ containers: [] });
   }
 }, "Logs_List"));
@@ -52,8 +52,8 @@ router.get("/:containerName", asyncHandler(async (req: Request, res: Response) =
   let containers;
   try {
     containers = await DockerStatsService.getAll(deviceFilter);
-  } catch (error: any) {
-    logger.error(`[Logs] Failed to query containers: ${error.message}`);
+  } catch (error: unknown) {
+    logger.error(`[Logs] Failed to query containers: ${(error as Error).message}`);
     return res.status(500).json({ error: "Failed to query Docker containers" });
   }
 
@@ -103,7 +103,7 @@ router.get("/:containerName", asyncHandler(async (req: Request, res: Response) =
     res.write(`event: error\ndata: ${JSON.stringify({ error: message })}\n\n`);
   }
 
-  function cleanup(child: any) {
+  function cleanup(child?: { kill: (signal?: string) => void; killed: boolean; stdout?: { destroy: () => void }; stderr?: { destroy: () => void } } | null) {
     if (closed) return;
     closed = true;
     if (child) {
@@ -223,9 +223,10 @@ function streamViaDockerApi(device: DeviceEntry, containerName: string, tail: nu
         cleanup();
       });
 
-      dockerRes.on("error", (error: any) => {
-        logger.error(`[Logs] Docker stream error for ${containerName}: ${error.message}`);
-        sendError(error.message);
+      dockerRes.on("error", (error: unknown) => {
+        const err = error as Error;
+        logger.error(`[Logs] Docker stream error for ${containerName}: ${err.message}`);
+        sendError(err.message);
         cleanup();
       });
 
@@ -238,9 +239,10 @@ function streamViaDockerApi(device: DeviceEntry, containerName: string, tail: nu
     },
   );
 
-  dockerReq.on("error", (error: any) => {
-    logger.error(`[Logs] Docker socket error for ${containerName}: ${error.message}`);
-    sendError(error.message);
+  dockerReq.on("error", (error: unknown) => {
+    const err = error as Error;
+    logger.error(`[Logs] Docker socket error for ${containerName}: ${err.message}`);
+    sendError(err.message);
     cleanup();
   });
 
