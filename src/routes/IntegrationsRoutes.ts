@@ -78,20 +78,12 @@ const INTEGRATIONS = [
   { envKey: "BRIGHTDATA_CUSTOMER_ID",provider: "Bright Data",  category: "Proxy",           docs: "https://brightdata.com" },
 ];
 
-/**
- * Mask a secret value — shows first 4 + last 4 characters.
- * Returns null if the value is empty or not set.
- */
 function maskValue(value: string | undefined | null) {
   if (!value || value.length === 0) return null;
   if (value.length <= 12) return `${"•".repeat(value.length)}`;
   return `${value.slice(0, 4)}${"•".repeat(Math.min(value.length - 8, 20))}${value.slice(-4)}`;
 }
 
-/**
- * GET /integrations
- * Returns all integration metadata grouped by category.
- */
 router.get("/", (_req: Request, res: Response) => {
   const integrations = INTEGRATIONS.map((def: { envKey: string; provider: string; category: string; docs: string }) => {
     const rawValue = process.env[def.envKey] || "";

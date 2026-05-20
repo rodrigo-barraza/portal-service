@@ -54,10 +54,6 @@ function periodToDateRange(period: string = "30d") {
   };
 }
 
-/**
- * Compute the previous-period date range of equal length for comparison.
- * e.g. "7d" → current is 7daysAgo..today, previous is 14daysAgo..8daysAgo
- */
 function previousPeriodRange(period: string = "30d") {
   const days = parseInt(period) || 30;
   return {
@@ -117,17 +113,11 @@ export default class GoogleAnalyticsService {
     }
   }
 
-  /**
-   * List configured GA4 properties.
-   */
-  static listProperties() {
+    static listProperties() {
     return getProperties();
   }
 
-  /**
-   * Realtime report — current active users + top active pages.
-   */
-  static async getRealtimeReport(propertyId: string) {
+    static async getRealtimeReport(propertyId: string) {
     const key = `realtime:${propertyId}`;
     return cached(key, REALTIME_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -151,10 +141,7 @@ export default class GoogleAnalyticsService {
     });
   }
 
-  /**
-   * Overview report — key metrics for the given period.
-   */
-  static async getOverviewReport(propertyId: string, period: string = "30d") {
+    static async getOverviewReport(propertyId: string, period: string = "30d") {
     const key = `overview:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -216,10 +203,7 @@ export default class GoogleAnalyticsService {
     });
   }
 
-  /**
-   * Top pages by pageviews.
-   */
-  static async getTopPages(propertyId: string, period: string = "30d") {
+    static async getTopPages(propertyId: string, period: string = "30d") {
     const key = `pages:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -255,10 +239,7 @@ export default class GoogleAnalyticsService {
     });
   }
 
-  /**
-   * Traffic sources — session source / medium breakdown.
-   */
-  static async getTrafficSources(propertyId: string, period: string = "30d") {
+    static async getTrafficSources(propertyId: string, period: string = "30d") {
     const key = `sources:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -293,10 +274,7 @@ export default class GoogleAnalyticsService {
     });
   }
 
-  /**
-   * Geography — country-level breakdown.
-   */
-  static async getGeography(propertyId: string, period: string = "30d") {
+    static async getGeography(propertyId: string, period: string = "30d") {
     const key = `geo:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -330,10 +308,7 @@ export default class GoogleAnalyticsService {
     });
   }
 
-  /**
-   * Devices — category + browser breakdown.
-   */
-  static async getDevices(propertyId: string, period: string = "30d") {
+    static async getDevices(propertyId: string, period: string = "30d") {
     const key = `devices:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -407,10 +382,7 @@ export default class GoogleAnalyticsService {
     });
   }
 
-  /**
-   * Time-series — daily pageviews + users for sparkline/chart rendering.
-   */
-  static async getTimeSeries(propertyId: string, period: string = "30d") {
+    static async getTimeSeries(propertyId: string, period: string = "30d") {
     const key = `timeseries:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -447,10 +419,7 @@ export default class GoogleAnalyticsService {
     });
   }
 
-  /**
-   * Channel grouping — sessionDefaultChannelGroup breakdown.
-   */
-  static async getChannelGrouping(propertyId: string, period: string = "30d") {
+    static async getChannelGrouping(propertyId: string, period: string = "30d") {
     const key = `channels:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -483,10 +452,7 @@ export default class GoogleAnalyticsService {
     });
   }
 
-  /**
-   * Landing pages — entry-point page performance.
-   */
-  static async getLandingPages(propertyId: string, period: string = "30d") {
+    static async getLandingPages(propertyId: string, period: string = "30d") {
     const key = `landing:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -520,10 +486,7 @@ export default class GoogleAnalyticsService {
     });
   }
 
-  /**
-   * Hourly heatmap — dayOfWeekName × hour breakdown for traffic heatmap.
-   */
-  static async getHourlyHeatmap(propertyId: string, period: string = "30d") {
+    static async getHourlyHeatmap(propertyId: string, period: string = "30d") {
     const key = `heatmap:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -558,10 +521,7 @@ export default class GoogleAnalyticsService {
     });
   }
 
-  /**
-   * New vs returning users breakdown.
-   */
-  static async getNewVsReturning(propertyId: string, period: string = "30d") {
+    static async getNewVsReturning(propertyId: string, period: string = "30d") {
     const key = `retention:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -592,10 +552,7 @@ export default class GoogleAnalyticsService {
     });
   }
 
-  /**
-   * Top events — GA4 event name breakdown.
-   */
-  static async getTopEvents(propertyId: string, period: string = "30d") {
+    static async getTopEvents(propertyId: string, period: string = "30d") {
     const key = `events:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();

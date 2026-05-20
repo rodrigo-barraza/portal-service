@@ -6,15 +6,6 @@ import { PROJECTS, DEVICES, HEALTH_CHECK_TIMEOUT_MS } from "../config.ts";
 import logger from "../utils/logger.ts";
 import { ERROR_CODE_LABELS } from "../types.ts";
 
-/**
- * Detect the device key that this API instance is running on.
- * Matches the machine's real network-interface IPs against DEVICES hostnames.
- *
- * NOTE: We intentionally exclude "localhost" / "127.0.0.1" from the set
- * because every host (including Docker containers) owns those addresses,
- * which would cause false positives — e.g. a container on Synology
- * incorrectly matching as the Workstation device.
- */
 function detectLocalDevice() {
   const interfaces = os.networkInterfaces();
   const localIPs = new Set();
@@ -33,11 +24,6 @@ function detectLocalDevice() {
 
 const LOCAL_DEVICE_KEY = detectLocalDevice();
 
-/**
- * Build a reverse lookup: hostname/IP → device name.
- * Maps each device's configured hostname plus localhost aliases
- * for the local device, so we always resolve a friendly name.
- */
 function buildHostnameToDeviceMap() {
   const map = new Map();
 
@@ -66,12 +52,6 @@ function buildHostnameToDeviceMap() {
 
 const HOSTNAME_TO_DEVICE = buildHostnameToDeviceMap();
 
-/**
- * Derive the display host from a service's URL.
- * Reverse-looks up the URL hostname against the DEVICES table
- * to return the friendly device name (e.g. "Synology NAS").
- * Falls back to the configured `device` field when no match is found.
- */
 function deriveHost(url: string, svc: ProjectEntry) {
   if (!url) return DEVICES[svc.device]?.name || svc.device || "Unknown";
   try {
@@ -85,11 +65,6 @@ function deriveHost(url: string, svc: ProjectEntry) {
   }
 }
 
-/**
- * Rewrite a URL to use localhost when health-checking a service on
- * the same device.  WSL2 can reach Windows apps via localhost but
- * not always via the LAN IP (apps that bind to 127.0.0.1 only).
- */
 function toLocalHealthUrl(url: string, svc: ProjectEntry) {
   if (!LOCAL_DEVICE_KEY || svc.device !== LOCAL_DEVICE_KEY) return url;
   try {
@@ -131,11 +106,7 @@ export type ServiceStatus = {
 const statusCache = new Map<string, ServiceStatus>();
 
 export default class ServiceRegistryService {
-  /**
-   * Get all registered services with their current status.
-
-   */
-  static list(): ServiceStatus[] {
+    static list(): ServiceStatus[] {
     return Object.entries(PROJECTS).map(([id, svc]) => {
       const cached = statusCache.get(id);
       return cached || {
@@ -167,11 +138,7 @@ export default class ServiceRegistryService {
     });
   }
 
-  /**
-   * Poll all services and update the status cache.
-
-   */
-  static async checkAll() {
+    static async checkAll() {
     const results = await Promise.all(
       Object.entries(PROJECTS).map(([id, svc]) =>
         ServiceRegistryService._checkService(id, svc),
@@ -185,24 +152,11 @@ export default class ServiceRegistryService {
     return results;
   }
 
-  /**
-   * Maximum number of retry attempts for a failed health check.
-   * Retries help catch services that are still initializing after startup.
-   */
-  static HEALTH_CHECK_RETRIES = 1;
+    static HEALTH_CHECK_RETRIES = 1;
 
-  /** Delay (ms) between retry attempts. */
-  static HEALTH_CHECK_RETRY_DELAY_MS = 1500;
+    static HEALTH_CHECK_RETRY_DELAY_MS = 1500;
 
-  /**
-   * Poll a single service's root health endpoint.
-   * Retries once after a short delay if the first attempt fails,
-   * which handles the window where a service (e.g. LM Studio) is
-   * still binding its HTTP listener after startup.
-
-
-   */
-  static async _checkService(id: string, svc: ProjectEntry) {
+    static async _checkService(id: string, svc: ProjectEntry) {
     if (!svc.url) {
       return {
         id,
@@ -257,12 +211,7 @@ export default class ServiceRegistryService {
     return lastResult as ServiceStatus;
   }
 
-  /**
-   * Single health-check attempt against a service endpoint.
-
-
-   */
-  static async _attemptHealthCheck(id: string, svc: ProjectEntry) {
+    static async _attemptHealthCheck(id: string, svc: ProjectEntry) {
     const start = Date.now();
 
     try {
@@ -347,14 +296,7 @@ export default class ServiceRegistryService {
     }
   }
 
-  /**
-   * Extract a meaningful error message from a fetch failure.
-   * Node's undici wraps the real cause (ECONNREFUSED, EHOSTUNREACH, etc.)
-   * inside error.cause, while error.message is just the opaque "fetch failed".
-
-
-   */
-  static _extractErrorDetail(error: unknown) {
+    static _extractErrorDetail(error: unknown) {
     const err = error as Error & { cause?: unknown, name?: string };
     if (err.name === "AbortError") return "Timeout";
 

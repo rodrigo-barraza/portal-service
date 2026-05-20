@@ -18,11 +18,7 @@ interface MinioObjectEntry {
 export default class MinioService {
   static client: Client | null = null;
 
-  /**
-   * Ensure the MinIO client is initialized.
-
-   */
-  static _getClient() {
+    static _getClient() {
     if (MinioService.client) return MinioService.client;
 
     if (!MINIO_ENDPOINT) {
@@ -41,10 +37,7 @@ export default class MinioService {
     logger.info(`[MinioService] Client initialized → ${MINIO_ENDPOINT}`);
     return MinioService.client;
   }
-  /**
-   * List all buckets with creation dates and object counts.
-   */
-  static async listBuckets() {
+    static async listBuckets() {
     const mc = MinioService._getClient();
     const rawBuckets = await mc.listBuckets();
 
@@ -80,13 +73,7 @@ export default class MinioService {
     return enriched;
   }
 
-  /**
-   * Async generator that yields enriched bucket objects one-by-one
-   * as each completes its object enumeration.
-   * Used by the SSE streaming endpoint for progressive loading.
-   * @yields {{ name: string, creationDate: string, objectCount: number, totalSize: number }}
-   */
-  static async *streamBuckets() {
+    static async *streamBuckets() {
     const mc = MinioService._getClient();
     const rawBuckets = await mc.listBuckets();
 
@@ -123,13 +110,7 @@ export default class MinioService {
     }
   }
 
-  /**
-   * List objects in a bucket, optionally filtered by prefix.
-   * Returns a flat list with virtual "folder" grouping via commonPrefixes.
-
-
-   */
-  static async listObjects(bucketName: string, prefix: string = "", recursive: boolean = false) {
+    static async listObjects(bucketName: string, prefix: string = "", recursive: boolean = false) {
     const mc = MinioService._getClient();
 
     return new Promise<{ objects: MinioObjectEntry[], prefixes: string[] }>((resolve, reject) => {
@@ -163,32 +144,17 @@ export default class MinioService {
     });
   }
 
-  /**
-   * Get metadata for a single object.
-
-
-   */
-  static async statObject(bucketName: string, objectName: string) {
+    static async statObject(bucketName: string, objectName: string) {
     const mc = MinioService._getClient();
     return mc.statObject(bucketName, objectName);
   }
 
-  /**
-   * Get a readable stream for an object.
-
-
-   */
-  static async getObject(bucketName: string, objectName: string) {
+    static async getObject(bucketName: string, objectName: string) {
     const mc = MinioService._getClient();
     return mc.getObject(bucketName, objectName);
   }
 
-  /**
-   * Delete an object from a bucket.
-
-
-   */
-  static async deleteObject(bucketName: string, objectName: string) {
+    static async deleteObject(bucketName: string, objectName: string) {
     const mc = MinioService._getClient();
     return mc.removeObject(bucketName, objectName);
   }

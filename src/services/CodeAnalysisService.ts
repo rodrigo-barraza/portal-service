@@ -13,22 +13,14 @@ const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const GITHUB_API = "https://api.github.com";
 const FETCH_TIMEOUT_MS = 8000;
 
-/** Config file paths to try, in priority order */
 const CONFIG_PATHS = ["config.ts", "src/config.ts", "config.js", "src/config.js"];
 
 interface EcosystemOwners {
-  /** All unique GitHub owners found in the registry, with npm scope prefixes */
-  owners: Set<string>;
+    owners: Set<string>;
   scopePrefixes: Set<string>;
-  /** Per-project owner extracted from its repo URL */
-  projectOwners: Map<string, string>;
+    projectOwners: Map<string, string>;
 }
 
-/**
- * Derive ALL GitHub owners and npm scopes from the project registry.
- * Supports multi-owner ecosystems (e.g., user's own repos + shared repos).
- * Each project's owner is extracted from its repo URL for attribution.
- */
 function deriveEcosystemOwners(): EcosystemOwners {
   const owners = new Set<string>();
   const scopePrefixes = new Set<string>();
@@ -72,8 +64,7 @@ interface ProjectAnalysis {
 interface AnalysisResult {
   dependencies: Record<string, ProjectAnalysis>;
   repoSizes: Record<string, { sizeKB: number; sizeBytes: number }>;
-  /** Per-project GitHub owner attribution */
-  owners: Record<string, string>;
+    owners: Record<string, string>;
   analyzedAt: string;
 }
 
@@ -85,10 +76,7 @@ let cacheAt = 0;
 // ── Service ─────────────────────────────────────────────────
 
 export default class CodeAnalysisService {
-  /**
-   * Run full ecosystem analysis. Returns cached result if fresh.
-   */
-  static async analyze(forceRefresh = false): Promise<AnalysisResult> {
+    static async analyze(forceRefresh = false): Promise<AnalysisResult> {
     const now = Date.now();
     if (!forceRefresh && cache && now - cacheAt < CACHE_TTL_MS) {
       return cache;
@@ -204,17 +192,7 @@ export default class CodeAnalysisService {
     }
   }
 
-  /**
-   * Resolve a package name + version specifier to an ecosystem project ID.
-   * Checks against ALL ecosystem owners — supports multi-owner setups.
-   *
-   * Handles:
-   *   @{any-owner}/utilities-library            → utilities-library
-   *   github:{any-owner}/service-library        → service-library
-   *   git+https://github.com/{any-owner}/lib    → lib
-   *   file:../utilities-library                 → utilities-library
-   */
-  private static _resolveEcosystemId(
+    private static _resolveEcosystemId(
     name: string, version: string, ecosystem: EcosystemOwners,
   ): string | null {
     // Check scoped packages against all ecosystem owners

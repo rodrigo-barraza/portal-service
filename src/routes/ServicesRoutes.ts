@@ -12,11 +12,6 @@ import type { ProjectEntry, EnrichedDependency, TtlCache } from "../types.ts";
 
 const router = Router();
 
-/**
- * Resolve the device object for a project's Docker host.
- * Returns the device entry from the registry that has dockerApi configured.
-
- */
 function resolveDockerDevice(svc: ProjectEntry) {
   const deviceId = svc.device || "synology";
   const device = DEVICES[deviceId];
@@ -28,10 +23,6 @@ function resolveDockerDevice(svc: ProjectEntry) {
   return { id: deviceId, device };
 }
 
-/**
- * Build a lookup map (id → name) and compute the inverse dependency graph.
- * Returns both `dependsOn` (resolved to {id, name}) and `dependedOnBy`.
- */
 function enrichWithDependencies(services: Record<string, unknown>[], infrastructure: Record<string, unknown>[]) {
   const all = [...services, ...infrastructure] as Array<Record<string, unknown> & { id: string; name: string; dependsOn?: Array<string | { id: string; criticality?: string }>; dependedOnBy?: EnrichedDependency[] }>;
 
@@ -75,12 +66,6 @@ function enrichWithDependencies(services: Record<string, unknown>[], infrastruct
   return { services, infrastructure };
 }
 
-/**
- * GET /services
- * Returns the current health status of all registered services
- * plus infrastructure backing stores (MongoDB, MinIO, etc.).
- * If ?refresh=true, forces a fresh health check before responding.
- */
 router.get("/", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     let services, infrastructure;
@@ -102,10 +87,6 @@ router.get("/", asyncHandler(async (req: Request, res: Response, next: NextFunct
   }
 }, "Services_List"));
 
-/**
- * POST /services/check
- * Trigger a fresh health check for all services and infrastructure.
- */
 router.post("/check", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const [services, infrastructure] = await Promise.all([
@@ -119,11 +100,6 @@ router.post("/check", asyncHandler(async (_req: Request, res: Response, next: Ne
   }
 }, "Services_Check"));
 
-/**
- * POST /services/:id/restart
- * Restart a containerized service via Docker Engine API.
- * Routes to the correct Docker host based on the project's device.
- */
 router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -174,10 +150,6 @@ router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, nex
   }
 }, "Services_Restart"));
 
-/**
- * POST /services/:id/stop
- * Stop a containerized service via Docker Engine API.
- */
 router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -227,10 +199,6 @@ router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: 
   }
 }, "Services_Stop"));
 
-/**
- * POST /services/:id/start
- * Start a containerized service via Docker Engine API.
- */
 router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -280,11 +248,6 @@ router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next:
   }
 }, "Services_Start"));
 
-/**
- * GET /services/:id/rollback-status
- * Check whether a :previous image tag exists for a containerized service,
- * indicating that a rollback is available.
- */
 router.get("/:id/rollback-status", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -339,17 +302,6 @@ router.get("/:id/rollback-status", asyncHandler(async (req: Request, res: Respon
   }
 }, "Services_RollbackStatus"));
 
-/**
- * POST /services/:id/rollback
- * Rollback a containerized service to its :previous image tag.
- *
- * Strategy:
- *  1. Verify :previous image exists
- *  2. Re-tag current :latest → :rollback-backup
- *  3. Re-tag :previous → :latest
- *  4. Re-tag :rollback-backup → :previous (so we can roll-forward)
- *  5. Restart the container (it uses :latest)
- */
 router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -451,11 +403,6 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
   }
 }, "Services_Rollback"));
 
-/**
- * GET /services/sizes
- * Returns GitHub repository sizes for all projects with a repo field.
- * Results are cached for 5 minutes to avoid GitHub API rate limits.
- */
 const SIZE_CACHE_TTL_MS = 5 * 60 * 1000;
 
 function createTtlCache<T>(ttlMs: number): TtlCache<T> {
@@ -537,14 +484,6 @@ router.get("/sizes", asyncHandler(async (_req: Request, res: Response, next: Nex
   }
 }, "Services_Sizes"));
 
-/**
- * GET /services/analysis
- * Returns auto-detected ecosystem dependencies:
- *   - Library imports (from package.json)
- *   - API call references (from config files)
- *   - Repository sizes (from GitHub API)
- * Results are cached for 15 minutes. Pass ?refresh=true to force re-analysis.
- */
 router.get("/analysis", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const forceRefresh = req.query.refresh === "true";
@@ -555,12 +494,6 @@ router.get("/analysis", asyncHandler(async (req: Request, res: Response, next: N
   }
 }, "Services_Analysis"));
 
-/**
- * GET /services/languages
- * Returns GitHub language breakdown for each project with a repo URL.
- * Uses the GitHub Linguist-powered /repos/{owner}/{repo}/languages endpoint.
- * Results are cached for 15 minutes to stay within API rate limits.
- */
 const LANG_CACHE_TTL_MS = 15 * 60 * 1000;
 
 interface LanguageBreakdown {
@@ -644,9 +577,6 @@ router.get("/languages", asyncHandler(async (_req: Request, res: Response, next:
   }
 }, "Services_Languages"));
 
-/**
- * Try to extract a message from a Docker API error response body.
- */
 function tryParseDockerError(body: string) {
   try {
     return JSON.parse(body).message;

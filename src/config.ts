@@ -19,12 +19,6 @@ export const GITHUB_PAT = process.env.GITHUB_PAT || "";
 // Populated from the registry's `devices` section at boot.
 export let DEVICES: Record<string, DeviceEntry> = {};
 
-/**
- * Infer the project type label from the project ID.
- * If the registry entry carries an explicit `projectType`, use it directly.
- * Otherwise: projects ending in "-client" are "Client", "-bot" are "Bot",
- * entries without repo/docker are "Infrastructure", rest are "Service".
- */
 function inferProjectType(id: string, svc: VaultRegistryProject) {
   if (svc.projectType) return svc.projectType;
   if (!svc.repo && !svc.dockerProject) return "Infrastructure";
@@ -33,13 +27,6 @@ function inferProjectType(id: string, svc: VaultRegistryProject) {
   return "Service";
 }
 
-/**
- * Infer the deploy tier from the project type when the registry
- * entry doesn't carry an explicit `deployTier` override.
- *   Tier 0 — Foundation (Infrastructure, vault-service)
- *   Tier 1 — Services & Clients
- *   Tier 2 — Bots
- */
 function inferDeployTier(projectType: string) {
   switch (projectType) {
     case "Infrastructure": return 0;
@@ -49,12 +36,6 @@ function inferDeployTier(projectType: string) {
   }
 }
 
-/**
- * Normalize a GitHub repository URL to HTTPS format.
- * Converts SSH URLs (git@github.com:owner/repo.git) to HTTPS.
-
-
- */
 function normalizeRepoUrl(repo: string | null) {
   if (!repo) return null;
   const sshMatch = repo.match(/^git@github\.com:(.+?)(?:\.git)?$/);
@@ -71,10 +52,6 @@ export let PROJECT_TYPE_COLORS: Record<string, string> = {};
 export let DEPLOY_TIER_COLORS: Record<string, string> = {};
 export let ANALYTICS_PROPERTIES: AnalyticsProperty[] = [];
 
-/**
- * Build the PROJECTS, INFRASTRUCTURE, and DEVICES maps from the Vault registry.
- * Called once from boot.js after the registry is loaded.
- */
 export function initializeRegistry(registry: VaultRegistry) {
   if (!registry || !registry.projects) {
     logger.warn("No registry data — PROJECTS and INFRASTRUCTURE will be empty");

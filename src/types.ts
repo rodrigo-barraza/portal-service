@@ -3,13 +3,11 @@
 
 // ── Docker Engine API ──────────────────────────────────────────
 
-/** Response shape from DockerStatsService.dockerRequest() (POST/DELETE) */
 export interface DockerActionResponse {
   statusCode: number;
   body: string;
 }
 
-/** Transport options resolved from a dockerApi URL */
 export interface DockerTransport {
   socketPath?: string;
   hostname?: string;
@@ -17,13 +15,11 @@ export interface DockerTransport {
   path: string;
 }
 
-/** Per-container CPU counter state for delta computation */
 export interface CpuCounterState {
   cpuTotal: number;
   systemTotal: number;
 }
 
-/** A single Docker container port mapping */
 export interface ContainerPort {
   ip: string;
   privatePort: number;
@@ -31,7 +27,6 @@ export interface ContainerPort {
   type: string;
 }
 
-/** A single Docker container mount */
 export interface ContainerMount {
   type: string;
   name: string;
@@ -41,7 +36,6 @@ export interface ContainerMount {
   rw: boolean;
 }
 
-/** Per-interface network I/O stats */
 export interface NetworkInterfaceStats {
   rxBytes: number;
   txBytes: number;
@@ -53,7 +47,6 @@ export interface NetworkInterfaceStats {
   txErrors: number;
 }
 
-/** Parsed container stats returned by DockerStatsService */
 export interface ContainerStats {
   id: string;
   name: string;
@@ -94,7 +87,6 @@ export interface ContainerStats {
   pids: number;
 }
 
-/** Time-series snapshot for the ring buffer */
 export interface ContainerSnapshot {
   timestamp: string;
   containers: Record<string, {
@@ -110,7 +102,6 @@ export interface ContainerSnapshot {
   }>;
 }
 
-/** Docker image disk usage entry */
 export interface DockerImageDisk {
   id: string;
   tags: string[];
@@ -120,7 +111,6 @@ export interface DockerImageDisk {
   containers: number;
 }
 
-/** Docker volume disk usage entry */
 export interface DockerVolumeDisk {
   name: string;
   driver: string;
@@ -128,7 +118,6 @@ export interface DockerVolumeDisk {
   refCount: number;
 }
 
-/** Host-level disk stats */
 export interface HostDisk {
   total: number;
   used: number;
@@ -138,7 +127,6 @@ export interface HostDisk {
 
 // ── Registry & Config ──────────────────────────────────────────
 
-/** A registered project (service, client, bot, library, etc.) */
 export interface ProjectEntry {
   name: string;
   url: string;
@@ -160,20 +148,17 @@ export interface ProjectEntry {
   dependsOn: DependencyRef[];
 }
 
-/** A dependency reference with criticality */
 export interface DependencyRef {
   id: string;
   criticality: string;
 }
 
-/** An enriched dependency with resolved name */
 export interface EnrichedDependency {
   id: string;
   name: string;
   criticality: string;
 }
 
-/** A registered infrastructure entry (database, object-store, inference) */
 export interface InfrastructureEntry {
   name: string;
   type: string;
@@ -189,7 +174,6 @@ export interface InfrastructureEntry {
   dependsOn: DependencyRef[];
 }
 
-/** A device entry from the registry */
 export interface DeviceEntry {
   name: string;
   type: string;
@@ -202,13 +186,11 @@ export interface DeviceEntry {
   specs: Record<string, unknown> | null;
 }
 
-/** Resolved Docker host target */
 export interface DockerDeviceTarget {
   id: string;
   device: DeviceEntry;
 }
 
-/** A GA4 analytics property */
 export interface AnalyticsProperty {
   id: string;
   label: string;
@@ -216,7 +198,6 @@ export interface AnalyticsProperty {
   serviceId: string;
 }
 
-/** Registry payload from vault */
 export interface VaultRegistry {
   projects: VaultRegistryProject[];
   infrastructure: VaultRegistryInfra[];
@@ -327,7 +308,6 @@ export interface InfraStatus {
 
 // ── MinIO Service ──────────────────────────────────────────────
 
-/** Enriched bucket info returned by MinioService.listBuckets() */
 export interface BucketInfo {
   name: string;
   creationDate: string | null;
@@ -335,12 +315,10 @@ export interface BucketInfo {
   totalSize: number;
 }
 
-/** SSE event types from MinioService.streamBuckets() */
 export type BucketStreamEvent =
   | { type: "init"; totalBuckets: number }
   | { type: "bucket"; bucket: BucketInfo };
 
-/** Object listing result */
 export interface ObjectListResult {
   objects: ObjectInfo[];
   prefixes: string[];
@@ -355,10 +333,8 @@ export interface ObjectInfo {
 
 // ── Google Analytics ───────────────────────────────────────────
 
-/** A formatted GA4 report row */
 export type GaReportRow = Record<string, string | number>;
 
-/** TTL cache entry */
 export interface CacheEntry<T = unknown> {
   data: T;
   ts: number;
@@ -366,7 +342,6 @@ export interface CacheEntry<T = unknown> {
 
 // ── Integrations ───────────────────────────────────────────────
 
-/** An integration provider definition */
 export interface IntegrationDef {
   envKey: string;
   provider: string;
@@ -374,13 +349,11 @@ export interface IntegrationDef {
   docs: string;
 }
 
-/** An enriched integration with configured status */
 export interface IntegrationStatus extends IntegrationDef {
   configured: boolean;
   maskedKey: string | null;
 }
 
-/** Integration category group */
 export interface IntegrationCategory {
   category: string;
   integrations: IntegrationStatus[];
@@ -390,7 +363,6 @@ export interface IntegrationCategory {
 
 // ── Container Metrics ──────────────────────────────────────────
 
-/** A persisted metrics document */
 export interface MetricsDocument {
   timestamp: Date;
   metadata: {
@@ -408,7 +380,6 @@ export interface MetricsDocument {
   pids: number;
 }
 
-/** Container metrics history query options */
 export interface MetricsHistoryOptions {
   container?: string;
   device?: string;
@@ -416,7 +387,6 @@ export interface MetricsHistoryOptions {
   limit?: number;
 }
 
-/** A single history data point */
 export interface MetricsPoint {
   t: Date;
   cpu: number;
@@ -427,7 +397,6 @@ export interface MetricsPoint {
   pids: number;
 }
 
-/** Container history response */
 export interface MetricsHistoryResult {
   containers: Record<string, { device: string; points: MetricsPoint[] }>;
   range: string;
@@ -437,7 +406,6 @@ export interface MetricsHistoryResult {
 
 // ── TTL Cache Utilities ────────────────────────────────────────
 
-/** Generic TTL cache for sizes/languages endpoints */
 export interface TtlCache<T> {
   get: (now: number) => T | null;
   set: (data: T, now: number) => void;
@@ -445,7 +413,6 @@ export interface TtlCache<T> {
 
 // ── Error Label Map ────────────────────────────────────────────
 
-/** Known fetch error code labels */
 export const ERROR_CODE_LABELS: Record<string, string> = {
   ECONNREFUSED: "Connection refused",
   EHOSTUNREACH: "Host unreachable",

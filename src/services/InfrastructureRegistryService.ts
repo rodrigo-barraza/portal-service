@@ -14,9 +14,6 @@ import {
 } from "../config.ts";
 import logger from "../utils/logger.ts";
 
-/**
- * Build a reverse lookup: hostname/IP → device name.
- */
 function buildHostnameToDeviceMap() {
   const map = new Map();
   for (const [_key, device] of Object.entries(DEVICES)) {
@@ -30,10 +27,6 @@ function buildHostnameToDeviceMap() {
 
 const HOSTNAME_TO_DEVICE = buildHostnameToDeviceMap();
 
-/**
- * Derive the display device name from a URL.
- * Reverse-looks up the URL hostname against the DEVICES table.
- */
 function deriveHost(url: string | null | undefined, infra: InfrastructureEntry) {
   if (!url) return DEVICES[infra.device]?.name || infra.device || "Unknown";
   try {
@@ -47,32 +40,12 @@ function deriveHost(url: string | null | undefined, infra: InfrastructureEntry) 
   }
 }
 
-/**
- * Infrastructure status snapshot.
- * @property {string} id
- * @property {string} name
- * @property {string} type       - "database" | "object-store"
- * @property {string} url
- * @property {number|null} port
- * @property {"Production"|"Development"} environment
- * @property {string} device    - Resolved device name
- * @property {boolean} healthy
- * @property {number|null} responseTimeMs
- * @property {object|null} metadata
- * @property {string|null} error
- * @property {string} checkedAt  - ISO timestamp
- * @property {boolean} isInfrastructure
- */
 
 
 const statusCache = new Map();
 
 export default class InfrastructureRegistryService {
-  /**
-   * Get all infrastructure services with their current status.
-
-   */
-  static list(): InfraStatus[] {
+    static list(): InfraStatus[] {
     return Object.entries(INFRASTRUCTURE).map(([id, infra]) => {
       const cached = statusCache.get(id);
       return cached || {
@@ -98,11 +71,7 @@ export default class InfrastructureRegistryService {
     });
   }
 
-  /**
-   * Poll all infrastructure services and update cache.
-
-   */
-  static async checkAll(): Promise<InfraStatus[]> {
+    static async checkAll(): Promise<InfraStatus[]> {
     const results = await Promise.all(
       Object.entries(INFRASTRUCTURE).map(([id, infra]) =>
         InfrastructureRegistryService._checkInfra(id, infra as InfrastructureEntry),
@@ -168,13 +137,7 @@ export default class InfrastructureRegistryService {
     }
   }
 
-  /**
-   * MongoDB health check — connects, runs admin ping, disconnects.
-   * Uses a short-lived client to avoid leaking connections.
-   * Gracefully handles limited privileges — ping is sufficient for liveness.
-
-   */
-  static async _checkMongo() {
+    static async _checkMongo() {
     if (!MONGO_URI) throw new Error("No MONGO_URI configured");
 
     const client = new MongoClient(MONGO_URI, {
@@ -214,11 +177,7 @@ export default class InfrastructureRegistryService {
     }
   }
 
-  /**
-   * MinIO health check — connects, lists buckets, disconnects.
-
-   */
-  static async _checkMinio() {
+    static async _checkMinio() {
     if (!MINIO_ENDPOINT) throw new Error("No MINIO_ENDPOINT configured");
 
     const url = new URL(MINIO_ENDPOINT);
@@ -247,13 +206,7 @@ export default class InfrastructureRegistryService {
     };
   }
 
-  /**
-   * Generic HTTP health check — hits url + healthPath.
-   * Used for inference servers (LM Studio) and any future HTTP-based infra.
-
-
-   */
-  static async _checkHttp(infra: InfrastructureEntry) {
+    static async _checkHttp(infra: InfrastructureEntry) {
     const baseUrl = infra.url;
     const healthPath = infra.healthPath || "/";
     if (!baseUrl) throw new Error("No URL configured");

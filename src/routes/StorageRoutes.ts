@@ -39,10 +39,6 @@ function guessMime(filename: string | null | undefined) {
   return (ext && EXT_TO_MIME[ext]) || "application/octet-stream";
 }
 
-/**
- * GET /object-store/buckets
- * List all MinIO buckets with object counts and total sizes.
- */
 router.get("/buckets", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const buckets = await MinioService.listBuckets();
@@ -53,14 +49,6 @@ router.get("/buckets", asyncHandler(async (_req: Request, res: Response, next: N
   }
 }, "Storage_ListBuckets"));
 
-/**
- * GET /object-store/buckets/stream
- * SSE endpoint — streams each bucket as it finishes enrichment.
- * Events:
- *   init   → { totalBuckets: number }
- *   bucket → { name, creationDate, objectCount, totalSize }
- *   done   → {} (signals completion)
- */
 router.get("/buckets/stream", asyncHandler(async (req: Request, res: Response) => {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -92,13 +80,6 @@ router.get("/buckets/stream", asyncHandler(async (req: Request, res: Response) =
   }
 }, "Storage_StreamBuckets"));
 
-/**
- * GET /object-store/buckets/:name
- * List objects in a bucket.
- * Query params:
- *   prefix    — filter by key prefix (default: "")
- *   recursive — if "true", list recursively (default: false)
- */
 router.get("/buckets/:name", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name } = req.params;
@@ -112,10 +93,6 @@ router.get("/buckets/:name", asyncHandler(async (req: Request, res: Response, ne
   }
 }, "Storage_ListObjects"));
 
-/**
- * GET /object-store/buckets/:name/stat/*objectPath
- * Get metadata (size, content-type, etag, lastModified) for a single object.
- */
 router.get("/buckets/:name/stat/*objectPath", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bucketName = req.params.name;
@@ -145,12 +122,6 @@ router.get("/buckets/:name/stat/*objectPath", asyncHandler(async (req: Request, 
   }
 }, "Storage_StatObject"));
 
-/**
- * GET /object-store/buckets/:name/download/*objectPath
- * Stream an object for download or inline viewing.
- * Query params:
- *   inline — if "true", sets Content-Disposition to inline (default: attachment)
- */
 router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bucketName = req.params.name;
@@ -183,10 +154,6 @@ router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req: Reque
   }
 }, "Storage_DownloadObject"));
 
-/**
- * DELETE /object-store/buckets/:name/*objectPath
- * Delete a single object from a bucket.
- */
 router.delete("/buckets/:name/*objectPath", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bucketName = req.params.name;

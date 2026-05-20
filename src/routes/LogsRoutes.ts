@@ -10,11 +10,6 @@ import logger from "../utils/logger.ts";
 
 const router = Router();
 
-/**
- * GET /logs
- * Returns a list of all Docker containers across all hosts,
- * regardless of whether they map to a registered project.
- */
 router.get("/", asyncHandler(async (_req: Request, res: Response) => {
   try {
     const containers = await DockerStatsService.getAll(undefined);
@@ -36,14 +31,6 @@ router.get("/", asyncHandler(async (_req: Request, res: Response) => {
   }
 }, "Logs_List"));
 
-/**
- * GET /logs/:containerName
- * Streams container logs as Server-Sent Events.
- * :containerName is the Docker container name (e.g. "prism-service", "mongo").
- * Optionally ?device=synology to disambiguate if the same name exists on multiple hosts.
- * Each SSE event is a single log line: `data: <line>\n\n`
- * Sends `event: connected` on handshake and `event: error` on failure.
- */
 router.get("/:containerName", asyncHandler(async (req: Request, res: Response) => {
   const { containerName } = req.params;
   const deviceFilter = typeof req.query.device === "string" ? req.query.device : undefined;
@@ -126,10 +113,6 @@ router.get("/:containerName", asyncHandler(async (req: Request, res: Response) =
   }
 }, "Logs_Stream"));
 
-/**
- * Stream logs via Docker Engine API (Unix socket or TCP).
- * This is a direct HTTP request to /containers/<name>/logs.
- */
 function streamViaDockerApi(device: DeviceEntry, containerName: string, tail: number, follow: boolean, sendLine: (l: string) => void, sendError: (e: string) => void, cleanup: () => void, clientReq: Request, clientRes: Response) {
   const qs = new URLSearchParams({
     stdout: "1",

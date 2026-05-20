@@ -11,19 +11,12 @@ import logger from "../utils/logger.ts";
 
 const router = Router();
 
-/**
- * Resolve the device object from a device ID.
-
- */
 function resolveDevice(deviceId: string) {
   const device = DEVICES[deviceId];
   if (!device || !device.dockerApi) return null;
   return { id: deviceId, device };
 }
 
-/**
- * Try to extract a message from a Docker API error response body.
- */
 function tryParseDockerError(body: string) {
   try {
     return JSON.parse(body).message;
@@ -32,11 +25,6 @@ function tryParseDockerError(body: string) {
   }
 }
 
-/**
- * POST /containers/:name/restart
- * Restart a Docker container by name on a specific device.
- * Requires ?device=<deviceId> query parameter.
- */
 router.post("/:name/restart", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name } = req.params;
@@ -81,11 +69,6 @@ router.post("/:name/restart", asyncHandler(async (req: Request, res: Response, n
   }
 }, "Containers_Restart"));
 
-/**
- * POST /containers/:name/stop
- * Stop a Docker container by name on a specific device.
- * Requires ?device=<deviceId> query parameter.
- */
 router.post("/:name/stop", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name } = req.params;
@@ -130,11 +113,6 @@ router.post("/:name/stop", asyncHandler(async (req: Request, res: Response, next
   }
 }, "Containers_Stop"));
 
-/**
- * POST /containers/:name/start
- * Start a Docker container by name on a specific device.
- * Requires ?device=<deviceId> query parameter.
- */
 router.post("/:name/start", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name } = req.params;

@@ -18,11 +18,7 @@ export default class ContainerMetricsService {
   static _timer: ReturnType<typeof setTimeout> | null = null;
   static _initialized = false;
 
-  /**
-   * Ensure the time-series collection and indexes exist.
-   * Called once during startup after MongoDB is connected.
-   */
-  static async ensureCollection(): Promise<void> {
+    static async ensureCollection(): Promise<void> {
     const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
     if (!db) {
       logger.warn("[ContainerMetrics] MongoDB not connected — skipping collection setup");
@@ -66,11 +62,7 @@ export default class ContainerMetricsService {
     }
   }
 
-  /**
-   * Persist a batch of container stats to MongoDB.
-   * Called from DockerStatsService after each snapshot collection.
-   */
-  static async persistSnapshot(deviceId: string, containers: Record<string, any>[]): Promise<void> {
+    static async persistSnapshot(deviceId: string, containers: Record<string, any>[]): Promise<void> {
     if (!ContainerMetricsService._initialized) return;
 
     const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
@@ -107,10 +99,7 @@ export default class ContainerMetricsService {
     }
   }
 
-  /**
-   * Query historical metrics for all containers, or filtered by container/device.
-   */
-  static async getHistory({
+    static async getHistory({
     container,
     device,
     range = "1h",
@@ -199,10 +188,7 @@ export default class ContainerMetricsService {
     }
   }
 
-  /**
-   * Parse a human-readable range string into milliseconds.
-   */
-  static _parseRange(range: string): number {
+    static _parseRange(range: string): number {
     const match = range.match(/^(\d+)(m|h|d)$/);
     if (!match) return 60 * 60 * 1000; // default 1h
 
@@ -215,10 +201,7 @@ export default class ContainerMetricsService {
     }
   }
 
-  /**
-   * Get the persist interval (used by DockerStatsService to throttle writes).
-   */
-  static get persistIntervalMs(): number {
+    static get persistIntervalMs(): number {
     return PERSIST_INTERVAL_MS;
   }
 }

@@ -8,12 +8,6 @@ import type { ServiceStatus, InfraStatus, ProjectEntry, InfrastructureEntry } fr
 
 const router = Router();
 
-/**
- * GET /devices
- * Returns all known devices with their associated services and health status.
- * Each device includes a list of services it hosts, enriched with live health data.
- * Infrastructure backing stores (MongoDB, MinIO) are included as a separate array.
- */
 router.get("/", (_req: Request, res: Response) => {
   // Build service → health lookup from the registry cache
   const serviceStatuses = ServiceRegistryService.list();
@@ -85,11 +79,6 @@ router.get("/", (_req: Request, res: Response) => {
   res.json({ devices });
 });
 
-/**
- * Extract port from a URL string. Returns null if parsing fails.
-
-
- */
 function extractPort(url: string | null | undefined) {
   if (!url) return null;
   try {

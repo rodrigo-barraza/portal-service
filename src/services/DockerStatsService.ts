@@ -54,30 +54,20 @@ const HISTORY_MAX_SAMPLES = 60;
 // ── Per-Host State ───────────────────────────────────────────────
 // Each Docker host gets isolated state keyed by device ID.
 
-/** @type {Map<string, { data: ContainerStats[], fetchedAt: number }>} */
 const statsCacheMap = new Map();
 
-/** @type {Map<string, { data: Record<string, unknown>, fetchedAt: number }>} */
 const systemCacheMap = new Map();
 
-/** @type {Map<string, Map<string, { cpuTotal: number, systemTotal: number }>>} */
 const cpuCounterMap = new Map();
 
 
 const historyMap = new Map();
 
-/** @type {Map<string, number>} — per-device last-persist timestamp for throttling writes */
 const lastPersistMap = new Map();
 
-/** Timer reference for cleanup on shutdown. */
 
 // ── Transport Parsing ────────────────────────────────────────────
 
-/**
- * Parse a dockerApi URL into http.request options.
-
-
- */
 function parseTransport(dockerApi: string, path: string): DockerTransport {
   if (dockerApi.startsWith("unix://")) {
     return { socketPath: dockerApi.slice(7), path };
@@ -95,9 +85,6 @@ function parseTransport(dockerApi: string, path: string): DockerTransport {
   throw new Error(`Unsupported Docker API protocol: ${dockerApi}`);
 }
 
-/**
- * Get the list of device entries that have Docker API configured.
- */
 function getDockerDevices(): Array<{ id: string; device: DeviceEntry }> {
   return Object.entries(DEVICES)
     .filter(([, dev]) => dev.dockerApi)
@@ -105,13 +92,7 @@ function getDockerDevices(): Array<{ id: string; device: DeviceEntry }> {
 }
 
 export default class DockerStatsService {
-  /**
-   * Get resource stats for all containers across all Docker hosts,
-   * or filtered to a single device.
-
-
-   */
-  static async getAll(deviceId?: string) {
+    static async getAll(deviceId?: string) {
     const devices = getDockerDevices();
     const targets = deviceId
       ? devices.filter((d) => d.id === deviceId)
@@ -133,12 +114,7 @@ export default class DockerStatsService {
     return combined.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  /**
-   * Get stats for a single Docker host. Uses per-device cache.
-
-
-   */
-  static async _getAllForDevice(deviceId: string, device: DeviceEntry): Promise<ContainerStats[]> {
+    static async _getAllForDevice(deviceId: string, device: DeviceEntry): Promise<ContainerStats[]> {
     const cached = statsCacheMap.get(deviceId);
     if (cached && Date.now() - cached.fetchedAt < STATS_CACHE_TTL_MS) {
       return cached.data;
@@ -177,12 +153,7 @@ export default class DockerStatsService {
     }
   }
 
-  /**
-   * Get the historical time-series ring buffer.
-
-
-   */
-  static getHistory(deviceId?: string) {
+    static getHistory(deviceId?: string) {
     if (deviceId) {
       return { [deviceId]: historyMap.get(deviceId) || [] };
     }
@@ -194,11 +165,7 @@ export default class DockerStatsService {
     return allHistory;
   }
 
-  /**
-   * Invalidate all caches (or for a specific device).
-
-   */
-  static invalidate(deviceId?: string) {
+    static invalidate(deviceId?: string) {
     if (deviceId) {
       statsCacheMap.delete(deviceId);
       systemCacheMap.delete(deviceId);
@@ -210,10 +177,7 @@ export default class DockerStatsService {
 
   static collectorTimer: ReturnType<typeof setInterval> | null = null;
 
-  /**
-   * Start the background collector that populates ring buffers for all hosts.
-   */
-  static startCollector() {
+    static startCollector() {
     if (DockerStatsService.collectorTimer) return;
 
     DockerStatsService._collectSnapshot();
@@ -226,21 +190,14 @@ export default class DockerStatsService {
     logger.info(`[DockerStats] Ring buffer collector started — ${devices.length} Docker host(s) (every ${HISTORY_INTERVAL_MS / 1000}s, ${HISTORY_MAX_SAMPLES} max samples)`);
   }
 
-  /**
-   * Stop the background collector.
-   */
-  static stopCollector() {
+    static stopCollector() {
     if (DockerStatsService.collectorTimer) {
       clearInterval(DockerStatsService.collectorTimer);
       DockerStatsService.collectorTimer = null;
     }
   }
 
-  /**
-   * Collect snapshots from all Docker hosts in parallel.
-   * @private
-   */
-  static async _collectSnapshot() {
+    static async _collectSnapshot() {
     const devices = getDockerDevices();
 
     await Promise.allSettled(
@@ -250,11 +207,7 @@ export default class DockerStatsService {
     );
   }
 
-  /**
-   * Collect a single snapshot for one device and push into its ring buffer.
-   * @private
-   */
-  static async _collectDeviceSnapshot(deviceId: string, device: DeviceEntry) {
+    static async _collectDeviceSnapshot(deviceId: string, device: DeviceEntry) {
     try {
       const stats = await DockerStatsService._getAllForDevice(deviceId, device);
 
@@ -304,12 +257,7 @@ export default class DockerStatsService {
 
   // ── Docker Engine API Calls ──────────────────────────────────
 
-  /**
-   * List all containers (running + stopped) on a device.
-
-
-   */
-  static async _listContainers(device: DeviceEntry): Promise<Record<string, unknown>[]> {
+    static async _listContainers(device: DeviceEntry): Promise<Record<string, unknown>[]> {
     const body = await DockerStatsService._dockerGet(
       device,
       "/containers/json?all=true",
@@ -317,12 +265,7 @@ export default class DockerStatsService {
     return JSON.parse(body);
   }
 
-  /**
-   * Get one-shot stats for a single container.
-
-
-   */
-  static async _getContainerStats(container: Record<string, unknown>, device: DeviceEntry, deviceId: string): Promise<ContainerStats | null> {
+    static async _getContainerStats(container: Record<string, unknown>, device: DeviceEntry, deviceId: string): Promise<ContainerStats | null> {
     try {
       const body = await DockerStatsService._dockerGet(
         device,
@@ -339,12 +282,7 @@ export default class DockerStatsService {
     }
   }
 
-  /**
-   * Build a zeroed-stats skeleton for a stopped/exited container.
-
-
-   */
-  static _buildStoppedSkeleton(container: Record<string, unknown>, deviceId: string): ContainerStats {
+    static _buildStoppedSkeleton(container: Record<string, unknown>, deviceId: string): ContainerStats {
     const name = ((container.Names as string[] | undefined)?.[0] || "unknown").replace(/^\//, "");
     const command = (container.Command as string) || "";
     const ports = ((container.Ports as Record<string, unknown>[]) || []).map((p: Record<string, unknown>) => ({
@@ -392,13 +330,7 @@ export default class DockerStatsService {
     };
   }
 
-  /**
-   * Parse raw Docker stats into a clean, displayable format.
-   * Uses per-device cached previous counters for CPU delta computation.
-
-
-   */
-  static _parseStats(container: Record<string, unknown>, raw: Record<string, unknown>, deviceId: string): ContainerStats {
+    static _parseStats(container: Record<string, unknown>, raw: Record<string, unknown>, deviceId: string): ContainerStats {
     // ── CPU (self-tracked deltas) ──────────────────────────────
     const cpuStats = raw.cpu_stats as DockerCpuStats;
     const currentCpuTotal = cpuStats?.cpu_usage?.total_usage || 0;
@@ -552,12 +484,7 @@ export default class DockerStatsService {
     };
   }
 
-  /**
-   * Get Docker system-level information and disk usage for a device.
-
-
-   */
-  static async getSystemInfo(deviceId?: string) {
+    static async getSystemInfo(deviceId?: string) {
     const devices = getDockerDevices();
 
     if (deviceId) {
@@ -579,12 +506,7 @@ export default class DockerStatsService {
       .map((r) => r.value);
   }
 
-  /**
-   * Get system info for a single Docker host. Uses per-device cache.
-
-
-   */
-  static async _getSystemInfoForDevice(deviceId: string, device: DeviceEntry) {
+    static async _getSystemInfoForDevice(deviceId: string, device: DeviceEntry) {
     const cached = systemCacheMap.get(deviceId);
     if (cached && Date.now() - cached.fetchedAt < SYSTEM_CACHE_TTL_MS) {
       return cached.data;
@@ -713,13 +635,7 @@ export default class DockerStatsService {
 
   // ── Transport Layer ────────────────────────────────────────────
 
-  /**
-   * HTTP GET helper for the Docker Engine API.
-   * Dispatches to Unix socket or TCP based on device.dockerApi.
-
-
-   */
-  static _dockerGet(device: DeviceEntry, path: string, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<string> {
+    static _dockerGet(device: DeviceEntry, path: string, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       const transport = parseTransport(device.dockerApi!, path);
 
@@ -755,12 +671,7 @@ export default class DockerStatsService {
     });
   }
 
-  /**
-   * HTTP POST/DELETE helper for Docker Engine API (container actions).
-
-
-   */
-  static dockerRequest(device: DeviceEntry, method: string, path: string, { timeout = 30_000 }: { timeout?: number } = {}): Promise<DockerActionResponse> {
+    static dockerRequest(device: DeviceEntry, method: string, path: string, { timeout = 30_000 }: { timeout?: number } = {}): Promise<DockerActionResponse> {
     return new Promise<DockerActionResponse>((resolve, reject) => {
       const transport = parseTransport(device.dockerApi!, path);
 
@@ -786,12 +697,7 @@ export default class DockerStatsService {
     });
   }
 
-  /**
-   * Public wrapper for _dockerGet — read-only Docker Engine API calls.
-
-
-   */
-  static dockerGet(device: DeviceEntry, path: string, timeoutMs?: number): Promise<string> {
+    static dockerGet(device: DeviceEntry, path: string, timeoutMs?: number): Promise<string> {
     return DockerStatsService._dockerGet(device, path, timeoutMs);
   }
 }

@@ -11,11 +11,7 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>();
 
 export default class StatsAggregatorService {
-  /**
-   * Get aggregate stats from Prism. Results are cached with a TTL.
-
-   */
-  static async getOverview() {
+    static async getOverview() {
     const cached = cache.get("overview");
     if (cached && Date.now() - cached.fetchedAt < STATS_CACHE_TTL_MS) {
       return cached.data;
@@ -47,12 +43,7 @@ export default class StatsAggregatorService {
     }
   }
 
-  /**
-   * Get request breakdown stats from Prism admin.
-
-
-   */
-  static async getRequestBreakdown(params: { period?: string } = {}) {
+    static async getRequestBreakdown(params: { period?: string } = {}) {
     const cacheKey = `breakdown:${params.period || "24h"}`;
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.fetchedAt < STATS_CACHE_TTL_MS) {
@@ -80,11 +71,7 @@ export default class StatsAggregatorService {
     }
   }
 
-  /**
-   * Get per-project stats.
-
-   */
-  static async getProjectStats() {
+    static async getProjectStats() {
     const cacheKey = "projects";
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.fetchedAt < STATS_CACHE_TTL_MS) {
@@ -109,12 +96,7 @@ export default class StatsAggregatorService {
     }
   }
 
-  /**
-   * Fetch helper with timeout.
-
-
-   */
-  static async _fetch(url: string) {
+    static async _fetch(url: string) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 
@@ -136,10 +118,7 @@ export default class StatsAggregatorService {
     }
   }
 
-  /**
-   * Invalidate all cached stats.
-   */
-  static invalidate() {
+    static invalidate() {
     cache.clear();
   }
 }
