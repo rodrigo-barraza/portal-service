@@ -1,0 +1,123 @@
+import { Router, Request, Response, NextFunction } from "express";
+import logger from "../utils/logger.ts";
+import { SESSIONS_SERVICE_URL } from "../config.ts";
+
+/**
+ * SessionAnalyticsRoutes — Proxy layer for sessions-service stats API.
+ *
+ * Forwards all session analytics requests from portal-client through
+ * portal-service to sessions-service. This keeps sessions-service
+ * internal (no public domain) while exposing its stats to the portal.
+ */
+
+const router = Router();
+
+const SESSIONS_STATS_BASE = `${SESSIONS_SERVICE_URL}/stats`;
+
+/**
+ * Generic proxy helper — forwards GET requests to sessions-service.
+ */
+async function proxy(
+  sessionsPath: string,
+  query: Record<string, string>,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!SESSIONS_SERVICE_URL) {
+      return res.status(503).json({
+        error: true,
+        message: "Sessions service URL not configured",
+      });
+    }
+
+    const qs = new URLSearchParams(query).toString();
+    const url = `${SESSIONS_STATS_BASE}${sessionsPath}${qs ? `?${qs}` : ""}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const data = await response.json();
+    return res.status(response.status).json(data);
+  } catch (error: unknown) {
+    const err = error as Error;
+    logger.error(`[SessionAnalytics] Proxy error: ${err.message}`);
+    next(error);
+  }
+}
+
+// ─── GET /session-analytics/projects ──────────────────────────
+
+router.get("/projects", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/projects", req.query as Record<string, string>, res, next);
+});
+
+// ─── GET /session-analytics/overview ──────────────────────────
+
+router.get("/overview", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/overview", req.query as Record<string, string>, res, next);
+});
+
+// ─── GET /session-analytics/sessions ──────────────────────────
+
+router.get("/sessions", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/sessions", req.query as Record<string, string>, res, next);
+});
+
+// ─── GET /session-analytics/pages ─────────────────────────────
+
+router.get("/pages", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/pages", req.query as Record<string, string>, res, next);
+});
+
+// ─── GET /session-analytics/referrers ─────────────────────────
+
+router.get("/referrers", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/referrers", req.query as Record<string, string>, res, next);
+});
+
+// ─── GET /session-analytics/geo ───────────────────────────────
+
+router.get("/geo", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/geo", req.query as Record<string, string>, res, next);
+});
+
+// ─── GET /session-analytics/devices ───────────────────────────
+
+router.get("/devices", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/devices", req.query as Record<string, string>, res, next);
+});
+
+// ─── GET /session-analytics/timeseries ────────────────────────
+
+router.get("/timeseries", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/timeseries", req.query as Record<string, string>, res, next);
+});
+
+// ─── GET /session-analytics/live ──────────────────────────────
+
+router.get("/live", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/live", req.query as Record<string, string>, res, next);
+});
+
+// ─── GET /session-analytics/events ────────────────────────────
+
+router.get("/events", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/events", req.query as Record<string, string>, res, next);
+});
+
+// ─── GET /session-analytics/events/feed ───────────────────────
+
+router.get("/events/feed", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/events/feed", req.query as Record<string, string>, res, next);
+});
+
+// ─── GET /session-analytics/cross-client ──────────────────────
+
+router.get("/cross-client", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/cross-client", req.query as Record<string, string>, res, next);
+});
+
+export default router;

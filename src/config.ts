@@ -161,3 +161,6 @@ export const STATS_CACHE_TTL_MS = 30_000;
 // ── Google Analytics (GA4 Data API) ───────────────────────────
 export const GOOGLE_ANALYTICS_CREDENTIALS = process.env.GOOGLE_ANALYTICS_CREDENTIALS;
 // Note: ANALYTICS_PROPERTIES is derived from registry entries (see initializeRegistry above)
+
+// ── Sessions Service (first-party analytics) ──────────────────
+export const SESSIONS_SERVICE_URL = process.env.SESSIONS_SERVICE_URL;
