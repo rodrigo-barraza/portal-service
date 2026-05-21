@@ -120,4 +120,17 @@ router.get("/cross-client", (req: Request, res: Response, next: NextFunction) =>
   proxy("/cross-client", req.query as Record<string, string>, res, next);
 });
 
+// ─── GET /session-analytics/session/:sessionId ────────────────
+
+router.get("/session/:sessionId", (req: Request, res: Response, next: NextFunction) => {
+  const sessionId = String(req.params.sessionId);
+  proxy(`/session/${encodeURIComponent(sessionId)}`, {}, res, next);
+});
+
+// ─── GET /session-analytics/visitors ──────────────────────────
+
+router.get("/visitors", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/visitors", req.query as Record<string, string>, res, next);
+});
+
 export default router;
