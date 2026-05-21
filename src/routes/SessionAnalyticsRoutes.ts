@@ -133,4 +133,17 @@ router.get("/visitors", (req: Request, res: Response, next: NextFunction) => {
   proxy("/visitors", req.query as Record<string, string>, res, next);
 });
 
+// ─── GET /session-analytics/ips ───────────────────────────────
+
+router.get("/ips", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/ips", req.query as Record<string, string>, res, next);
+});
+
+// ─── GET /session-analytics/ip/:ip ────────────────────────────
+
+router.get("/ip/:ip", (req: Request, res: Response, next: NextFunction) => {
+  const ip = String(req.params.ip);
+  proxy(`/ip/${encodeURIComponent(ip)}`, req.query as Record<string, string>, res, next);
+});
+
 export default router;
