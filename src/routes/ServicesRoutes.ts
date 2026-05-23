@@ -6,9 +6,9 @@ import ServiceRegistryService from "../services/ServiceRegistryService.ts";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.ts";
 import DockerStatsService from "../services/DockerStatsService.ts";
 import CodeAnalysisService from "../services/CodeAnalysisService.ts";
-import { PROJECTS, DEVICES, PROJECT_TYPE_COLORS, DEPLOY_TIER_COLORS, GITHUB_PAT } from "../config.ts";
+import { PROJECTS, DEVICES, PROJECT_TYPE_COLORS, DEPLOY_TIER_COLORS, GITHUB_PAT, initializeRegistry } from "../config.ts";
 import logger from "../utils/logger.ts";
-import type { ProjectEntry, EnrichedDependency, TtlCache } from "../types.ts";
+import type { ProjectEntry, EnrichedDependency, TtlCache, VaultRegistry } from "../types.ts";
 
 const router = Router();
 
@@ -576,6 +576,38 @@ router.get("/languages", asyncHandler(async (_req: Request, res: Response, next:
     next(error);
   }
 }, "Services_Languages"));
+
+router.post("/reload", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { vault } = await import("../boot.js");
+    vault.clearRegistryCache();
+    const registry = await vault.fetchRegistry();
+
+    if (!registry?.projects?.length) {
+      return res.status(502).json({ error: "Vault returned empty registry" });
+    }
+
+    const previousCount = Object.keys(PROJECTS).length;
+    initializeRegistry(registry as unknown as VaultRegistry);
+    const newCount = Object.keys(PROJECTS).length;
+
+    // Fire health checks for the refreshed registry
+    ServiceRegistryService.checkAll().catch(() => {});
+    InfrastructureRegistryService.checkAll().catch(() => {});
+
+    logger.success(`[Registry] Manual reload — ${previousCount} → ${newCount} projects`);
+
+    res.json({
+      success: true,
+      previousCount,
+      newCount,
+      delta: newCount - previousCount,
+      message: `Registry reloaded: ${previousCount} → ${newCount} projects`,
+    });
+  } catch (error: unknown) {
+    next(error);
+  }
+}, "Services_Reload"));
 
 function tryParseDockerError(body: string) {
   try {

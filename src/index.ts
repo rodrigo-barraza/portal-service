@@ -8,7 +8,8 @@ import { errorHandler } from "./utils/errors.ts";
 import logger from "./utils/logger.ts";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
 import MongoWrapper from "./wrappers/MongoWrapper.ts";
-import { PORT, MONGO_URI, MONGO_DB_NAME, PROJECTS } from "./config.ts";
+import { PORT, MONGO_URI, MONGO_DB_NAME, PROJECTS, initializeRegistry } from "./config.ts";
+import type { VaultRegistry } from "./types.ts";
 import { COLLECTIONS } from "./constants.ts";
 import ServiceRegistryService from "./services/ServiceRegistryService.ts";
 import InfrastructureRegistryService from "./services/InfrastructureRegistryService.ts";
@@ -187,6 +188,38 @@ app.use(errorHandler);
     ServiceRegistryService.checkAll().catch(() => {});
     InfrastructureRegistryService.checkAll().catch(() => {});
   }, 60_000);
+
+  // ── Periodic Registry Refresh ──────────────────────────────────
+  // Re-fetch the vault registry every 5 minutes so new projects
+  // (e.g. notes-service, notes-client) are picked up without
+  // requiring a portal-service container restart.
+  const REGISTRY_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+  setInterval(async () => {
+    try {
+      const { vault } = await import("./boot.js");
+      vault.clearRegistryCache();
+      const registry = await vault.fetchRegistry();
+
+      if (registry?.projects?.length > 0) {
+        const currentCount = Object.keys(PROJECTS).length;
+        const newCount = registry.projects.length;
+
+        // Only re-initialize if the project count changed
+        if (newCount !== currentCount) {
+          initializeRegistry(registry as unknown as VaultRegistry);
+          logger.info(`[Registry] Hot-reloaded — ${currentCount} → ${newCount} projects`);
+
+          // Trigger health checks for any newly registered services
+          ServiceRegistryService.checkAll().catch(() => {});
+          InfrastructureRegistryService.checkAll().catch(() => {});
+        }
+      }
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.warn(`[Registry] Periodic refresh failed: ${err.message}`);
+    }
+  }, REGISTRY_REFRESH_INTERVAL_MS);
 
   // Start server
   app.listen(PORT, () => {
