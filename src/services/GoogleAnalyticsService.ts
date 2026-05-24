@@ -201,17 +201,17 @@ export default class GoogleAnalyticsService {
       // With two date ranges, GA4 returns rows tagged by dateRange index.
       // Row 0 = current period, Row 1 = previous period.
       const parseRow = (row: GoogleAnalyticsResponseRow | undefined): TransformedOverviewMetricPeriod => {
-        const m = row?.metricValues || [];
+        const metricValues = row?.metricValues || [];
         return {
-          sessions: parseInt(m[0]?.value || "0", 10),
-          pageviews: parseInt(m[1]?.value || "0", 10),
-          activeUsers: parseInt(m[2]?.value || "0", 10),
-          totalUsers: parseInt(m[3]?.value || "0", 10),
-          newUsers: parseInt(m[4]?.value || "0", 10),
-          bounceRate: parseFloat(m[5]?.value || "0"),
-          avgSessionDuration: parseFloat(m[6]?.value || "0"),
-          engagedSessions: parseInt(m[7]?.value || "0", 10),
-          engagementRate: parseFloat(m[8]?.value || "0"),
+          sessions: parseInt(metricValues[0]?.value || "0", 10),
+          pageviews: parseInt(metricValues[1]?.value || "0", 10),
+          activeUsers: parseInt(metricValues[2]?.value || "0", 10),
+          totalUsers: parseInt(metricValues[3]?.value || "0", 10),
+          newUsers: parseInt(metricValues[4]?.value || "0", 10),
+          bounceRate: parseFloat(metricValues[5]?.value || "0"),
+          avgSessionDuration: parseFloat(metricValues[6]?.value || "0"),
+          engagedSessions: parseInt(metricValues[7]?.value || "0", 10),
+          engagementRate: parseFloat(metricValues[8]?.value || "0"),
         };
       };
 
