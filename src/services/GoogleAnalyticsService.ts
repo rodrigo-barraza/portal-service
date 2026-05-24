@@ -7,6 +7,31 @@ import {
   ANALYTICS_PROPERTIES,
 } from "../config.ts";
 
+interface GoogleAnalyticsResponseRow {
+  dimensionValues?: { value?: string | null }[] | null;
+  metricValues?: { value?: string | null }[] | null;
+}
+
+interface GoogleAnalyticsResponse {
+  rows?: GoogleAnalyticsResponseRow[] | null;
+}
+
+interface TransformedGoogleAnalyticsRow {
+  [key: string]: string | number;
+}
+
+interface TransformedOverviewMetricPeriod {
+  sessions: number;
+  pageviews: number;
+  activeUsers: number;
+  totalUsers: number;
+  newUsers: number;
+  bounceRate: number;
+  avgSessionDuration: number;
+  engagedSessions: number;
+  engagementRate: number;
+}
+
 // ── TTL Cache ──────────────────────────────────────────────────
 
 const cache = new Map<string, { data: unknown; ts: number }>();
@@ -64,11 +89,15 @@ function previousPeriodRange(period: string = "30d") {
 
 // ── Report Helpers ─────────────────────────────────────────────
 
-function formatRows(response: Record<string, any> | undefined | null, dimensionNames: string[], metricNames: string[]) {
+function formatRows(
+  response: GoogleAnalyticsResponse | undefined | null,
+  dimensionNames: string[],
+  metricNames: string[]
+): TransformedGoogleAnalyticsRow[] {
   if (!response?.rows) return [];
 
-  return response.rows.map((row: Record<string, any>) => {
-    const entry: Record<string, string | number> = {};
+  return response.rows.map((row: GoogleAnalyticsResponseRow) => {
+    const entry: TransformedGoogleAnalyticsRow = {};
     dimensionNames.forEach((name: string, i: number) => {
       entry[name] = row.dimensionValues?.[i]?.value || "";
     });
@@ -109,7 +138,8 @@ export default class GoogleAnalyticsService {
       logger.success("[GoogleAnalytics] Client initialized");
       return GoogleAnalyticsService.client;
     } catch (error: unknown) {
-      throw new Error(`Failed to initialize GA client: ${(error as Error).message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to initialize GA client: ${errorMessage}`);
     }
   }
 
@@ -129,12 +159,19 @@ export default class GoogleAnalyticsService {
       });
 
       const pages = formatRows(response, ["pagePath"], ["activeUsers"]);
-      const totalActive = pages.reduce((sum: number, p: Record<string, any>) => sum + (p.activeUsers as number), 0);
+      const totalActive = pages.reduce((sum: number, p: TransformedGoogleAnalyticsRow) => {
+        const users = p.activeUsers;
+        return sum + (typeof users === "number" ? users : 0);
+      }, 0);
 
       return {
         activeUsers: totalActive,
         topPages: pages
-          .sort((a: Record<string, any>, b: Record<string, any>) => (b.activeUsers as number) - (a.activeUsers as number))
+          .sort((a: TransformedGoogleAnalyticsRow, b: TransformedGoogleAnalyticsRow) => {
+            const aUsers = typeof a.activeUsers === "number" ? a.activeUsers : 0;
+            const bUsers = typeof b.activeUsers === "number" ? b.activeUsers : 0;
+            return bUsers - aUsers;
+          })
           .slice(0, 10),
         fetchedAt: new Date().toISOString(),
       };
@@ -163,7 +200,7 @@ export default class GoogleAnalyticsService {
 
       // With two date ranges, GA4 returns rows tagged by dateRange index.
       // Row 0 = current period, Row 1 = previous period.
-      const parseRow = (row: Record<string, any> | undefined) => {
+      const parseRow = (row: GoogleAnalyticsResponseRow | undefined): TransformedOverviewMetricPeriod => {
         const m = row?.metricValues || [];
         return {
           sessions: parseInt(m[0]?.value || "0", 10),
@@ -409,9 +446,9 @@ export default class GoogleAnalyticsService {
 
       // Format date from YYYYMMDD → YYYY-MM-DD
       return {
-        series: rows.map((r: Record<string, any>) => ({
+        series: rows.map((r: TransformedGoogleAnalyticsRow) => ({
           ...r,
-          date: r.date.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"),
+          date: String(r.date).replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"),
         })),
         period,
         fetchedAt: new Date().toISOString(),
@@ -511,9 +548,9 @@ export default class GoogleAnalyticsService {
 
       // Convert hour from string to int
       return {
-        cells: rows.map((r: Record<string, any>) => ({
+        cells: rows.map((r: TransformedGoogleAnalyticsRow) => ({
           ...r,
-          hour: parseInt(r.hour, 10),
+          hour: parseInt(String(r.hour), 10),
         })),
         period,
         fetchedAt: new Date().toISOString(),

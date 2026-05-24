@@ -21,6 +21,11 @@ interface EcosystemOwners {
     projectOwners: Map<string, string>;
 }
 
+interface TransformedGitHubResponse {
+  content?: string;
+  size?: number;
+}
+
 function deriveEcosystemOwners(): EcosystemOwners {
   const owners = new Set<string>();
   const scopePrefixes = new Set<string>();
@@ -110,8 +115,8 @@ export default class CodeAnalysisService {
           dependencies[id] = { imports, apiCalls };
           if (size) repoSizes[id] = size;
         } catch (err: unknown) {
-          const e = err as Error;
-          logger.warn(`[CodeAnalysis] Failed for ${id}: ${e.message}`);
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          logger.warn(`[CodeAnalysis] Failed for ${id}: ${errorMessage}`);
           dependencies[id] = { imports: [], apiCalls: [] };
         }
       }),
@@ -138,7 +143,7 @@ export default class CodeAnalysisService {
     return match ? match[1] : null;
   }
 
-  private static async _githubGet(path: string): Promise<Record<string, any> | null> {
+  private static async _githubGet(path: string): Promise<TransformedGitHubResponse | null> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -152,7 +157,7 @@ export default class CodeAnalysisService {
       const resp = await fetch(`${GITHUB_API}${path}`, { headers, signal: controller.signal });
       clearTimeout(timeout);
       if (!resp.ok) return null;
-      return (await resp.json()) as Record<string, any>;
+      return (await resp.json()) as TransformedGitHubResponse;
     } catch {
       clearTimeout(timeout);
       return null;

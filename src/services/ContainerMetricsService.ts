@@ -8,6 +8,23 @@ import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../config.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
+import type { ContainerStats, MetricsHistoryResult } from "../types.ts";
+
+interface AggregateHistoryDocument {
+  _id: {
+    container: string;
+    device: string;
+  };
+  points: {
+    t: Date;
+    cpu: number;
+    mem: number;
+    memLimit: number;
+    netRx: number;
+    netTx: number;
+    pids: number;
+  }[];
+}
 
 // ── Configuration ────────────────────────────────────────────────
 const PERSIST_INTERVAL_MS = 30_000;       // Write one sample every 30s
@@ -51,18 +68,17 @@ export default class ContainerMetricsService {
       ContainerMetricsService._initialized = true;
       logger.success("[ContainerMetrics] Indexes ensured");
     } catch (error: unknown) {
-      const err = error as Error & { codeName?: string };
-      // If collection already exists with different options, that's fine
-      if (err.codeName === "NamespaceExists") {
+      if (error && typeof error === "object" && "codeName" in error && error.codeName === "NamespaceExists") {
         ContainerMetricsService._initialized = true;
         logger.info("[ContainerMetrics] Collection already exists");
       } else {
-        logger.error(`[ContainerMetrics] Setup failed: ${err.message}`);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error(`[ContainerMetrics] Setup failed: ${errorMessage}`);
       }
     }
   }
 
-    static async persistSnapshot(deviceId: string, containers: Record<string, any>[]): Promise<void> {
+    static async persistSnapshot(deviceId: string, containers: ContainerStats[]): Promise<void> {
     if (!ContainerMetricsService._initialized) return;
 
     const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
@@ -95,7 +111,8 @@ export default class ContainerMetricsService {
     try {
       await col.insertMany(documents, { ordered: false });
     } catch (error: unknown) {
-      logger.warn(`[ContainerMetrics] Insert failed: ${(error as Error).message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.warn(`[ContainerMetrics] Insert failed: ${errorMessage}`);
     }
   }
 
@@ -109,7 +126,7 @@ export default class ContainerMetricsService {
     device?: string;
     range?: string;
     limit?: number;
-  } = {}): Promise<any> {
+  } = {}): Promise<MetricsHistoryResult> {
     const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
     if (!db) return { containers: {}, range, samples: 0 };
 
@@ -120,7 +137,7 @@ export default class ContainerMetricsService {
     const since = new Date(Date.now() - rangeMs);
 
     // Build match filter
-    const match: Record<string, any> = { timestamp: { $gte: since } };
+    const match: Record<string, unknown> = { timestamp: { $gte: since } };
     if (container) match["metadata.container"] = container;
     if (device) match["metadata.device"] = device;
 
@@ -128,7 +145,7 @@ export default class ContainerMetricsService {
     const bucketCount = Math.min(limit, 120);
 
     try {
-      const pipeline: Record<string, any>[] = [
+      const pipeline: Record<string, unknown>[] = [
         { $match: match },
         { $sort: { "metadata.container": 1, timestamp: 1 } },
         {
@@ -161,14 +178,14 @@ export default class ContainerMetricsService {
       const results = await col.aggregate(pipeline).toArray();
 
       // Reshape into { containerName: { device, points: [...] } }
-      const containers: Record<string, any> = {};
+      const containers: MetricsHistoryResult["containers"] = {};
       let totalSamples = 0;
 
-      for (const doc of results) {
+      for (const doc of results as unknown as AggregateHistoryDocument[]) {
         const name = doc._id.container;
         containers[name] = {
           device: doc._id.device,
-          points: doc.points.map((p: Record<string, any>) => ({
+          points: doc.points.map((p) => ({
             t: p.t,
             cpu: Math.round(p.cpu * 100) / 100,
             mem: p.mem,
@@ -183,7 +200,8 @@ export default class ContainerMetricsService {
 
       return { containers, range, since: since.toISOString(), samples: totalSamples };
     } catch (error: unknown) {
-      logger.error(`[ContainerMetrics] Query failed: ${(error as Error).message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`[ContainerMetrics] Query failed: ${errorMessage}`);
       return { containers: {}, range, samples: 0 };
     }
   }
