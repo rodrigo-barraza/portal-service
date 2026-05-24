@@ -1,23 +1,10 @@
 // ─── Request Logger Middleware ──────────────────────────────
+// Delegates to @rodrigo-barraza/service-library's standard implementation.
+// ─────────────────────────────────────────────────────────────
 
-import { Request, Response, NextFunction } from "express";
+import { createRequestLoggerMiddleware } from "@rodrigo-barraza/service-library";
 import logger from "../utils/logger.ts";
 
-export function requestLoggerMiddleware(req: Request, res: Response, next: NextFunction) {
-  const start = Date.now();
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    const status = res.statusCode;
-    const method = req.method;
-    const url = req.originalUrl;
-
-    const time = duration >= 1000
-      ? `${(duration / 1000).toFixed(2)}s`
-      : `${duration}ms`;
-
-    logger.request(method, url, status, time);
-  });
-
-  next();
-}
+export const requestLoggerMiddleware = createRequestLoggerMiddleware(logger, {
+  identityAware: false,
+});
