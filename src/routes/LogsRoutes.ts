@@ -207,7 +207,7 @@ function streamViaDockerApi(device: DeviceEntry, containerName: string, tail: nu
       });
 
       dockerRes.on("error", (error: unknown) => {
-        const err = error as Error;
+        const typedError = error as Error;
         logger.error(`[Logs] Docker stream error for ${containerName}: ${err.message}`);
         sendError(err.message);
         cleanup();
