@@ -59,8 +59,8 @@ export default class ContainerMetricsService {
       }
 
       // Compound index on metadata fields for efficient per-container queries
-      const col = db.collection(COLLECTIONS.CONTAINER_METRICS);
-      await col.createIndex(
+      const metricsCollection = db.collection(COLLECTIONS.CONTAINER_METRICS);
+      await metricsCollection.createIndex(
         { "metadata.container": 1, "metadata.device": 1, timestamp: -1 },
         { name: "container_device_time_desc" },
       );
@@ -84,32 +84,32 @@ export default class ContainerMetricsService {
     const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
     if (!db) return;
 
-    const col = db.collection(COLLECTIONS.CONTAINER_METRICS);
+    const metricsCollection = db.collection(COLLECTIONS.CONTAINER_METRICS);
     const now = new Date();
 
     const documents = containers
-      .filter((c) => c.cpu && c.memory)
-      .map((c) => ({
+      .filter((containerStats) => containerStats.cpu && containerStats.memory)
+      .map((containerStats) => ({
         timestamp: now,
         metadata: {
-          container: c.name,
+          container: containerStats.name,
           device: deviceId,
         },
-        cpu: c.cpu.percent,
-        memoryUsed: c.memory.used,
-        memoryLimit: c.memory.limit,
-        memoryPercent: c.memory.percent,
-        netRx: c.network?.rx || 0,
-        netTx: c.network?.tx || 0,
-        blockRead: c.blockIO?.read || 0,
-        blockWrite: c.blockIO?.write || 0,
-        pids: c.pids || 0,
+        cpu: containerStats.cpu.percent,
+        memoryUsed: containerStats.memory.used,
+        memoryLimit: containerStats.memory.limit,
+        memoryPercent: containerStats.memory.percent,
+        netRx: containerStats.network?.rx || 0,
+        netTx: containerStats.network?.tx || 0,
+        blockRead: containerStats.blockIO?.read || 0,
+        blockWrite: containerStats.blockIO?.write || 0,
+        pids: containerStats.pids || 0,
       }));
 
     if (documents.length === 0) return;
 
     try {
-      await col.insertMany(documents, { ordered: false });
+      await metricsCollection.insertMany(documents, { ordered: false });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(`[ContainerMetrics] Insert failed: ${errorMessage}`);
@@ -130,7 +130,7 @@ export default class ContainerMetricsService {
     const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
     if (!db) return { containers: {}, range, samples: 0 };
 
-    const col = db.collection(COLLECTIONS.CONTAINER_METRICS);
+    const metricsCollection = db.collection(COLLECTIONS.CONTAINER_METRICS);
 
     // Parse time range
     const rangeMs = ContainerMetricsService._parseRange(range);
@@ -175,7 +175,7 @@ export default class ContainerMetricsService {
         },
       ];
 
-      const results = await col.aggregate(pipeline).toArray();
+      const results = await metricsCollection.aggregate(pipeline).toArray();
 
       // Reshape into { containerName: { device, points: [...] } }
       const containers: MetricsHistoryResult["containers"] = {};
@@ -185,14 +185,14 @@ export default class ContainerMetricsService {
         const name = doc._id.container;
         containers[name] = {
           device: doc._id.device,
-          points: doc.points.map((p) => ({
-            t: p.t,
-            cpu: Math.round(p.cpu * 100) / 100,
-            mem: p.mem,
-            memLimit: p.memLimit,
-            netRx: p.netRx,
-            netTx: p.netTx,
-            pids: p.pids,
+          points: doc.points.map((point) => ({
+            t: point.t,
+            cpu: Math.round(point.cpu * 100) / 100,
+            mem: point.mem,
+            memLimit: point.memLimit,
+            netRx: point.netRx,
+            netTx: point.netTx,
+            pids: point.pids,
           })),
         };
         totalSamples += doc.points.length;

@@ -124,14 +124,14 @@ export default class InfrastructureRegistryService {
         checkedAt: new Date().toISOString(),
       };
     } catch (error: unknown) {
-      const err = error as Error;
-      logger.warn(`[InfraRegistry] ${infra.name} unreachable: ${err.message}`);
+      const errorObject = error as Error;
+      logger.warn(`[InfraRegistry] ${infra.name} unreachable: ${errorObject.message}`);
       return {
         ...base,
         healthy: false,
         responseTimeMs: Date.now() - start,
         metadata: null,
-        error: err.name === "AbortError" ? "Timeout" : err.message,
+        error: errorObject.name === "AbortError" ? "Timeout" : errorObject.message,
         checkedAt: new Date().toISOString(),
       } as InfraStatus;
     }

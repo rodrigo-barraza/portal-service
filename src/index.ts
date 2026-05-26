@@ -114,8 +114,8 @@ app.use(errorHandler);
       await ContainerMetricsService.ensureCollection();
     }
   } catch (error: unknown) {
-    const err = error as Error;
-    logger.error(`Failed to ensure indexes: ${err.message}`);
+    const errorObject = error as Error;
+    logger.error(`Failed to ensure indexes: ${errorObject.message}`);
   }
 
   // ── Deferred Registry Recovery ─────────────────────────────────
@@ -154,8 +154,8 @@ app.use(errorHandler);
           logger.warn(`[Registry] Deferred attempt ${deferredAttempt}/${MAX_DEFERRED_ATTEMPTS} — still empty`);
         }
       } catch (error: unknown) {
-        const err = error as Error;
-        logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${err.message}`);
+        const errorObject = error as Error;
+        logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${errorObject.message}`);
         if (deferredAttempt >= MAX_DEFERRED_ATTEMPTS) {
           clearInterval(deferredTimer);
         }
@@ -179,8 +179,8 @@ app.use(errorHandler);
       );
     })
     .catch((error: unknown) => {
-      const err = error as Error;
-      logger.warn(`[Registry] Initial check failed: ${err.message}`);
+      const errorObject = error as Error;
+      logger.warn(`[Registry] Initial check failed: ${errorObject.message}`);
     });
 
   // Periodic health checks every 60 seconds
@@ -216,8 +216,8 @@ app.use(errorHandler);
         }
       }
     } catch (error: unknown) {
-      const err = error as Error;
-      logger.warn(`[Registry] Periodic refresh failed: ${err.message}`);
+      const errorObject = error as Error;
+      logger.warn(`[Registry] Periodic refresh failed: ${errorObject.message}`);
     }
   }, REGISTRY_REFRESH_INTERVAL_MS);
 

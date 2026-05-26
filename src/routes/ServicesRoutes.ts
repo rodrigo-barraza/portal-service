@@ -405,15 +405,15 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
 
 const SIZE_CACHE_TTL_MS = 5 * 60 * 1000;
 
-function createTtlCache<T>(ttlMs: number): TtlCache<T> {
-  let cache: T | null = null;
+function createTtlCache<CachedValue>(ttlMs: number): TtlCache<CachedValue> {
+  let cache: CachedValue | null = null;
   let cacheAt = 0;
   return {
     get: (now: number) => {
       if (cache && now - cacheAt < ttlMs) return cache;
       return null;
     },
-    set: (data: T, now: number) => {
+    set: (data: CachedValue, now: number) => {
       cache = data;
       cacheAt = now;
     }
@@ -547,10 +547,10 @@ router.get("/languages", asyncHandler(async (_req: Request, res: Response, next:
           }
 
           const data = await resp.json() as Record<string, number>;
-          const totalBytes = Object.values(data).reduce((sum, b) => sum + b, 0);
+          const totalBytes = Object.values(data).reduce((sum, bytesValue) => sum + bytesValue, 0);
 
           // Sort by bytes descending
-          const sorted = Object.entries(data).sort(([, a], [, b]) => b - a);
+          const sorted = Object.entries(data).sort(([, firstBytes], [, secondBytes]) => secondBytes - firstBytes);
           const primary = sorted.length > 0 ? sorted[0][0] : null;
 
           languages[id] = {

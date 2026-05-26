@@ -70,10 +70,10 @@ router.get("/buckets/stream", asyncHandler(async (req: Request, res: Response) =
       res.write(`event: done\ndata: {}\n\n`);
     }
   } catch (error: unknown) {
-    const err = error as Error;
-    logger.error(`[ObjectStore] streamBuckets failed: ${err.message}`);
+    const errorObject = error as Error;
+    logger.error(`[ObjectStore] streamBuckets failed: ${errorObject.message}`);
     if (!req.closed) {
-      res.write(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message: errorObject.message })}\n\n`);
     }
   } finally {
     res.end();
@@ -113,11 +113,11 @@ router.get("/buckets/:name/stat/*objectPath", asyncHandler(async (req: Request, 
       metadata: stat.metaData || {},
     });
   } catch (error: unknown) {
-    const err = error as Error & { code?: string };
-    if (err.code === "NotFound" || err.message?.includes("Not Found")) {
+    const errorObject = error as Error & { code?: string };
+    if (errorObject.code === "NotFound" || errorObject.message?.includes("Not Found")) {
       return res.status(404).json({ error: "Object not found" });
     }
-    logger.error(`[ObjectStore] statObject failed: ${err.message}`);
+    logger.error(`[ObjectStore] statObject failed: ${errorObject.message}`);
     next(error);
   }
 }, "Storage_StatObject"));
@@ -145,11 +145,11 @@ router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req: Reque
     const stream = await MinioService.getObject(String(bucketName), objectName);
     stream.pipe(res);
   } catch (error: unknown) {
-    const err = error as Error & { code?: string };
-    if (err.code === "NotFound" || err.message?.includes("Not Found")) {
+    const errorObject = error as Error & { code?: string };
+    if (errorObject.code === "NotFound" || errorObject.message?.includes("Not Found")) {
       return res.status(404).json({ error: "Object not found" });
     }
-    logger.error(`[ObjectStore] getObject failed: ${err.message}`);
+    logger.error(`[ObjectStore] getObject failed: ${errorObject.message}`);
     next(error);
   }
 }, "Storage_DownloadObject"));

@@ -297,19 +297,19 @@ export default class ServiceRegistryService {
   }
 
     static _extractErrorDetail(error: unknown) {
-    const err = error as Error & { cause?: unknown, name?: string };
-    if (err.name === "AbortError") return "Timeout";
+    const errorObject = error as Error & { cause?: unknown, name?: string };
+    if (errorObject.name === "AbortError") return "Timeout";
 
     // Dig into undici's nested cause chain for the real error code
-    let rootCause = err.cause as { code?: string; message?: string; cause?: unknown } | undefined | null;
+    let rootCause = errorObject.cause as { code?: string; message?: string; cause?: unknown } | undefined | null;
     while (rootCause) {
       if (rootCause.code) {
         const code = rootCause.code;
-        return ERROR_CODE_LABELS[code] || `${code}: ${rootCause.message || err.message}`;
+        return ERROR_CODE_LABELS[code] || `${code}: ${rootCause.message || errorObject.message}`;
       }
       rootCause = rootCause.cause as { code?: string; message?: string; cause?: unknown } | undefined | null;
     }
 
-    return err.message;
+    return errorObject.message;
   }
 }

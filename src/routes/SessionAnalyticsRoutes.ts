@@ -31,8 +31,8 @@ async function proxy(
       });
     }
 
-    const qs = new URLSearchParams(query).toString();
-    const url = `${SESSIONS_STATS_BASE}${sessionsPath}${qs ? `?${qs}` : ""}`;
+    const queryString = new URLSearchParams(query).toString();
+    const url = `${SESSIONS_STATS_BASE}${sessionsPath}${queryString ? `?${queryString}` : ""}`;
 
     const response = await fetch(url, {
       method: "GET",
@@ -42,8 +42,8 @@ async function proxy(
     const data = await response.json();
     return res.status(response.status).json(data);
   } catch (error: unknown) {
-    const err = error as Error;
-    logger.error(`[SessionAnalytics] Proxy error: ${err.message}`);
+    const errorObject = error as Error;
+    logger.error(`[SessionAnalytics] Proxy error: ${errorObject.message}`);
     next(error);
   }
 }

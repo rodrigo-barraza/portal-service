@@ -14,14 +14,14 @@ router.get("/", asyncHandler(async (_req: Request, res: Response) => {
   try {
     const containers = await DockerStatsService.getAll(undefined);
 
-    const loggable = containers.map((c: ContainerStats) => ({
-      id: c.name,
-      name: c.name,
-      image: c.image,
-      state: c.state,
-      status: c.status,
-      device: c.device,
-      deviceName: DEVICES[c.device]?.name || c.device,
+    const loggable = containers.map((container: ContainerStats) => ({
+      id: container.name,
+      name: container.name,
+      image: container.image,
+      state: container.state,
+      status: container.status,
+      device: container.device,
+      deviceName: DEVICES[container.device]?.name || container.device,
     }));
 
     res.json({ containers: loggable });
@@ -44,7 +44,7 @@ router.get("/:containerName", asyncHandler(async (req: Request, res: Response) =
     return res.status(500).json({ error: "Failed to query Docker containers" });
   }
 
-  const match = containers.find((c: ContainerStats) => c.name === containerName);
+  const match = containers.find((container: ContainerStats) => container.name === containerName);
 
   if (!match) {
     return res.status(404).json({ error: `Container not found: ${containerName}` });
@@ -113,8 +113,8 @@ router.get("/:containerName", asyncHandler(async (req: Request, res: Response) =
   }
 }, "Logs_Stream"));
 
-function streamViaDockerApi(device: DeviceEntry, containerName: string, tail: number, follow: boolean, sendLine: (l: string) => void, sendError: (e: string) => void, cleanup: () => void, clientReq: Request, clientRes: Response) {
-  const qs = new URLSearchParams({
+function streamViaDockerApi(device: DeviceEntry, containerName: string, tail: number, follow: boolean, sendLine: (line: string) => void, sendError: (error: string) => void, cleanup: () => void, clientReq: Request, clientRes: Response) {
+  const queryString = new URLSearchParams({
     stdout: "1",
     stderr: "1",
     tail: String(tail),
@@ -122,7 +122,7 @@ function streamViaDockerApi(device: DeviceEntry, containerName: string, tail: nu
     timestamps: "1",
   });
 
-  const path = `/containers/${containerName}/logs?${qs}`;
+  const path = `/containers/${containerName}/logs?${queryString}`;
 
   logger.info(`[Logs] Docker API → ${path}`);
 
@@ -223,9 +223,9 @@ function streamViaDockerApi(device: DeviceEntry, containerName: string, tail: nu
   );
 
   dockerReq.on("error", (error: unknown) => {
-    const err = error as Error;
-    logger.error(`[Logs] Docker socket error for ${containerName}: ${err.message}`);
-    sendError(err.message);
+    const errorObject = error as Error;
+    logger.error(`[Logs] Docker socket error for ${containerName}: ${errorObject.message}`);
+    sendError(errorObject.message);
     cleanup();
   });
 

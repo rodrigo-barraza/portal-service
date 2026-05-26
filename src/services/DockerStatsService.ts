@@ -145,8 +145,8 @@ export default class DockerStatsService {
       statsCacheMap.set(deviceId, { data: result, fetchedAt: Date.now() });
       return result;
     } catch (error: unknown) {
-      const err = error as Error;
-      logger.error(`[DockerStats:${deviceId}] Failed to collect stats: ${err.message}`);
+      const errorObject = error as Error;
+      logger.error(`[DockerStats:${deviceId}] Failed to collect stats: ${errorObject.message}`);
       const stale = statsCacheMap.get(deviceId);
       if (stale) return stale.data;
       return [];
@@ -245,13 +245,13 @@ export default class DockerStatsService {
       const lastPersist = lastPersistMap.get(deviceId) || 0;
       if (now - lastPersist >= ContainerMetricsService.persistIntervalMs) {
         lastPersistMap.set(deviceId, now);
-        ContainerMetricsService.persistSnapshot(deviceId, stats).catch((err: unknown) => {
-          logger.warn(`[DockerStats:${deviceId}] Metrics persist failed: ${(err as Error).message}`);
+        ContainerMetricsService.persistSnapshot(deviceId, stats).catch((errorObject: unknown) => {
+          logger.warn(`[DockerStats:${deviceId}] Metrics persist failed: ${(errorObject as Error).message}`);
         });
       }
     } catch (error: unknown) {
-      const err = error as Error;
-      logger.warn(`[DockerStats:${deviceId}] Snapshot failed: ${err.message}`);
+      const errorObject = error as Error;
+      logger.warn(`[DockerStats:${deviceId}] Snapshot failed: ${errorObject.message}`);
     }
   }
 
@@ -274,9 +274,9 @@ export default class DockerStatsService {
       const raw = JSON.parse(body);
       return DockerStatsService._parseStats(container, raw, deviceId);
     } catch (error: unknown) {
-      const err = error as Error;
+      const errorObject = error as Error;
       logger.warn(
-        `[DockerStats:${deviceId}] Failed to get stats for ${(container.Names as string[] | undefined)?.[0]}: ${err.message}`,
+        `[DockerStats:${deviceId}] Failed to get stats for ${(container.Names as string[] | undefined)?.[0]}: ${errorObject.message}`,
       );
       return null;
     }
@@ -579,8 +579,8 @@ export default class DockerStatsService {
             const percent = total > 0 ? Math.round((used / total) * 10000) / 100 : 0;
             hostDisk = { total, used, available, percent };
           }
-        } catch (dfErr: unknown) {
-          logger.warn(`[DockerStats:${deviceId}] Host disk stats failed: ${(dfErr as Error).message}`);
+        } catch (dfError: unknown) {
+          logger.warn(`[DockerStats:${deviceId}] Host disk stats failed: ${(dfError as Error).message}`);
         }
       }
 
@@ -625,11 +625,11 @@ export default class DockerStatsService {
       systemCacheMap.set(deviceId, { data: result, fetchedAt: Date.now() });
       return result;
     } catch (error: unknown) {
-      const err = error as Error;
-      logger.error(`[DockerStats:${deviceId}] System info failed: ${err.message}`);
+      const errorObject = error as Error;
+      logger.error(`[DockerStats:${deviceId}] System info failed: ${errorObject.message}`);
       const stale = systemCacheMap.get(deviceId);
       if (stale) return stale.data;
-      throw err;
+      throw errorObject;
     }
   }
 

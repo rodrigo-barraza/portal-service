@@ -35,11 +35,11 @@ export default class StatsAggregatorService {
       cache.set("overview", { data, fetchedAt: Date.now() });
       return data;
     } catch (error: unknown) {
-      const err = error as Error;
-      logger.error(`[StatsAggregator] Failed to fetch overview: ${err.message}`);
+      const errorObject = error as Error;
+      logger.error(`[StatsAggregator] Failed to fetch overview: ${errorObject.message}`);
       // Return stale cache if available
       if (cached) return { ...cached.data, stale: true };
-      return { error: err.message };
+      return { error: errorObject.message };
     }
   }
 
@@ -54,20 +54,20 @@ export default class StatsAggregatorService {
     if (!prismUrl) return { error: "Prism URL not configured" };
 
     try {
-      const qs = new URLSearchParams();
-      if (params.period) qs.set("period", params.period);
+      const queryString = new URLSearchParams();
+      if (params.period) queryString.set("period", params.period);
 
       const data = await StatsAggregatorService._fetch(
-        `${prismUrl}/admin/stats/breakdown?${qs}`,
+        `${prismUrl}/admin/stats/breakdown?${queryString}`,
       );
 
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
     } catch (error: unknown) {
-      const err = error as Error;
-      logger.error(`[StatsAggregator] Breakdown fetch failed: ${err.message}`);
+      const errorObject = error as Error;
+      logger.error(`[StatsAggregator] Breakdown fetch failed: ${errorObject.message}`);
       if (cached) return { ...cached.data, stale: true };
-      return { error: err.message };
+      return { error: errorObject.message };
     }
   }
 
@@ -89,10 +89,10 @@ export default class StatsAggregatorService {
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
     } catch (error: unknown) {
-      const err = error as Error;
-      logger.error(`[StatsAggregator] Project stats failed: ${err.message}`);
+      const errorObject = error as Error;
+      logger.error(`[StatsAggregator] Project stats failed: ${errorObject.message}`);
       if (cached) return { ...cached.data, stale: true };
-      return { error: err.message };
+      return { error: errorObject.message };
     }
   }
 
