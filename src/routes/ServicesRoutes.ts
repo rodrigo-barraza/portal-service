@@ -12,8 +12,8 @@ import type { ProjectEntry, EnrichedDependency, TtlCache, VaultRegistry } from "
 
 const router = Router();
 
-function resolveDockerDevice(svc: ProjectEntry) {
-  const deviceId = svc.device || "synology";
+function resolveDockerDevice(service: ProjectEntry) {
+  const deviceId = service.device || "synology";
   const device = DEVICES[deviceId];
 
   if (!device || !device.dockerApi) {
@@ -27,7 +27,7 @@ function enrichWithDependencies(services: Record<string, unknown>[], infrastruct
   const all = [...services, ...infrastructure] as Array<Record<string, unknown> & { id: string; name: string; dependsOn?: Array<string | { id: string; criticality?: string }>; dependedOnBy?: EnrichedDependency[] }>;
 
   // id → name lookup
-  const nameMap = Object.fromEntries(all.map((s) => [s.id, s.name]));
+  const nameMap = Object.fromEntries(all.map((serviceEntry) => [serviceEntry.id, serviceEntry.name]));
 
   // Normalize a dependency entry — handles raw string IDs,
   // structured { id, criticality } objects, and already-enriched
@@ -103,30 +103,30 @@ router.post("/check", asyncHandler(async (_req: Request, res: Response, next: Ne
 router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[String(id)];
+    const service = PROJECTS[String(id)];
 
-    if (!svc) {
+    if (!service) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
     }
 
-    if (!svc.dockerProject) {
-      return res.status(400).json({ error: `${svc.name} is not a containerized service` });
+    if (!service.dockerProject) {
+      return res.status(400).json({ error: `${service.name} is not a containerized service` });
     }
 
-    const target = resolveDockerDevice(svc);
+    const target = resolveDockerDevice(service);
     if (!target) {
-      return res.status(400).json({ error: `No Docker API configured for device: ${svc.device}` });
+      return res.status(400).json({ error: `No Docker API configured for device: ${service.device}` });
     }
 
-    const container = svc.dockerProject;
-    logger.info(`[Restart] ${svc.name} → ${target.id}:/containers/${container}/restart`);
+    const container = service.dockerProject;
+    logger.info(`[Restart] ${service.name} → ${target.id}:/containers/${container}/restart`);
 
     const result = await DockerStatsService.dockerRequest(
       target.device, "POST", `/containers/${container}/restart?t=10`,
     );
 
     if (result.statusCode === 204) {
-      logger.success(`[Restart] ${svc.name} restarted successfully`);
+      logger.success(`[Restart] ${service.name} restarted successfully`);
 
       // Trigger a fresh health check after a short delay
       setTimeout(() => {
@@ -135,13 +135,13 @@ router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, nex
 
       res.json({
         success: true,
-        service: svc.name,
+        service: service.name,
         device: target.id,
         message: "Container restarted",
       });
     } else {
       const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
-      logger.error(`[Restart] Failed for ${svc.name}: ${message}`);
+      logger.error(`[Restart] Failed for ${service.name}: ${message}`);
       res.status(502).json({ error: message });
     }
   } catch (error: unknown) {
@@ -153,30 +153,30 @@ router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, nex
 router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[String(id)];
+    const service = PROJECTS[String(id)];
 
-    if (!svc) {
+    if (!service) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
     }
 
-    if (!svc.dockerProject) {
-      return res.status(400).json({ error: `${svc.name} is not a containerized service` });
+    if (!service.dockerProject) {
+      return res.status(400).json({ error: `${service.name} is not a containerized service` });
     }
 
-    const target = resolveDockerDevice(svc);
+    const target = resolveDockerDevice(service);
     if (!target) {
-      return res.status(400).json({ error: `No Docker API configured for device: ${svc.device}` });
+      return res.status(400).json({ error: `No Docker API configured for device: ${service.device}` });
     }
 
-    const container = svc.dockerProject;
-    logger.info(`[Stop] ${svc.name} → ${target.id}:/containers/${container}/stop`);
+    const container = service.dockerProject;
+    logger.info(`[Stop] ${service.name} → ${target.id}:/containers/${container}/stop`);
 
     const result = await DockerStatsService.dockerRequest(
       target.device, "POST", `/containers/${container}/stop?t=10`,
     );
 
     if (result.statusCode === 204 || result.statusCode === 304) {
-      logger.success(`[Stop] ${svc.name} stopped successfully`);
+      logger.success(`[Stop] ${service.name} stopped successfully`);
 
       setTimeout(() => {
         ServiceRegistryService.checkAll().catch(() => {});
@@ -184,13 +184,13 @@ router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: 
 
       res.json({
         success: true,
-        service: svc.name,
+        service: service.name,
         device: target.id,
         message: result.statusCode === 304 ? "Container already stopped" : "Container stopped",
       });
     } else {
       const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
-      logger.error(`[Stop] Failed for ${svc.name}: ${message}`);
+      logger.error(`[Stop] Failed for ${service.name}: ${message}`);
       res.status(502).json({ error: message });
     }
   } catch (error: unknown) {
@@ -202,30 +202,30 @@ router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: 
 router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[String(id)];
+    const service = PROJECTS[String(id)];
 
-    if (!svc) {
+    if (!service) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
     }
 
-    if (!svc.dockerProject) {
-      return res.status(400).json({ error: `${svc.name} is not a containerized service` });
+    if (!service.dockerProject) {
+      return res.status(400).json({ error: `${service.name} is not a containerized service` });
     }
 
-    const target = resolveDockerDevice(svc);
+    const target = resolveDockerDevice(service);
     if (!target) {
-      return res.status(400).json({ error: `No Docker API configured for device: ${svc.device}` });
+      return res.status(400).json({ error: `No Docker API configured for device: ${service.device}` });
     }
 
-    const container = svc.dockerProject;
-    logger.info(`[Start] ${svc.name} → ${target.id}:/containers/${container}/start`);
+    const container = service.dockerProject;
+    logger.info(`[Start] ${service.name} → ${target.id}:/containers/${container}/start`);
 
     const result = await DockerStatsService.dockerRequest(
       target.device, "POST", `/containers/${container}/start`,
     );
 
     if (result.statusCode === 204 || result.statusCode === 304) {
-      logger.success(`[Start] ${svc.name} started successfully`);
+      logger.success(`[Start] ${service.name} started successfully`);
 
       setTimeout(() => {
         ServiceRegistryService.checkAll().catch(() => {});
@@ -233,13 +233,13 @@ router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next:
 
       res.json({
         success: true,
-        service: svc.name,
+        service: service.name,
         device: target.id,
         message: result.statusCode === 304 ? "Container already running" : "Container started",
       });
     } else {
       const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
-      logger.error(`[Start] Failed for ${svc.name}: ${message}`);
+      logger.error(`[Start] Failed for ${service.name}: ${message}`);
       res.status(502).json({ error: message });
     }
   } catch (error: unknown) {
@@ -251,22 +251,22 @@ router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next:
 router.get("/:id/rollback-status", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[String(id)];
+    const service = PROJECTS[String(id)];
 
-    if (!svc) {
+    if (!service) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
     }
 
-    if (!svc.dockerProject) {
+    if (!service.dockerProject) {
       return res.json({ available: false, reason: "Not a containerized service" });
     }
 
-    const target = resolveDockerDevice(svc);
+    const target = resolveDockerDevice(service);
     if (!target) {
       return res.json({ available: false, reason: "No Docker API configured" });
     }
 
-    const imageName = svc.dockerProject;
+    const imageName = service.dockerProject;
     const previousTag = `${imageName}:previous`;
 
     try {
@@ -282,7 +282,7 @@ router.get("/:id/rollback-status", asyncHandler(async (req: Request, res: Respon
 
       res.json({
         available: true,
-        service: svc.name,
+        service: service.name,
         device: target.id,
         previousImage: {
           tag: previousTag,
@@ -305,27 +305,27 @@ router.get("/:id/rollback-status", asyncHandler(async (req: Request, res: Respon
 router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const svc = PROJECTS[String(id)];
+    const service = PROJECTS[String(id)];
 
-    if (!svc) {
+    if (!service) {
       return res.status(404).json({ error: `Unknown service: ${id}` });
     }
 
-    if (!svc.dockerProject) {
-      return res.status(400).json({ error: `${svc.name} is not a containerized service` });
+    if (!service.dockerProject) {
+      return res.status(400).json({ error: `${service.name} is not a containerized service` });
     }
 
-    const target = resolveDockerDevice(svc);
+    const target = resolveDockerDevice(service);
     if (!target) {
-      return res.status(400).json({ error: `No Docker API configured for device: ${svc.device}` });
+      return res.status(400).json({ error: `No Docker API configured for device: ${service.device}` });
     }
 
-    const imageName = svc.dockerProject;
+    const imageName = service.dockerProject;
     const latestTag = `${imageName}:latest`;
     const previousTag = `${imageName}:previous`;
     const backupTag = `${imageName}:rollback-backup`;
 
-    logger.info(`[Rollback] ${svc.name} → checking for :previous image`);
+    logger.info(`[Rollback] ${service.name} → checking for :previous image`);
 
     // 1. Verify :previous exists
     try {
@@ -374,13 +374,13 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
     ).catch(() => {});
 
     // 5. Restart the container so it picks up the new :latest
-    logger.info(`[Rollback] Restarting ${svc.name} with rolled-back image`);
+    logger.info(`[Rollback] Restarting ${service.name} with rolled-back image`);
     const restartResult = await DockerStatsService.dockerRequest(
-      target.device, "POST", `/containers/${svc.dockerProject}/restart?t=10`,
+      target.device, "POST", `/containers/${service.dockerProject}/restart?t=10`,
     );
 
     if (restartResult.statusCode === 204) {
-      logger.success(`[Rollback] ${svc.name} rolled back and restarted successfully`);
+      logger.success(`[Rollback] ${service.name} rolled back and restarted successfully`);
 
       setTimeout(() => {
         ServiceRegistryService.checkAll().catch(() => {});
@@ -388,7 +388,7 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
 
       res.json({
         success: true,
-        service: svc.name,
+        service: service.name,
         device: target.id,
         message: "Rolled back to previous image and restarted",
       });
@@ -430,12 +430,12 @@ router.get("/sizes", asyncHandler(async (_req: Request, res: Response, next: Nex
       return res.json(cachedSize);
     }
 
-    const entries = Object.entries(PROJECTS).filter(([, svc]) => svc.repo);
+    const entries = Object.entries(PROJECTS).filter(([, projectEntry]) => projectEntry.repo);
     const sizes: Record<string, { sizeKB: number; sizeBytes: number }> = {};
 
     await Promise.allSettled(
-      entries.map(async ([id, svc]) => {
-        const match = svc.repo?.match(/github\.com\/(.+?)(?:\.git)?$/);
+      entries.map(async ([id, projectEntry]) => {
+        const match = projectEntry.repo?.match(/github\.com\/(.+?)(?:\.git)?$/);
         if (!match) return;
 
         const slug = match[1];
@@ -512,12 +512,12 @@ router.get("/languages", asyncHandler(async (_req: Request, res: Response, next:
       return res.json(cached);
     }
 
-    const entries = Object.entries(PROJECTS).filter(([, svc]) => svc.repo);
+    const entries = Object.entries(PROJECTS).filter(([, projectEntry]) => projectEntry.repo);
     const languages: Record<string, LanguageBreakdown> = {};
 
     await Promise.allSettled(
-      entries.map(async ([id, svc]) => {
-        const match = svc.repo?.match(/github\.com\/(.+?)(?:\.git)?$/);
+      entries.map(async ([id, projectEntry]) => {
+        const match = projectEntry.repo?.match(/github\.com\/(.+?)(?:\.git)?$/);
         if (!match) return;
 
         const slug = match[1];

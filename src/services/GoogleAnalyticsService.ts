@@ -159,8 +159,8 @@ export default class GoogleAnalyticsService {
       });
 
       const pages = formatRows(response, ["pagePath"], ["activeUsers"]);
-      const totalActive = pages.reduce((sum: number, p: TransformedGoogleAnalyticsRow) => {
-        const users = p.activeUsers;
+      const totalActive = pages.reduce((sum: number, page: TransformedGoogleAnalyticsRow) => {
+        const users = page.activeUsers;
         return sum + (typeof users === "number" ? users : 0);
       }, 0);
 
@@ -219,9 +219,9 @@ export default class GoogleAnalyticsService {
       const previous = parseRow(response?.rows?.[1]);
 
       // Compute deltas as fractional change (e.g. 0.15 = +15%)
-      const delta = (cur: number, prev: number) => {
-        if (!prev || prev === 0) return cur > 0 ? 1 : 0;
-        return (cur - prev) / Math.abs(prev);
+      const delta = (currentValue: number, previousValue: number) => {
+        if (!previousValue || previousValue === 0) return currentValue > 0 ? 1 : 0;
+        return (currentValue - previousValue) / Math.abs(previousValue);
       };
 
       return {
@@ -446,9 +446,9 @@ export default class GoogleAnalyticsService {
 
       // Format date from YYYYMMDD → YYYY-MM-DD
       return {
-        series: rows.map((r: TransformedGoogleAnalyticsRow) => ({
-          ...r,
-          date: String(r.date).replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"),
+        series: rows.map((row: TransformedGoogleAnalyticsRow) => ({
+          ...row,
+          date: String(row.date).replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"),
         })),
         period,
         fetchedAt: new Date().toISOString(),
@@ -548,9 +548,9 @@ export default class GoogleAnalyticsService {
 
       // Convert hour from string to int
       return {
-        cells: rows.map((r: TransformedGoogleAnalyticsRow) => ({
-          ...r,
-          hour: parseInt(String(r.hour), 10),
+        cells: rows.map((row: TransformedGoogleAnalyticsRow) => ({
+          ...row,
+          hour: parseInt(String(row.hour), 10),
         })),
         period,
         fetchedAt: new Date().toISOString(),

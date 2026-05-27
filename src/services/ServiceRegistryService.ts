@@ -52,21 +52,21 @@ function buildHostnameToDeviceMap() {
 
 const HOSTNAME_TO_DEVICE = buildHostnameToDeviceMap();
 
-function deriveHost(url: string, svc: ProjectEntry) {
-  if (!url) return DEVICES[svc.device]?.name || svc.device || "Unknown";
+function deriveHost(url: string, service: ProjectEntry) {
+  if (!url) return DEVICES[service.device]?.name || service.device || "Unknown";
   try {
     const parsed = new URL(url);
     return HOSTNAME_TO_DEVICE.get(parsed.hostname)
-      || DEVICES[svc.device]?.name
-      || svc.device
+      || DEVICES[service.device]?.name
+      || service.device
       || "Unknown";
   } catch {
-    return DEVICES[svc.device]?.name || svc.device || "Unknown";
+    return DEVICES[service.device]?.name || service.device || "Unknown";
   }
 }
 
-function toLocalHealthUrl(url: string, svc: ProjectEntry) {
-  if (!LOCAL_DEVICE_KEY || svc.device !== LOCAL_DEVICE_KEY) return url;
+function toLocalHealthUrl(url: string, service: ProjectEntry) {
+  if (!LOCAL_DEVICE_KEY || service.device !== LOCAL_DEVICE_KEY) return url;
   try {
     const parsed = new URL(url);
     parsed.hostname = "localhost";
@@ -107,28 +107,28 @@ const statusCache = new Map<string, ServiceStatus>();
 
 export default class ServiceRegistryService {
     static list(): ServiceStatus[] {
-    return Object.entries(PROJECTS).map(([id, svc]) => {
+    return Object.entries(PROJECTS).map(([id, service]) => {
       const cached = statusCache.get(id);
       return cached || {
         id,
-        name: svc.name,
-        url: svc.url,
-        port: svc.port || null,
-        environment: svc.environment,
-        visibility: svc.visibility,
-        projectType: svc.projectType || null,
-        description: svc.description || null,
-        db: svc.db || null,
-        minioBucket: svc.minioBucket || null,
-        repo: svc.repo || null,
-        npmPackage: svc.npmPackage || null,
-        device: deriveHost(svc.url, svc),
-        domain: svc.domain || null,
-        dependsOn: svc.dependsOn || [],
-        deployTier: svc.deployTier ?? null,
-        essential: svc.essential || false,
-        restartable: !!svc.dockerProject,
-        dockerProject: svc.dockerProject || null,
+        name: service.name,
+        url: service.url,
+        port: service.port || null,
+        environment: service.environment,
+        visibility: service.visibility,
+        projectType: service.projectType || null,
+        description: service.description || null,
+        db: service.db || null,
+        minioBucket: service.minioBucket || null,
+        repo: service.repo || null,
+        npmPackage: service.npmPackage || null,
+        device: deriveHost(service.url, service),
+        domain: service.domain || null,
+        dependsOn: service.dependsOn || [],
+        deployTier: service.deployTier ?? null,
+        essential: service.essential || false,
+        restartable: !!service.dockerProject,
+        dockerProject: service.dockerProject || null,
         healthy: false,
         responseTimeMs: null,
         metadata: null,
@@ -140,8 +140,8 @@ export default class ServiceRegistryService {
 
     static async checkAll() {
     const results = await Promise.all(
-      Object.entries(PROJECTS).map(([id, svc]) =>
-        ServiceRegistryService._checkService(id, svc),
+      Object.entries(PROJECTS).map(([id, service]) =>
+        ServiceRegistryService._checkService(id, service),
       ),
     );
 
@@ -156,28 +156,28 @@ export default class ServiceRegistryService {
 
     static HEALTH_CHECK_RETRY_DELAY_MS = 1500;
 
-    static async _checkService(id: string, svc: ProjectEntry) {
-    if (!svc.url) {
+    static async _checkService(id: string, service: ProjectEntry) {
+    if (!service.url) {
       return {
         id,
-        name: svc.name,
+        name: service.name,
         url: "",
-        port: svc.port || null,
-        environment: svc.environment,
-        visibility: svc.visibility,
-        projectType: svc.projectType || null,
-        description: svc.description || null,
-        db: svc.db || null,
-        minioBucket: svc.minioBucket || null,
-        repo: svc.repo || null,
-        npmPackage: svc.npmPackage || null,
-        device: deriveHost(svc.url, svc),
-        domain: svc.domain || null,
-        dependsOn: svc.dependsOn || [],
-        deployTier: svc.deployTier ?? null,
-        essential: svc.essential || false,
-        restartable: !!svc.dockerProject,
-        dockerProject: svc.dockerProject || null,
+        port: service.port || null,
+        environment: service.environment,
+        visibility: service.visibility,
+        projectType: service.projectType || null,
+        description: service.description || null,
+        db: service.db || null,
+        minioBucket: service.minioBucket || null,
+        repo: service.repo || null,
+        npmPackage: service.npmPackage || null,
+        device: deriveHost(service.url, service),
+        domain: service.domain || null,
+        dependsOn: service.dependsOn || [],
+        deployTier: service.deployTier ?? null,
+        essential: service.essential || false,
+        restartable: !!service.dockerProject,
+        dockerProject: service.dockerProject || null,
         healthy: false,
         responseTimeMs: null,
         metadata: null,
@@ -198,11 +198,11 @@ export default class ServiceRegistryService {
         await new Promise((r) => setTimeout(r, ServiceRegistryService.HEALTH_CHECK_RETRY_DELAY_MS));
       }
 
-      lastResult = await ServiceRegistryService._attemptHealthCheck(id, svc);
+      lastResult = await ServiceRegistryService._attemptHealthCheck(id, service);
 
       if (lastResult?.healthy) {
         if (attempt > 1) {
-          logger.info(`[ServiceRegistry] ${svc.name} recovered on retry ${attempt - 1}`);
+          logger.info(`[ServiceRegistry] ${service.name} recovered on retry ${attempt - 1}`);
         }
         return lastResult;
       }
@@ -211,7 +211,7 @@ export default class ServiceRegistryService {
     return lastResult as ServiceStatus;
   }
 
-    static async _attemptHealthCheck(id: string, svc: ProjectEntry) {
+    static async _attemptHealthCheck(id: string, service: ProjectEntry) {
     const start = Date.now();
 
     try {
@@ -221,8 +221,8 @@ export default class ServiceRegistryService {
         HEALTH_CHECK_TIMEOUT_MS,
       );
 
-      const publicHealthUrl = `${svc.url}${svc.healthPath || "/"}`;
-      const healthUrl = toLocalHealthUrl(publicHealthUrl, svc);
+      const publicHealthUrl = `${service.url}${service.healthPath || "/"}`;
+      const healthUrl = toLocalHealthUrl(publicHealthUrl, service);
       const response = await fetch(healthUrl, {
         signal: controller.signal,
         headers: { Accept: "application/json" },
@@ -240,24 +240,24 @@ export default class ServiceRegistryService {
 
       return {
         id,
-        name: svc.name,
-        url: svc.url,
-        port: svc.port || null,
-        environment: svc.environment,
-        visibility: svc.visibility,
-        projectType: svc.projectType || null,
-        description: svc.description || null,
-        db: svc.db || null,
-        minioBucket: svc.minioBucket || null,
-        repo: svc.repo || null,
-        npmPackage: svc.npmPackage || null,
-        device: deriveHost(svc.url, svc),
-        domain: svc.domain || null,
-        dependsOn: svc.dependsOn || [],
-        deployTier: svc.deployTier ?? null,
-        essential: svc.essential || false,
-        restartable: !!svc.dockerProject,
-        dockerProject: svc.dockerProject || null,
+        name: service.name,
+        url: service.url,
+        port: service.port || null,
+        environment: service.environment,
+        visibility: service.visibility,
+        projectType: service.projectType || null,
+        description: service.description || null,
+        db: service.db || null,
+        minioBucket: service.minioBucket || null,
+        repo: service.repo || null,
+        npmPackage: service.npmPackage || null,
+        device: deriveHost(service.url, service),
+        domain: service.domain || null,
+        dependsOn: service.dependsOn || [],
+        deployTier: service.deployTier ?? null,
+        essential: service.essential || false,
+        restartable: !!service.dockerProject,
+        dockerProject: service.dockerProject || null,
         healthy: response.ok,
         responseTimeMs,
         metadata,
@@ -266,27 +266,27 @@ export default class ServiceRegistryService {
       } as ServiceStatus;
     } catch (error: unknown) {
       const errorDetail = ServiceRegistryService._extractErrorDetail(error);
-      logger.warn(`[ServiceRegistry] ${svc.name} unreachable: ${errorDetail}`);
+      logger.warn(`[ServiceRegistry] ${service.name} unreachable: ${errorDetail}`);
       return {
         id,
-        name: svc.name,
-        url: svc.url,
-        port: svc.port || null,
-        environment: svc.environment,
-        visibility: svc.visibility,
-        projectType: svc.projectType || null,
-        description: svc.description || null,
-        db: svc.db || null,
-        minioBucket: svc.minioBucket || null,
-        repo: svc.repo || null,
-        npmPackage: svc.npmPackage || null,
-        device: deriveHost(svc.url, svc),
-        domain: svc.domain || null,
-        dependsOn: svc.dependsOn || [],
-        deployTier: svc.deployTier ?? null,
-        essential: svc.essential || false,
-        restartable: !!svc.dockerProject,
-        dockerProject: svc.dockerProject || null,
+        name: service.name,
+        url: service.url,
+        port: service.port || null,
+        environment: service.environment,
+        visibility: service.visibility,
+        projectType: service.projectType || null,
+        description: service.description || null,
+        db: service.db || null,
+        minioBucket: service.minioBucket || null,
+        repo: service.repo || null,
+        npmPackage: service.npmPackage || null,
+        device: deriveHost(service.url, service),
+        domain: service.domain || null,
+        dependsOn: service.dependsOn || [],
+        deployTier: service.deployTier ?? null,
+        essential: service.essential || false,
+        restartable: !!service.dockerProject,
+        dockerProject: service.dockerProject || null,
         healthy: false,
         responseTimeMs: Date.now() - start,
         metadata: null,

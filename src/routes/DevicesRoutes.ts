@@ -21,18 +21,18 @@ router.get("/", (_req: Request, res: Response) => {
   const devices = Object.entries(DEVICES).map(([deviceId, device]) => {
     // Application services on this device
     const hostedServices = Object.entries(PROJECTS)
-      .filter(([, svc]) => (svc as ProjectEntry).device === deviceId)
-      .map(([svcId, svc]) => {
-        const status = statusMap.get(svcId);
+      .filter(([, service]) => (service as ProjectEntry).device === deviceId)
+      .map(([serviceId, service]) => {
+        const status = statusMap.get(serviceId);
         return {
-          id: svcId,
-          name: svc.name,
-          url: svc.url,
-          port: extractPort(svc.url),
-          environment: svc.environment,
-          visibility: svc.visibility,
-          dockerProject: svc.dockerProject || null,
-          deployTier: svc.deployTier ?? null,
+          id: serviceId,
+          name: service.name,
+          url: service.url,
+          port: extractPort(service.url),
+          environment: service.environment,
+          visibility: service.visibility,
+          dockerProject: service.dockerProject || null,
+          deployTier: service.deployTier ?? null,
           healthy: status?.healthy ?? false,
           responseTimeMs: status?.responseTimeMs ?? null,
           error: status?.error ?? null,

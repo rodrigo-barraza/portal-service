@@ -87,21 +87,21 @@ function parseTransport(dockerApi: string, path: string): DockerTransport {
 
 function getDockerDevices(): Array<{ id: string; device: DeviceEntry }> {
   return Object.entries(DEVICES)
-    .filter(([, dev]) => dev.dockerApi)
-    .map(([id, dev]) => ({ id, device: dev }));
+    .filter(([, deviceEntry]) => deviceEntry.dockerApi)
+    .map(([id, deviceEntry]) => ({ id, device: deviceEntry }));
 }
 
 export default class DockerStatsService {
     static async getAll(deviceId?: string) {
     const devices = getDockerDevices();
     const targets = deviceId
-      ? devices.filter((d) => d.id === deviceId)
+      ? devices.filter((deviceEntry) => deviceEntry.id === deviceId)
       : devices;
 
     if (targets.length === 0) return [];
 
     const results = await Promise.allSettled(
-      targets.map((t) => DockerStatsService._getAllForDevice(t.id, t.device)),
+      targets.map((target) => DockerStatsService._getAllForDevice(target.id, target.device)),
     );
 
     const combined: ContainerStats[] = [];
@@ -123,11 +123,11 @@ export default class DockerStatsService {
     try {
       const containers = await DockerStatsService._listContainers(device);
       const stats = await Promise.all(
-        containers.map((c: Record<string, unknown>) => {
-          if (c.State !== "running") {
-            return DockerStatsService._buildStoppedSkeleton(c, deviceId);
+        containers.map((containerEntry: Record<string, unknown>) => {
+          if (containerEntry.State !== "running") {
+            return DockerStatsService._buildStoppedSkeleton(containerEntry, deviceId);
           }
-          return DockerStatsService._getContainerStats(c, device, deviceId);
+          return DockerStatsService._getContainerStats(containerEntry, device, deviceId);
         }),
       );
 
@@ -136,7 +136,7 @@ export default class DockerStatsService {
       // Prune stale CPU counters for this device
       const counters = cpuCounterMap.get(deviceId);
       if (counters) {
-        const activeIds = new Set(containers.map((c: Record<string, unknown>) => c.Id));
+        const activeIds = new Set(containers.map((containerEntry: Record<string, unknown>) => containerEntry.Id));
         for (const id of counters.keys()) {
           if (!activeIds.has(id)) counters.delete(id);
         }
@@ -216,17 +216,17 @@ export default class DockerStatsService {
         containers: {} as ContainerSnapshot["containers"],
       };
 
-      for (const s of stats) {
-        snapshot.containers[s.name] = {
-          cpu: s.cpu.percent,
-          memoryUsed: s.memory.used,
-          memoryLimit: s.memory.limit,
-          memoryPercent: s.memory.percent,
-          blockRead: s.blockIO.read,
-          blockWrite: s.blockIO.write,
-          netRx: s.network.rx,
-          netTx: s.network.tx,
-          pids: s.pids,
+      for (const containerStats of stats) {
+        snapshot.containers[containerStats.name] = {
+          cpu: containerStats.cpu.percent,
+          memoryUsed: containerStats.memory.used,
+          memoryLimit: containerStats.memory.limit,
+          memoryPercent: containerStats.memory.percent,
+          blockRead: containerStats.blockIO.read,
+          blockWrite: containerStats.blockIO.write,
+          netRx: containerStats.network.rx,
+          netTx: containerStats.network.tx,
+          pids: containerStats.pids,
         };
       }
 
@@ -285,19 +285,19 @@ export default class DockerStatsService {
     static _buildStoppedSkeleton(container: Record<string, unknown>, deviceId: string): ContainerStats {
     const name = ((container.Names as string[] | undefined)?.[0] || "unknown").replace(/^\//, "");
     const command = (container.Command as string) || "";
-    const ports = ((container.Ports as Record<string, unknown>[]) || []).map((p: Record<string, unknown>) => ({
-      ip: (p.IP as string) || "",
-      privatePort: p.PrivatePort as number,
-      publicPort: p.PublicPort as number,
-      type: p.Type as string,
+    const ports = ((container.Ports as Record<string, unknown>[]) || []).map((portEntry: Record<string, unknown>) => ({
+      ip: (portEntry.IP as string) || "",
+      privatePort: portEntry.PrivatePort as number,
+      publicPort: portEntry.PublicPort as number,
+      type: portEntry.Type as string,
     }));
-    const mounts = ((container.Mounts as Record<string, unknown>[]) || []).map((m: Record<string, unknown>) => ({
-      type: m.Type as string,
-      name: (m.Name as string) || "",
-      source: m.Source as string,
-      destination: m.Destination as string,
-      mode: (m.Mode as string) || "rw",
-      rw: (m.RW as boolean) ?? true,
+    const mounts = ((container.Mounts as Record<string, unknown>[]) || []).map((mountEntry: Record<string, unknown>) => ({
+      type: mountEntry.Type as string,
+      name: (mountEntry.Name as string) || "",
+      source: mountEntry.Source as string,
+      destination: mountEntry.Destination as string,
+      mode: (mountEntry.Mode as string) || "rw",
+      rw: (mountEntry.RW as boolean) ?? true,
     }));
     const labels = (container.Labels as Record<string, string>) || {};
 
@@ -345,12 +345,12 @@ export default class DockerStatsService {
       cpuCounterMap.set(deviceId, new Map());
     }
     const deviceCounters = cpuCounterMap.get(deviceId);
-    const prev = deviceCounters.get(container.Id);
+     const previousCpuState = deviceCounters.get(container.Id);
 
     let cpuPercent = 0;
-    if (prev) {
-      const cpuDelta = currentCpuTotal - prev.cpuTotal;
-      const systemDelta = currentSystemTotal - prev.systemTotal;
+    if (previousCpuState) {
+      const cpuDelta = currentCpuTotal - previousCpuState.cpuTotal;
+      const systemDelta = currentSystemTotal - previousCpuState.systemTotal;
       if (systemDelta > 0 && cpuDelta > 0) {
         cpuPercent = (cpuDelta / systemDelta) * numCpus * 100;
       }
@@ -432,19 +432,19 @@ export default class DockerStatsService {
 
     // ── Container Metadata ────────────────────────────────────
     const command = (container.Command as string) || "";
-    const ports = ((container.Ports as Record<string, unknown>[]) || []).map((p: Record<string, unknown>) => ({
-      ip: (p.IP as string) || "",
-      privatePort: p.PrivatePort as number,
-      publicPort: p.PublicPort as number,
-      type: p.Type as string,
+    const ports = ((container.Ports as Record<string, unknown>[]) || []).map((portEntry: Record<string, unknown>) => ({
+      ip: (portEntry.IP as string) || "",
+      privatePort: portEntry.PrivatePort as number,
+      publicPort: portEntry.PublicPort as number,
+      type: portEntry.Type as string,
     }));
-    const mounts = ((container.Mounts as Record<string, unknown>[]) || []).map((m: Record<string, unknown>) => ({
-      type: m.Type as string,
-      name: (m.Name as string) || "",
-      source: m.Source as string,
-      destination: m.Destination as string,
-      mode: (m.Mode as string) || "rw",
-      rw: (m.RW as boolean) ?? true,
+    const mounts = ((container.Mounts as Record<string, unknown>[]) || []).map((mountEntry: Record<string, unknown>) => ({
+      type: mountEntry.Type as string,
+      name: (mountEntry.Name as string) || "",
+      source: mountEntry.Source as string,
+      destination: mountEntry.Destination as string,
+      mode: (mountEntry.Mode as string) || "rw",
+      rw: (mountEntry.RW as boolean) ?? true,
     }));
     const labels = (container.Labels as Record<string, string>) || {};
     const name = ((container.Names as string[] | undefined)?.[0] || "unknown").replace(/^\//, "");
@@ -488,22 +488,22 @@ export default class DockerStatsService {
     const devices = getDockerDevices();
 
     if (deviceId) {
-      const target = devices.find((d) => d.id === deviceId);
+      const target = devices.find((deviceEntry) => deviceEntry.id === deviceId);
       if (!target) throw new Error(`Unknown Docker device: ${deviceId}`);
       return DockerStatsService._getSystemInfoForDevice(target.id, target.device);
     }
 
     // Return system info for all Docker hosts
     const results = await Promise.allSettled(
-      devices.map((t) =>
-        DockerStatsService._getSystemInfoForDevice(t.id, t.device)
-          .then((info) => ({ deviceId: t.id, deviceName: t.device.name, ...info })),
+      devices.map((deviceTarget) =>
+        DockerStatsService._getSystemInfoForDevice(deviceTarget.id, deviceTarget.device)
+          .then((info) => ({ deviceId: deviceTarget.id, deviceName: deviceTarget.device.name, ...info })),
       ),
     );
 
     return results
-      .filter((r): r is PromiseFulfilledResult<Record<string, unknown>> => r.status === "fulfilled")
-      .map((r) => r.value);
+      .filter((promiseResult): promiseResult is PromiseFulfilledResult<Record<string, unknown>> => promiseResult.status === "fulfilled")
+      .map((promiseResult) => promiseResult.value);
   }
 
     static async _getSystemInfoForDevice(deviceId: string, device: DeviceEntry) {
@@ -535,14 +535,14 @@ export default class DockerStatsService {
       const totalImageShared = images.reduce((sum: number, image: { sharedSize: number }) => sum + image.sharedSize, 0);
 
       // ── Volume disk usage ───────────────────────────────────
-      const volumes = ((df.Volumes as Record<string, unknown>[]) || []).map((vol: Record<string, unknown>) => ({
-        name: vol.Name as string,
-        driver: vol.Driver as string,
-        size: (vol.UsageData as Record<string, number>)?.Size || 0,
-        refCount: (vol.UsageData as Record<string, number>)?.RefCount || 0,
+      const volumes = ((df.Volumes as Record<string, unknown>[]) || []).map((volume: Record<string, unknown>) => ({
+        name: volume.Name as string,
+        driver: volume.Driver as string,
+        size: (volume.UsageData as Record<string, number>)?.Size || 0,
+        refCount: (volume.UsageData as Record<string, number>)?.RefCount || 0,
       }));
 
-      const totalVolumeSize = volumes.reduce((sum: number, vol: { size: number }) => sum + vol.size, 0);
+      const totalVolumeSize = volumes.reduce((sum: number, volume: { size: number }) => sum + volume.size, 0);
 
       // ── Build cache disk usage ──────────────────────────────
       const buildCache = (df.BuildCache as Record<string, unknown>[]) || [];
@@ -552,16 +552,16 @@ export default class DockerStatsService {
       );
 
       // ── Container disk usage ────────────────────────────────
-      const containersDf = ((df.Containers as Record<string, unknown>[]) || []).map((c: Record<string, unknown>) => ({
-        id: (c.Id as string)?.substring(0, 12) || "unknown",
-        names: (c.Names as string[]) || [],
-        sizeRw: (c.SizeRw as number) || 0,
-        sizeRootFs: (c.SizeRootFs as number) || 0,
-        state: c.State as string,
+      const containersDf = ((df.Containers as Record<string, unknown>[]) || []).map((containerEntry: Record<string, unknown>) => ({
+        id: (containerEntry.Id as string)?.substring(0, 12) || "unknown",
+        names: (containerEntry.Names as string[]) || [],
+        sizeRw: (containerEntry.SizeRw as number) || 0,
+        sizeRootFs: (containerEntry.SizeRootFs as number) || 0,
+        state: containerEntry.State as string,
       }));
 
       const totalContainerRw = containersDf.reduce(
-        (sum: number, c: { sizeRw: number }) => sum + c.sizeRw,
+        (sum: number, containerEntry: { sizeRw: number }) => sum + containerEntry.sizeRw,
         0,
       );
 

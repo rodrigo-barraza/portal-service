@@ -168,14 +168,14 @@ app.use(errorHandler);
     ServiceRegistryService.checkAll(),
     InfrastructureRegistryService.checkAll(),
   ])
-    .then(([svcResults, infraResults]) => {
-      const svcHealthy = svcResults.filter((s) => s && s.healthy).length;
-      const infraHealthy = infraResults.filter((s) => s && s.healthy).length;
+    .then(([serviceResults, infraResults]) => {
+      const serviceHealthyCount = serviceResults.filter((result) => result && result.healthy).length;
+      const infraHealthyCount = infraResults.filter((result) => result && result.healthy).length;
       logger.info(
-        `[ServiceRegistry] ${svcHealthy}/${svcResults.length} services healthy`,
+        `[ServiceRegistry] ${serviceHealthyCount}/${serviceResults.length} services healthy`,
       );
       logger.info(
-        `[InfraRegistry] ${infraHealthy}/${infraResults.length} infrastructure healthy`,
+        `[InfraRegistry] ${infraHealthyCount}/${infraResults.length} infrastructure healthy`,
       );
     })
     .catch((error: unknown) => {

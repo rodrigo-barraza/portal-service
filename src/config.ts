@@ -19,9 +19,9 @@ export const GITHUB_PAT = process.env.GITHUB_PAT || "";
 // Populated from the registry's `devices` section at boot.
 export let DEVICES: Record<string, DeviceEntry> = {};
 
-function inferProjectType(id: string, svc: VaultRegistryProject) {
-  if (svc.projectType) return svc.projectType;
-  if (!svc.repo && !svc.dockerProject) return "Infrastructure";
+function inferProjectType(id: string, service: VaultRegistryProject) {
+  if (service.projectType) return service.projectType;
+  if (!service.repo && !service.dockerProject) return "Infrastructure";
   if (id.endsWith("-client")) return "Client";
   if (id.endsWith("-bot")) return "Bot";
   return "Service";
@@ -60,26 +60,26 @@ export function initializeRegistry(registry: VaultRegistry) {
 
   const projects: Record<string, ProjectEntry> = {};
 
-  for (const svc of registry.projects) {
-    projects[svc.id] = {
-      name: svc.label,
-      url: svc.url || "",
-      port: svc.port || null,
-      healthPath: svc.healthPath || "/",
+  for (const service of registry.projects) {
+    projects[service.id] = {
+      name: service.label,
+      url: service.url || "",
+      port: service.port || null,
+      healthPath: service.healthPath || "/",
       environment: "Production",
-      visibility: svc.visibility || "internal",
-      projectType: inferProjectType(svc.id, svc),
-      description: svc.description || null,
-      db: svc.db || null,
-      minioBucket: svc.minioBucket || null,
-      repo: normalizeRepoUrl(svc.repo || null),
-      npmPackage: svc.npmPackage || null,
-      device: svc.device || "synology",
-      domain: svc.domain || null,
-      dockerProject: svc.dockerProject || null,
-      deployTier: svc.deployTier ?? inferDeployTier(inferProjectType(svc.id, svc)),
-      essential: svc.essential || false,
-      dependsOn: (svc.dependsOn || []).map((dep: { id: string; criticality?: string }) => ({
+      visibility: service.visibility || "internal",
+      projectType: inferProjectType(service.id, service),
+      description: service.description || null,
+      db: service.db || null,
+      minioBucket: service.minioBucket || null,
+      repo: normalizeRepoUrl(service.repo || null),
+      npmPackage: service.npmPackage || null,
+      device: service.device || "synology",
+      domain: service.domain || null,
+      dockerProject: service.dockerProject || null,
+      deployTier: service.deployTier ?? inferDeployTier(inferProjectType(service.id, service)),
+      essential: service.essential || false,
+      dependsOn: (service.dependsOn || []).map((dep: { id: string; criticality?: string }) => ({
         id: dep.id,
         criticality: dep.criticality || "required",
       })),
@@ -92,12 +92,12 @@ export function initializeRegistry(registry: VaultRegistry) {
   // Derive GA4 properties from project entries that declare an
   // analyticsPropertyId — replaces the old GOOGLE_ANALYTICS_PROPERTIES env var.
   ANALYTICS_PROPERTIES = (registry.projects || [])
-    .filter((svc: VaultRegistryProject) => svc.analyticsPropertyId)
-    .map((svc: VaultRegistryProject) => ({
-      id: svc.analyticsPropertyId!,
-      label: svc.label,
-      measurementId: svc.analyticsMeasurementId || "",
-      serviceId: svc.id,
+    .filter((service: VaultRegistryProject) => service.analyticsPropertyId)
+    .map((service: VaultRegistryProject) => ({
+      id: service.analyticsPropertyId!,
+      label: service.label,
+      measurementId: service.analyticsMeasurementId || "",
+      serviceId: service.id,
     }));
 
   const infra: Record<string, InfrastructureEntry> = {};

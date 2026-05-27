@@ -31,9 +31,9 @@ function deriveEcosystemOwners(): EcosystemOwners {
   const scopePrefixes = new Set<string>();
   const projectOwners = new Map<string, string>();
 
-  for (const [id, svc] of Object.entries(PROJECTS)) {
-    if (!svc.repo) continue;
-    const match = svc.repo.match(/github\.com\/([^/]+)\//);
+  for (const [id, service] of Object.entries(PROJECTS)) {
+    if (!service.repo) continue;
+    const match = service.repo.match(/github\.com\/([^/]+)\//);
     if (match) {
       const owner = match[1];
       owners.add(owner);
@@ -97,12 +97,12 @@ export default class CodeAnalysisService {
     const dependencies: Record<string, ProjectAnalysis> = {};
     const repoSizes: Record<string, { sizeKB: number; sizeBytes: number }> = {};
 
-    const entries = Object.entries(PROJECTS).filter(([, svc]) => svc.repo);
+    const entries = Object.entries(PROJECTS).filter(([, service]) => service.repo);
 
     await Promise.allSettled(
-      entries.map(async ([id, svc]) => {
-        if (!svc.repo) return;
-        const slug = CodeAnalysisService._extractSlug(svc.repo);
+      entries.map(async ([id, service]) => {
+        if (!service.repo) return;
+        const slug = CodeAnalysisService._extractSlug(service.repo);
         if (!slug) return;
 
         try {
