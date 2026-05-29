@@ -8,6 +8,25 @@ import type { ObjectListResult } from "../types.ts";
 
 const router = Router();
 
+router.get("/search", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const query = typeof req.query.query === "string" ? req.query.query.trim() : "";
+    if (!query || query.length > 200) {
+      return res.status(400).json({ error: "Query parameter required (1–200 characters)" });
+    }
+
+    const bucket = typeof req.query.bucket === "string" ? req.query.bucket : undefined;
+    const rawLimit = parseInt(String(req.query.limit || "200"), 10);
+    const limit = Math.min(Math.max(rawLimit, 1), 500);
+
+    const searchResult = await MinioService.searchObjects(query, { bucket, limit });
+    res.json(searchResult);
+  } catch (error: unknown) {
+    logger.error(`[ObjectStore] search failed: ${(error as Error).message}`);
+    next(error);
+  }
+}, "Storage_Search"));
+
 // ── MIME type inference from extension ────────────────────────
 const EXT_TO_MIME: Record<string, string> = {
   ".png": "image/png",

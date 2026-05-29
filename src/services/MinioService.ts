@@ -158,4 +158,55 @@ export default class MinioService {
     const mc = MinioService._getClient();
     return mc.removeObject(bucketName, objectName);
   }
+
+    static async searchObjects(
+    query: string,
+    { bucket, limit = 200 }: { bucket?: string; limit?: number } = {},
+  ): Promise<{ results: Array<MinioObjectEntry & { bucket: string }>; totalScanned: number; truncated: boolean }> {
+    const mc = MinioService._getClient();
+    const normalizedQuery = query.toLowerCase();
+    const results: Array<MinioObjectEntry & { bucket: string }> = [];
+    let totalScanned = 0;
+    let truncated = false;
+
+    const bucketsToSearch = bucket
+      ? [{ name: bucket }]
+      : (await mc.listBuckets()).map((b) => ({ name: b.name }));
+
+    for (const targetBucket of bucketsToSearch) {
+      if (truncated) break;
+
+      await new Promise<void>((resolve, reject) => {
+        const stream = mc.listObjectsV2(targetBucket.name, "", true);
+
+        stream.on("data", (item) => {
+          if (item.prefix) return;
+          totalScanned++;
+
+          const objectName = item.name || "";
+          if (objectName.toLowerCase().includes(normalizedQuery)) {
+            results.push({
+              name: objectName,
+              size: item.size,
+              lastModified: item.lastModified?.toISOString() || null,
+              etag: item.etag || null,
+              bucket: targetBucket.name,
+            });
+
+            if (results.length >= limit) {
+              truncated = true;
+              stream.destroy();
+              resolve();
+              return;
+            }
+          }
+        });
+
+        stream.on("end", resolve);
+        stream.on("error", reject);
+      });
+    }
+
+    return { results, totalScanned, truncated };
+  }
 }
