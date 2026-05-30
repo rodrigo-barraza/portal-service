@@ -98,6 +98,7 @@ export function initializeRegistry(registry: VaultRegistry) {
       label: service.label,
       measurementId: service.analyticsMeasurementId || "",
       serviceId: service.id,
+      domain: service.domain || null,
     }));
 
   const infra: Record<string, InfrastructureEntry> = {};

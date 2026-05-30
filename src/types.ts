@@ -196,6 +196,7 @@ export interface AnalyticsProperty {
   label: string;
   measurementId: string;
   serviceId: string;
+  domain: string | null;
 }
 
 export interface VaultRegistry {
