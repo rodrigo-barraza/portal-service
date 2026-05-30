@@ -65,25 +65,52 @@ function getProperties() {
   return ANALYTICS_PROPERTIES;
 }
 
-// ── Date Range Helpers ─────────────────────────────────────────
-
 function periodToDateRange(period: string = "30d") {
-  const map: Record<string, string> = {
+  const presetMap: Record<string, string> = {
     "7d": "7daysAgo",
     "30d": "30daysAgo",
     "90d": "90daysAgo",
   };
+
+  if (period.includes("_")) {
+    const [startDate, endDate] = period.split("_");
+    if (startDate && endDate) {
+      return {
+        startDate,
+        endDate,
+      };
+    }
+  }
+
   return {
-    startDate: map[period] || "30daysAgo",
+    startDate: presetMap[period] || "30daysAgo",
     endDate: "today",
   };
 }
 
 function previousPeriodRange(period: string = "30d") {
-  const days = parseInt(period) || 30;
+  if (period.includes("_")) {
+    const [startDateString, endDateString] = period.split("_");
+    if (startDateString && endDateString) {
+      const startDate = new Date(startDateString);
+      const endDate = new Date(endDateString);
+      const millisecondsDifference = endDate.getTime() - startDate.getTime();
+      
+      const previousEndDate = new Date(startDate.getTime() - 24 * 60 * 60 * 1000);
+      const previousStartDate = new Date(previousEndDate.getTime() - millisecondsDifference);
+      
+      const formatDate = (date: Date) => date.toISOString().split("T")[0];
+      return {
+        startDate: formatDate(previousStartDate),
+        endDate: formatDate(previousEndDate),
+      };
+    }
+  }
+
+  const daysCount = parseInt(period, 10) || 30;
   return {
-    startDate: `${days * 2}daysAgo`,
-    endDate: `${days + 1}daysAgo`,
+    startDate: `${daysCount * 2}daysAgo`,
+    endDate: `${daysCount + 1}daysAgo`,
   };
 }
 
