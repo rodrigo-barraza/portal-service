@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { SESSIONS_SERVICE_URL } from "../config.ts";
 
 /**
@@ -42,8 +43,7 @@ async function proxy(
     const data = await response.json();
     return res.status(response.status).json(data);
   } catch (error: unknown) {
-    const errorObject = error as Error;
-    logger.error(`[SessionAnalytics] Proxy error: ${errorObject.message}`);
+    logger.error(`[SessionAnalytics] Proxy error: ${getErrorMessage(error)}`);
     next(error);
   }
 }

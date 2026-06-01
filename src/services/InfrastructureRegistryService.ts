@@ -13,6 +13,7 @@ import {
   MONGO_URI,
 } from "../config.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 function buildHostnameToDeviceMap() {
   const map = new Map();
@@ -124,8 +125,8 @@ export default class InfrastructureRegistryService {
         checkedAt: new Date().toISOString(),
       };
     } catch (error: unknown) {
-      const errorObject = error as Error;
-      logger.warn(`[InfraRegistry] ${infra.name} unreachable: ${errorObject.message}`);
+      const errorObject = error instanceof Error ? error : new Error(String(error));
+      logger.warn(`[InfraRegistry] ${infra.name} unreachable: ${getErrorMessage(error)}`);
       return {
         ...base,
         healthy: false,
@@ -202,7 +203,7 @@ export default class InfrastructureRegistryService {
 
     return {
       buckets: buckets.length,
-      bucketNames: buckets.map((b) => b.name),
+      bucketNames: buckets.map((bucket) => bucket.name),
     };
   }
 

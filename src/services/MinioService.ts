@@ -7,6 +7,7 @@ import {
   MINIO_SECRET_KEY,
 } from "../config.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 interface MinioObjectEntry {
   name: string;
@@ -18,7 +19,7 @@ interface MinioObjectEntry {
 export default class MinioService {
   static client: Client | null = null;
 
-    static _getClient() {
+  static _getClient() {
     if (MinioService.client) return MinioService.client;
 
     if (!MINIO_ENDPOINT) {
@@ -37,9 +38,10 @@ export default class MinioService {
     logger.info(`[MinioService] Client initialized → ${MINIO_ENDPOINT}`);
     return MinioService.client;
   }
-    static async listBuckets() {
-    const mc = MinioService._getClient();
-    const rawBuckets = await mc.listBuckets();
+
+  static async listBuckets() {
+    const minioClient = MinioService._getClient();
+    const rawBuckets = await minioClient.listBuckets();
 
     // Gather object counts + total sizes in parallel
     const enriched = await Promise.all(
@@ -49,7 +51,7 @@ export default class MinioService {
 
         try {
           await new Promise<void>((resolve, reject) => {
-            const stream = mc.listObjectsV2(bucket.name, "", true);
+            const stream = minioClient.listObjectsV2(bucket.name, "", true);
             stream.on("data", (object) => {
               objectCount++;
               totalSize += object.size || 0;
@@ -58,7 +60,7 @@ export default class MinioService {
             stream.on("error", reject);
           });
         } catch (error: unknown) {
-          logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${(error as Error).message}`);
+          logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${getErrorMessage(error)}`);
         }
 
         return {
@@ -73,9 +75,9 @@ export default class MinioService {
     return enriched;
   }
 
-    static async *streamBuckets() {
-    const mc = MinioService._getClient();
-    const rawBuckets = await mc.listBuckets();
+  static async *streamBuckets() {
+    const minioClient = MinioService._getClient();
+    const rawBuckets = await minioClient.listBuckets();
 
     // Yield the total count first so the client knows how many to expect
     yield { type: "init", totalBuckets: rawBuckets.length };
@@ -86,7 +88,7 @@ export default class MinioService {
 
       try {
         await new Promise<void>((resolve, reject) => {
-          const stream = mc.listObjectsV2(bucket.name, "", true);
+          const stream = minioClient.listObjectsV2(bucket.name, "", true);
           stream.on("data", (object) => {
             objectCount++;
             totalSize += object.size || 0;
@@ -95,7 +97,7 @@ export default class MinioService {
           stream.on("error", reject);
         });
       } catch (error: unknown) {
-        logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${(error as Error).message}`);
+        logger.warn(`[MinioService] Failed to count objects in ${bucket.name}: ${getErrorMessage(error)}`);
       }
 
       yield {
@@ -110,14 +112,14 @@ export default class MinioService {
     }
   }
 
-    static async listObjects(bucketName: string, prefix: string = "", recursive: boolean = false) {
-    const mc = MinioService._getClient();
+  static async listObjects(bucketName: string, prefix: string = "", recursive: boolean = false) {
+    const minioClient = MinioService._getClient();
 
     return new Promise<{ objects: MinioObjectEntry[], prefixes: string[] }>((resolve, reject) => {
       const objects: MinioObjectEntry[] = [];
       const prefixes = new Set<string>();
 
-      const stream = mc.listObjectsV2(bucketName, prefix, recursive);
+      const stream = minioClient.listObjectsV2(bucketName, prefix, recursive);
 
       stream.on("data", (item) => {
         if (item.prefix) {
@@ -144,26 +146,26 @@ export default class MinioService {
     });
   }
 
-    static async statObject(bucketName: string, objectName: string) {
-    const mc = MinioService._getClient();
-    return mc.statObject(bucketName, objectName);
+  static async statObject(bucketName: string, objectName: string) {
+    const minioClient = MinioService._getClient();
+    return minioClient.statObject(bucketName, objectName);
   }
 
-    static async getObject(bucketName: string, objectName: string) {
-    const mc = MinioService._getClient();
-    return mc.getObject(bucketName, objectName);
+  static async getObject(bucketName: string, objectName: string) {
+    const minioClient = MinioService._getClient();
+    return minioClient.getObject(bucketName, objectName);
   }
 
-    static async deleteObject(bucketName: string, objectName: string) {
-    const mc = MinioService._getClient();
-    return mc.removeObject(bucketName, objectName);
+  static async deleteObject(bucketName: string, objectName: string) {
+    const minioClient = MinioService._getClient();
+    return minioClient.removeObject(bucketName, objectName);
   }
 
-    static async searchObjects(
+  static async searchObjects(
     query: string,
     { bucket, limit = 200 }: { bucket?: string; limit?: number } = {},
   ): Promise<{ results: Array<MinioObjectEntry & { bucket: string }>; totalScanned: number; truncated: boolean }> {
-    const mc = MinioService._getClient();
+    const minioClient = MinioService._getClient();
     const normalizedQuery = query.toLowerCase();
     const results: Array<MinioObjectEntry & { bucket: string }> = [];
     let totalScanned = 0;
@@ -171,13 +173,13 @@ export default class MinioService {
 
     const bucketsToSearch = bucket
       ? [{ name: bucket }]
-      : (await mc.listBuckets()).map((b) => ({ name: b.name }));
+      : (await minioClient.listBuckets()).map((bucketItem) => ({ name: bucketItem.name }));
 
     for (const targetBucket of bucketsToSearch) {
       if (truncated) break;
 
       await new Promise<void>((resolve, reject) => {
-        const stream = mc.listObjectsV2(targetBucket.name, "", true);
+        const stream = minioClient.listObjectsV2(targetBucket.name, "", true);
 
         stream.on("data", (item) => {
           if (item.prefix) return;

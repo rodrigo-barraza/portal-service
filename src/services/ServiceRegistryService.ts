@@ -195,7 +195,7 @@ export default class ServiceRegistryService {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       if (attempt > 1) {
-        await new Promise((r) => setTimeout(r, ServiceRegistryService.HEALTH_CHECK_RETRY_DELAY_MS));
+        await new Promise((resolve) => setTimeout(resolve, ServiceRegistryService.HEALTH_CHECK_RETRY_DELAY_MS));
       }
 
       lastResult = await ServiceRegistryService._attemptHealthCheck(id, service);
@@ -297,19 +297,22 @@ export default class ServiceRegistryService {
   }
 
     static _extractErrorDetail(error: unknown) {
-    const errorObject = error as Error & { cause?: unknown, name?: string };
-    if (errorObject.name === "AbortError") return "Timeout";
+    if (error instanceof Error) {
+      const errorObject = error as Error & { cause?: unknown };
+      if (errorObject.name === "AbortError") return "Timeout";
 
-    // Dig into undici's nested cause chain for the real error code
-    let rootCause = errorObject.cause as { code?: string; message?: string; cause?: unknown } | undefined | null;
-    while (rootCause) {
-      if (rootCause.code) {
-        const code = rootCause.code;
-        return ERROR_CODE_LABELS[code] || `${code}: ${rootCause.message || errorObject.message}`;
+      // Dig into undici's nested cause chain for the real error code
+      let rootCause = errorObject.cause as { code?: string; message?: string; cause?: unknown } | undefined | null;
+      while (rootCause) {
+        if (rootCause.code) {
+          const code = rootCause.code;
+          return ERROR_CODE_LABELS[code] || `${code}: ${rootCause.message || errorObject.message}`;
+        }
+        rootCause = rootCause.cause as { code?: string; message?: string; cause?: unknown } | undefined | null;
       }
-      rootCause = rootCause.cause as { code?: string; message?: string; cause?: unknown } | undefined | null;
-    }
 
-    return errorObject.message;
+      return errorObject.message;
+    }
+    return String(error);
   }
 }

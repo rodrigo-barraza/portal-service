@@ -5,6 +5,7 @@ import express from "express";
 import cors from "cors";
 
 import { errorHandler } from "./utils/errors.ts";
+import { getErrorMessage } from "./utils/ErrorHelpers.ts";
 import logger from "./utils/logger.ts";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
 import MongoWrapper from "./wrappers/MongoWrapper.ts";
@@ -115,8 +116,7 @@ app.use(errorHandler);
       await ContainerMetricsService.ensureCollection();
     }
   } catch (error: unknown) {
-    const errorObject = error as Error;
-    logger.error(`Failed to ensure indexes: ${errorObject.message}`);
+    logger.error(`Failed to ensure indexes: ${getErrorMessage(error)}`);
   }
 
   // ── Deferred Registry Recovery ─────────────────────────────────
@@ -155,8 +155,7 @@ app.use(errorHandler);
           logger.warn(`[Registry] Deferred attempt ${deferredAttempt}/${MAX_DEFERRED_ATTEMPTS} — still empty`);
         }
       } catch (error: unknown) {
-        const errorObject = error as Error;
-        logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${errorObject.message}`);
+        logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${getErrorMessage(error)}`);
         if (deferredAttempt >= MAX_DEFERRED_ATTEMPTS) {
           clearInterval(deferredTimer);
         }
@@ -180,8 +179,7 @@ app.use(errorHandler);
       );
     })
     .catch((error: unknown) => {
-      const errorObject = error as Error;
-      logger.warn(`[Registry] Initial check failed: ${errorObject.message}`);
+      logger.warn(`[Registry] Initial check failed: ${getErrorMessage(error)}`);
     });
 
   // Periodic health checks every 60 seconds
@@ -217,8 +215,7 @@ app.use(errorHandler);
         }
       }
     } catch (error: unknown) {
-      const errorObject = error as Error;
-      logger.warn(`[Registry] Periodic refresh failed: ${errorObject.message}`);
+      logger.warn(`[Registry] Periodic refresh failed: ${getErrorMessage(error)}`);
     }
   }, REGISTRY_REFRESH_INTERVAL_MS);
 

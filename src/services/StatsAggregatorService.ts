@@ -2,6 +2,7 @@
 
 import { PROJECTS, STATS_CACHE_TTL_MS } from "../config.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 interface CacheEntry {
   data: Record<string, unknown>;
@@ -35,11 +36,10 @@ export default class StatsAggregatorService {
       cache.set("overview", { data, fetchedAt: Date.now() });
       return data;
     } catch (error: unknown) {
-      const errorObject = error as Error;
-      logger.error(`[StatsAggregator] Failed to fetch overview: ${errorObject.message}`);
+      logger.error(`[StatsAggregator] Failed to fetch overview: ${getErrorMessage(error)}`);
       // Return stale cache if available
       if (cached) return { ...cached.data, stale: true };
-      return { error: errorObject.message };
+      return { error: getErrorMessage(error) };
     }
   }
 
@@ -64,10 +64,9 @@ export default class StatsAggregatorService {
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
     } catch (error: unknown) {
-      const errorObject = error as Error;
-      logger.error(`[StatsAggregator] Breakdown fetch failed: ${errorObject.message}`);
+      logger.error(`[StatsAggregator] Breakdown fetch failed: ${getErrorMessage(error)}`);
       if (cached) return { ...cached.data, stale: true };
-      return { error: errorObject.message };
+      return { error: getErrorMessage(error) };
     }
   }
 
@@ -89,10 +88,9 @@ export default class StatsAggregatorService {
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
     } catch (error: unknown) {
-      const errorObject = error as Error;
-      logger.error(`[StatsAggregator] Project stats failed: ${errorObject.message}`);
+      logger.error(`[StatsAggregator] Project stats failed: ${getErrorMessage(error)}`);
       if (cached) return { ...cached.data, stale: true };
-      return { error: errorObject.message };
+      return { error: getErrorMessage(error) };
     }
   }
 

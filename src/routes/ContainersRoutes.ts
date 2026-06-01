@@ -8,6 +8,7 @@ import DockerStatsService from "../services/DockerStatsService.ts";
 import ServiceRegistryService from "../services/ServiceRegistryService.ts";
 import { DEVICES } from "../config.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = Router();
 
@@ -64,7 +65,7 @@ router.post("/:name/restart", asyncHandler(async (req: Request, res: Response, n
       res.status(502).json({ error: message });
     }
   } catch (error: unknown) {
-    logger.error(`[Container:Restart] Failed: ${(error as Error).message}`);
+    logger.error(`[Container:Restart] Failed: ${getErrorMessage(error)}`);
     next(error);
   }
 }, "Containers_Restart"));
@@ -108,7 +109,7 @@ router.post("/:name/stop", asyncHandler(async (req: Request, res: Response, next
       res.status(502).json({ error: message });
     }
   } catch (error: unknown) {
-    logger.error(`[Container:Stop] Failed: ${(error as Error).message}`);
+    logger.error(`[Container:Stop] Failed: ${getErrorMessage(error)}`);
     next(error);
   }
 }, "Containers_Stop"));
@@ -152,7 +153,7 @@ router.post("/:name/start", asyncHandler(async (req: Request, res: Response, nex
       res.status(502).json({ error: message });
     }
   } catch (error: unknown) {
-    logger.error(`[Container:Start] Failed: ${(error as Error).message}`);
+    logger.error(`[Container:Start] Failed: ${getErrorMessage(error)}`);
     next(error);
   }
 }, "Containers_Start"));

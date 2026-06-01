@@ -8,6 +8,7 @@ import DockerStatsService from "../services/DockerStatsService.ts";
 import CodeAnalysisService from "../services/CodeAnalysisService.ts";
 import { PROJECTS, DEVICES, PROJECT_TYPE_COLORS, DEPLOY_TIER_COLORS, GITHUB_PAT, initializeRegistry } from "../config.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import type { ProjectEntry, EnrichedDependency, TtlCache, VaultRegistry } from "../types.ts";
 
 const router = Router();
@@ -32,32 +33,32 @@ function enrichWithDependencies(services: Record<string, unknown>[], infrastruct
   // Normalize a dependency entry — handles raw string IDs,
   // structured { id, criticality } objects, and already-enriched
   // { id, name, criticality } objects from cached status.
-  const rawId = (dep: string | { id: string }) => (typeof dep === "string" ? dep : dep.id);
-  const rawCriticality = (dep: string | { id: string; criticality?: string }) =>
-    typeof dep === "string" ? "required" : dep.criticality || "required";
+  const rawId = (dependency: string | { id: string }) => (typeof dependency === "string" ? dependency : dependency.id);
+  const rawCriticality = (dependency: string | { id: string; criticality?: string }) =>
+    typeof dependency === "string" ? "required" : dependency.criticality || "required";
 
   // Compute inverse: dependedOnBy[targetId] = [{ id, name, criticality }, ...]
   const inverseMap: Record<string, EnrichedDependency[]> = {};
   for (const item of all) {
-    for (const dep of item.dependsOn || []) {
-      const id = rawId(dep);
+    for (const dependency of item.dependsOn || []) {
+      const id = rawId(dependency);
       if (!inverseMap[id]) inverseMap[id] = [];
       inverseMap[id].push({
         id: item.id,
         name: item.name,
-        criticality: rawCriticality(dep),
+        criticality: rawCriticality(dependency),
       });
     }
   }
 
   // Enrich each item — resolve names and carry criticality
   for (const item of all) {
-    item.dependsOn = (item.dependsOn || []).map((dep) => {
-      const id = rawId(dep);
+    item.dependsOn = (item.dependsOn || []).map((dependency) => {
+      const id = rawId(dependency);
       return {
         id,
         name: nameMap[id] || id,
-        criticality: rawCriticality(dep),
+        criticality: rawCriticality(dependency),
       };
     });
     item.dependedOnBy = inverseMap[item.id] || [];
@@ -145,7 +146,7 @@ router.post("/:id/restart", asyncHandler(async (req: Request, res: Response, nex
       res.status(502).json({ error: message });
     }
   } catch (error: unknown) {
-    logger.error(`[Restart] Failed: ${(error as Error).message}`);
+    logger.error(`[Restart] Failed: ${getErrorMessage(error)}`);
     next(error);
   }
 }, "Services_Restart"));
@@ -194,7 +195,7 @@ router.post("/:id/stop", asyncHandler(async (req: Request, res: Response, next: 
       res.status(502).json({ error: message });
     }
   } catch (error: unknown) {
-    logger.error(`[Stop] Failed: ${(error as Error).message}`);
+    logger.error(`[Stop] Failed: ${getErrorMessage(error)}`);
     next(error);
   }
 }, "Services_Stop"));
@@ -243,7 +244,7 @@ router.post("/:id/start", asyncHandler(async (req: Request, res: Response, next:
       res.status(502).json({ error: message });
     }
   } catch (error: unknown) {
-    logger.error(`[Start] Failed: ${(error as Error).message}`);
+    logger.error(`[Start] Failed: ${getErrorMessage(error)}`);
     next(error);
   }
 }, "Services_Start"));
@@ -398,7 +399,7 @@ router.post("/:id/rollback", asyncHandler(async (req: Request, res: Response, ne
       res.status(502).json({ error: message });
     }
   } catch (error: unknown) {
-    logger.error(`[Rollback] Failed: ${(error as Error).message}`);
+    logger.error(`[Rollback] Failed: ${getErrorMessage(error)}`);
     next(error);
   }
 }, "Services_Rollback"));
@@ -451,20 +452,20 @@ router.get("/sizes", asyncHandler(async (_req: Request, res: Response, next: Nex
             headers.Authorization = `Bearer ${GITHUB_PAT}`;
           }
 
-          const resp = await fetch(`https://api.github.com/repos/${slug}`, {
+          const gitHubResponse = await fetch(`https://api.github.com/repos/${slug}`, {
             headers,
             signal: controller.signal,
           });
           clearTimeout(timeout);
 
-          if (!resp.ok) {
-            if (!GITHUB_PAT && resp.status === 403) {
+          if (!gitHubResponse.ok) {
+            if (!GITHUB_PAT && gitHubResponse.status === 403) {
               logger.warn(`[Sizes] GitHub 403 for ${slug} — set GITHUB_PAT for private repo access`);
             }
             return;
           }
 
-          const data = await resp.json() as Record<string, number>;
+          const data = await gitHubResponse.json() as Record<string, number>;
           sizes[id] = {
             sizeKB: data.size,
             sizeBytes: data.size * 1024,
@@ -533,20 +534,20 @@ router.get("/languages", asyncHandler(async (_req: Request, res: Response, next:
             headers.Authorization = `Bearer ${GITHUB_PAT}`;
           }
 
-          const resp = await fetch(`https://api.github.com/repos/${slug}/languages`, {
+          const gitHubResponse = await fetch(`https://api.github.com/repos/${slug}/languages`, {
             headers,
             signal: controller.signal,
           });
           clearTimeout(timeout);
 
-          if (!resp.ok) {
-            if (!GITHUB_PAT && resp.status === 403) {
+          if (!gitHubResponse.ok) {
+            if (!GITHUB_PAT && gitHubResponse.status === 403) {
               logger.warn(`[Languages] GitHub 403 for ${slug} — set GITHUB_PAT for private repo access`);
             }
             return;
           }
 
-          const data = await resp.json() as Record<string, number>;
+          const data = await gitHubResponse.json() as Record<string, number>;
           const totalBytes = Object.values(data).reduce((sum, bytesValue) => sum + bytesValue, 0);
 
           // Sort by bytes descending
@@ -555,8 +556,8 @@ router.get("/languages", asyncHandler(async (_req: Request, res: Response, next:
 
           languages[id] = {
             primary,
-            breakdown: sorted.map(([lang, bytes]) => ({
-              language: lang,
+            breakdown: sorted.map(([language, bytes]) => ({
+              language,
               bytes,
               percent: totalBytes > 0 ? Math.round((bytes / totalBytes) * 1000) / 10 : 0,
             })),

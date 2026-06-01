@@ -7,6 +7,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { DEVICES } from "../config.ts";
 import DockerStatsService from "../services/DockerStatsService.ts";
 import logger from "../utils/logger.ts";
+import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const router = Router();
 
@@ -26,7 +27,7 @@ router.get("/", asyncHandler(async (_req: Request, res: Response) => {
 
     res.json({ containers: loggable });
   } catch (error: unknown) {
-    logger.error(`[Logs] Failed to list containers: ${(error as Error).message}`);
+    logger.error(`[Logs] Failed to list containers: ${getErrorMessage(error)}`);
     res.json({ containers: [] });
   }
 }, "Logs_List"));
@@ -40,7 +41,7 @@ router.get("/:containerName", asyncHandler(async (req: Request, res: Response) =
   try {
     containers = await DockerStatsService.getAll(deviceFilter);
   } catch (error: unknown) {
-    logger.error(`[Logs] Failed to query containers: ${(error as Error).message}`);
+    logger.error(`[Logs] Failed to query containers: ${getErrorMessage(error)}`);
     return res.status(500).json({ error: "Failed to query Docker containers" });
   }
 
@@ -207,9 +208,8 @@ function streamViaDockerApi(device: DeviceEntry, containerName: string, tail: nu
       });
 
       dockerRes.on("error", (error: unknown) => {
-        const typedError = error as Error;
-        logger.error(`[Logs] Docker stream error for ${containerName}: ${typedError.message}`);
-        sendError(typedError.message);
+        logger.error(`[Logs] Docker stream error for ${containerName}: ${getErrorMessage(error)}`);
+        sendError(getErrorMessage(error));
         cleanup();
       });
 
@@ -223,9 +223,8 @@ function streamViaDockerApi(device: DeviceEntry, containerName: string, tail: nu
   );
 
   dockerReq.on("error", (error: unknown) => {
-    const errorObject = error as Error;
-    logger.error(`[Logs] Docker socket error for ${containerName}: ${errorObject.message}`);
-    sendError(errorObject.message);
+    logger.error(`[Logs] Docker socket error for ${containerName}: ${getErrorMessage(error)}`);
+    sendError(getErrorMessage(error));
     cleanup();
   });
 
