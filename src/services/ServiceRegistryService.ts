@@ -296,23 +296,27 @@ export default class ServiceRegistryService {
     }
   }
 
-    static _extractErrorDetail(error: unknown) {
+  static _extractErrorDetail(error: unknown) {
     if (error instanceof Error) {
-      const errorObject = error as Error & { cause?: unknown };
-      if (errorObject.name === "AbortError") return "Timeout";
+      if (error.name === "AbortError") return "Timeout";
 
       // Dig into undici's nested cause chain for the real error code
-      let rootCause = errorObject.cause as { code?: string; message?: string; cause?: unknown } | undefined | null;
-      while (rootCause) {
-        if (rootCause.code) {
-          const code = rootCause.code;
-          return ERROR_CODE_LABELS[code] || `${code}: ${rootCause.message || errorObject.message}`;
+      let current: unknown = error;
+      while (current && typeof current === "object" && "cause" in current) {
+        const next: unknown = (current as { cause: unknown }).cause;
+        if (next && typeof next === "object" && next !== null) {
+          const causeObject = next as { code?: string; message?: string; cause?: unknown };
+          if (causeObject.code) {
+            const code = causeObject.code;
+            return ERROR_CODE_LABELS[code] || `${code}: ${causeObject.message || error.message}`;
+          }
         }
-        rootCause = rootCause.cause as { code?: string; message?: string; cause?: unknown } | undefined | null;
+        current = next;
       }
 
-      return errorObject.message;
+      return error.message;
     }
     return String(error);
   }
 }
+
