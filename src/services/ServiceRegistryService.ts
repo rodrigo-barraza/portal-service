@@ -1,80 +1,8 @@
 import type { ProjectEntry, DependencyRef } from "../types.ts";
-// ─── Service Registry Service ───────────────────────────────
-
-import os from "os";
-import { PROJECTS, DEVICES, HEALTH_CHECK_TIMEOUT_MS } from "../config.ts";
+import { PROJECTS, HEALTH_CHECK_TIMEOUT_MS } from "../config.ts";
 import logger from "../utils/logger.ts";
 import { ERROR_CODE_LABELS } from "../types.ts";
-
-function detectLocalDevice() {
-  const interfaces = os.networkInterfaces();
-  const localIPs = new Set();
-  for (const iface of Object.values(interfaces)) {
-    if (!iface) continue;
-    for (const addr of iface) {
-      if (!addr.internal) localIPs.add(addr.address);
-    }
-  }
-
-  for (const [key, device] of Object.entries(DEVICES)) {
-    if (device.hostname && localIPs.has(device.hostname)) return key;
-  }
-  return null;
-}
-
-const LOCAL_DEVICE_KEY = detectLocalDevice();
-
-function buildHostnameToDeviceMap() {
-  const map = new Map();
-
-  for (const [_key, device] of Object.entries(DEVICES)) {
-    if (device.hostname) map.set(device.hostname, device.name);
-  }
-
-  // Map localhost aliases to whichever device we're running on
-  if (LOCAL_DEVICE_KEY) {
-    const localName = DEVICES[LOCAL_DEVICE_KEY].name;
-    map.set("localhost", localName);
-    map.set("127.0.0.1", localName);
-
-    // Also map this machine's LAN IPs to the local device name
-    const interfaces = os.networkInterfaces();
-    for (const iface of Object.values(interfaces)) {
-      if (!iface) continue;
-      for (const addr of iface) {
-        if (!addr.internal) map.set(addr.address, localName);
-      }
-    }
-  }
-
-  return map;
-}
-
-const HOSTNAME_TO_DEVICE = buildHostnameToDeviceMap();
-
-function deriveHost(url: string, service: ProjectEntry) {
-  if (!url) return DEVICES[service.device]?.name || service.device || "Unknown";
-  try {
-    const parsed = new URL(url);
-    return HOSTNAME_TO_DEVICE.get(parsed.hostname)
-      || DEVICES[service.device]?.name
-      || service.device
-      || "Unknown";
-  } catch {
-    return DEVICES[service.device]?.name || service.device || "Unknown";
-  }
-}
-
-function toLocalHealthUrl(url: string, service: ProjectEntry) {
-  if (!LOCAL_DEVICE_KEY || service.device !== LOCAL_DEVICE_KEY) return url;
-  try {
-    const parsed = new URL(url);
-    parsed.hostname = "localhost";
-    return parsed.toString().replace(/\/$/, "");
-  } catch {
-    return url;
-  }
-}
+import { DeviceResolver } from "../utils/DeviceResolver.ts";
 
 export type ServiceStatus = {
   id: string;
@@ -106,7 +34,7 @@ export type ServiceStatus = {
 const statusCache = new Map<string, ServiceStatus>();
 
 export default class ServiceRegistryService {
-    static list(): ServiceStatus[] {
+  public static list(): ServiceStatus[] {
     return Object.entries(PROJECTS).map(([id, service]) => {
       const cached = statusCache.get(id);
       return cached || {
@@ -122,12 +50,12 @@ export default class ServiceRegistryService {
         minioBucket: service.minioBucket || null,
         repo: service.repo || null,
         npmPackage: service.npmPackage || null,
-        device: deriveHost(service.url, service),
+        device: DeviceResolver.deriveHost(service.url, service.device),
         domain: service.domain || null,
         dependsOn: service.dependsOn || [],
         deployTier: service.deployTier ?? null,
         essential: service.essential || false,
-        restartable: !!service.dockerProject,
+        restartable: !service.dockerProject,
         dockerProject: service.dockerProject || null,
         healthy: false,
         responseTimeMs: null,
@@ -138,7 +66,7 @@ export default class ServiceRegistryService {
     });
   }
 
-    static async checkAll() {
+  public static async checkAll() {
     const results = await Promise.all(
       Object.entries(PROJECTS).map(([id, service]) =>
         ServiceRegistryService._checkService(id, service),
@@ -152,11 +80,10 @@ export default class ServiceRegistryService {
     return results;
   }
 
-    static HEALTH_CHECK_RETRIES = 1;
+  public static HEALTH_CHECK_RETRIES = 1;
+  public static HEALTH_CHECK_RETRY_DELAY_MS = 1500;
 
-    static HEALTH_CHECK_RETRY_DELAY_MS = 1500;
-
-    static async _checkService(id: string, service: ProjectEntry) {
+  public static async _checkService(id: string, service: ProjectEntry) {
     if (!service.url) {
       return {
         id,
@@ -171,12 +98,12 @@ export default class ServiceRegistryService {
         minioBucket: service.minioBucket || null,
         repo: service.repo || null,
         npmPackage: service.npmPackage || null,
-        device: deriveHost(service.url, service),
+        device: DeviceResolver.deriveHost(service.url, service.device),
         domain: service.domain || null,
         dependsOn: service.dependsOn || [],
         deployTier: service.deployTier ?? null,
         essential: service.essential || false,
-        restartable: !!service.dockerProject,
+        restartable: !service.dockerProject,
         dockerProject: service.dockerProject || null,
         healthy: false,
         responseTimeMs: null,
@@ -211,7 +138,7 @@ export default class ServiceRegistryService {
     return lastResult as ServiceStatus;
   }
 
-    static async _attemptHealthCheck(id: string, service: ProjectEntry) {
+  public static async _attemptHealthCheck(id: string, service: ProjectEntry) {
     const start = Date.now();
 
     try {
@@ -222,7 +149,7 @@ export default class ServiceRegistryService {
       );
 
       const publicHealthUrl = `${service.url}${service.healthPath || "/"}`;
-      const healthUrl = toLocalHealthUrl(publicHealthUrl, service);
+      const healthUrl = DeviceResolver.toLocalHealthUrl(publicHealthUrl, service.device);
       const response = await fetch(healthUrl, {
         signal: controller.signal,
         headers: { Accept: "application/json" },
@@ -251,12 +178,12 @@ export default class ServiceRegistryService {
         minioBucket: service.minioBucket || null,
         repo: service.repo || null,
         npmPackage: service.npmPackage || null,
-        device: deriveHost(service.url, service),
+        device: DeviceResolver.deriveHost(service.url, service.device),
         domain: service.domain || null,
         dependsOn: service.dependsOn || [],
         deployTier: service.deployTier ?? null,
         essential: service.essential || false,
-        restartable: !!service.dockerProject,
+        restartable: !service.dockerProject,
         dockerProject: service.dockerProject || null,
         healthy: response.ok,
         responseTimeMs,
@@ -280,12 +207,12 @@ export default class ServiceRegistryService {
         minioBucket: service.minioBucket || null,
         repo: service.repo || null,
         npmPackage: service.npmPackage || null,
-        device: deriveHost(service.url, service),
+        device: DeviceResolver.deriveHost(service.url, service.device),
         domain: service.domain || null,
         dependsOn: service.dependsOn || [],
         deployTier: service.deployTier ?? null,
         essential: service.essential || false,
-        restartable: !!service.dockerProject,
+        restartable: !service.dockerProject,
         dockerProject: service.dockerProject || null,
         healthy: false,
         responseTimeMs: Date.now() - start,
@@ -296,11 +223,10 @@ export default class ServiceRegistryService {
     }
   }
 
-  static _extractErrorDetail(error: unknown) {
+  public static _extractErrorDetail(error: unknown) {
     if (error instanceof Error) {
       if (error.name === "AbortError") return "Timeout";
 
-      // Dig into undici's nested cause chain for the real error code
       let current: unknown = error;
       while (current && typeof current === "object" && "cause" in current) {
         const next: unknown = (current as { cause: unknown }).cause;
@@ -319,4 +245,3 @@ export default class ServiceRegistryService {
     return String(error);
   }
 }
-

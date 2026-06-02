@@ -1,11 +1,10 @@
-// ─── Google Analytics Service ───────────────────────────────
-
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
 import logger from "../utils/logger.ts";
 import {
   GOOGLE_ANALYTICS_CREDENTIALS,
   ANALYTICS_PROPERTIES,
 } from "../config.ts";
+import { GoogleAnalyticsDateHelper } from "./google-analytics/GoogleAnalyticsDateHelper.ts";
 
 interface GoogleAnalyticsResponseRow {
   dimensionValues?: { value?: string | null }[] | null;
@@ -32,8 +31,6 @@ interface TransformedOverviewMetricPeriod {
   engagementRate: number;
 }
 
-// ── TTL Cache ──────────────────────────────────────────────────
-
 const cache = new Map<string, { data: unknown; ts: number }>();
 
 function cached<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> {
@@ -48,9 +45,8 @@ function cached<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promi
     throw error;
   });
 
-  // Serve stale while revalidating if we have a previous value
   if (hit) {
-    promise.catch(() => {}); // swallow — stale is fine
+    promise.catch(() => {});
     return Promise.resolve(hit.data as T);
   }
   return promise;
@@ -59,62 +55,9 @@ function cached<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promi
 const REALTIME_TTL = 15_000;
 const REPORT_TTL = 60_000;
 
-// ── Client Initialization ──────────────────────────────────────
-
 function getProperties() {
   return ANALYTICS_PROPERTIES;
 }
-
-function periodToDateRange(period: string = "30d") {
-  const presetMap: Record<string, string> = {
-    "7d": "7daysAgo",
-    "30d": "30daysAgo",
-    "90d": "90daysAgo",
-  };
-
-  if (period.includes("_")) {
-    const [startDate, endDate] = period.split("_");
-    if (startDate && endDate) {
-      return {
-        startDate,
-        endDate,
-      };
-    }
-  }
-
-  return {
-    startDate: presetMap[period] || "30daysAgo",
-    endDate: "today",
-  };
-}
-
-function previousPeriodRange(period: string = "30d") {
-  if (period.includes("_")) {
-    const [startDateString, endDateString] = period.split("_");
-    if (startDateString && endDateString) {
-      const startDate = new Date(startDateString);
-      const endDate = new Date(endDateString);
-      const millisecondsDifference = endDate.getTime() - startDate.getTime();
-      
-      const previousEndDate = new Date(startDate.getTime() - 24 * 60 * 60 * 1000);
-      const previousStartDate = new Date(previousEndDate.getTime() - millisecondsDifference);
-      
-      const formatDate = (date: Date) => date.toISOString().split("T")[0];
-      return {
-        startDate: formatDate(previousStartDate),
-        endDate: formatDate(previousEndDate),
-      };
-    }
-  }
-
-  const daysCount = parseInt(period, 10) || 30;
-  return {
-    startDate: `${daysCount * 2}daysAgo`,
-    endDate: `${daysCount + 1}daysAgo`,
-  };
-}
-
-// ── Report Helpers ─────────────────────────────────────────────
 
 function formatRows(
   response: GoogleAnalyticsResponse | undefined | null,
@@ -138,12 +81,10 @@ function formatRows(
   });
 }
 
-// ── Public API ─────────────────────────────────────────────────
-
 export default class GoogleAnalyticsService {
-  static client: BetaAnalyticsDataClient | null = null;
+  public static client: BetaAnalyticsDataClient | null = null;
 
-  static _getClient() {
+  public static _getClient() {
     if (GoogleAnalyticsService.client) return GoogleAnalyticsService.client;
 
     if (!GOOGLE_ANALYTICS_CREDENTIALS) {
@@ -170,11 +111,11 @@ export default class GoogleAnalyticsService {
     }
   }
 
-    static listProperties() {
+  public static listProperties() {
     return getProperties();
   }
 
-    static async getRealtimeReport(propertyId: string) {
+  public static async getRealtimeReport(propertyId: string) {
     const key = `realtime:${propertyId}`;
     return cached(key, REALTIME_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -205,7 +146,7 @@ export default class GoogleAnalyticsService {
     });
   }
 
-    static async getOverviewReport(propertyId: string, period: string = "30d") {
+  public static async getOverviewReport(propertyId: string, period: string = "30d") {
     const key = `overview:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
@@ -219,14 +160,12 @@ export default class GoogleAnalyticsService {
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
         dateRanges: [
-          periodToDateRange(period),
-          previousPeriodRange(period),
+          GoogleAnalyticsDateHelper.periodToDateRange(period),
+          GoogleAnalyticsDateHelper.previousPeriodRange(period),
         ],
         metrics: metricNames.map((name) => ({ name })),
       });
 
-      // With two date ranges, GA4 returns rows tagged by dateRange index.
-      // Row 0 = current period, Row 1 = previous period.
       const parseRow = (row: GoogleAnalyticsResponseRow | undefined): TransformedOverviewMetricPeriod => {
         const metricValues = row?.metricValues || [];
         return {
@@ -245,7 +184,6 @@ export default class GoogleAnalyticsService {
       const current = parseRow(response?.rows?.[0]);
       const previous = parseRow(response?.rows?.[1]);
 
-      // Compute deltas as fractional change (e.g. 0.15 = +15%)
       const delta = (currentValue: number, previousValue: number) => {
         if (!previousValue || previousValue === 0) return currentValue > 0 ? 1 : 0;
         return (currentValue - previousValue) / Math.abs(previousValue);
@@ -267,14 +205,14 @@ export default class GoogleAnalyticsService {
     });
   }
 
-    static async getTopPages(propertyId: string, period: string = "30d") {
+  public static async getTopPages(propertyId: string, period: string = "30d") {
     const key = `pages:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [
           { name: "pagePath" },
           { name: "pageTitle" },
@@ -303,14 +241,14 @@ export default class GoogleAnalyticsService {
     });
   }
 
-    static async getTrafficSources(propertyId: string, period: string = "30d") {
+  public static async getTrafficSources(propertyId: string, period: string = "30d") {
     const key = `sources:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [
           { name: "sessionSource" },
           { name: "sessionMedium" },
@@ -338,14 +276,14 @@ export default class GoogleAnalyticsService {
     });
   }
 
-    static async getGeography(propertyId: string, period: string = "30d") {
+  public static async getGeography(propertyId: string, period: string = "30d") {
     const key = `geo:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [
           { name: "country" },
           { name: "city" },
@@ -372,15 +310,14 @@ export default class GoogleAnalyticsService {
     });
   }
 
-    static async getDevices(propertyId: string, period: string = "30d") {
+  public static async getDevices(propertyId: string, period: string = "30d") {
     const key = `devices:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
-      // Device categories
       const [catResponse] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [{ name: "deviceCategory" }],
         metrics: [
           { name: "activeUsers" },
@@ -391,10 +328,9 @@ export default class GoogleAnalyticsService {
         ],
       });
 
-      // Browsers
       const [browserResponse] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [{ name: "browser" }],
         metrics: [
           { name: "activeUsers" },
@@ -406,10 +342,9 @@ export default class GoogleAnalyticsService {
         limit: 10,
       });
 
-      // Operating systems
       const [osResponse] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [{ name: "operatingSystem" }],
         metrics: [
           { name: "activeUsers" },
@@ -421,10 +356,9 @@ export default class GoogleAnalyticsService {
         limit: 10,
       });
 
-      // Screen resolutions
       const [resResponse] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [{ name: "screenResolution" }],
         metrics: [
           { name: "sessions" },
@@ -446,14 +380,14 @@ export default class GoogleAnalyticsService {
     });
   }
 
-    static async getTimeSeries(propertyId: string, period: string = "30d") {
+  public static async getTimeSeries(propertyId: string, period: string = "30d") {
     const key = `timeseries:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [{ name: "date" }],
         metrics: [
           { name: "screenPageViews" },
@@ -471,7 +405,6 @@ export default class GoogleAnalyticsService {
         ["pageviews", "users", "sessions"],
       );
 
-      // Format date from YYYYMMDD → YYYY-MM-DD
       return {
         series: rows.map((row: TransformedGoogleAnalyticsRow) => ({
           ...row,
@@ -483,14 +416,14 @@ export default class GoogleAnalyticsService {
     });
   }
 
-    static async getChannelGrouping(propertyId: string, period: string = "30d") {
+  public static async getChannelGrouping(propertyId: string, period: string = "30d") {
     const key = `channels:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [{ name: "sessionDefaultChannelGroup" }],
         metrics: [
           { name: "sessions" },
@@ -516,14 +449,14 @@ export default class GoogleAnalyticsService {
     });
   }
 
-    static async getLandingPages(propertyId: string, period: string = "30d") {
+  public static async getLandingPages(propertyId: string, period: string = "30d") {
     const key = `landing:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [{ name: "landingPagePlusQueryString" }],
         metrics: [
           { name: "sessions" },
@@ -550,14 +483,14 @@ export default class GoogleAnalyticsService {
     });
   }
 
-    static async getHourlyHeatmap(propertyId: string, period: string = "30d") {
+  public static async getHourlyHeatmap(propertyId: string, period: string = "30d") {
     const key = `heatmap:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [
           { name: "dayOfWeekName" },
           { name: "hour" },
@@ -573,7 +506,6 @@ export default class GoogleAnalyticsService {
         ["users"],
       );
 
-      // Convert hour from string to int
       return {
         cells: rows.map((row: TransformedGoogleAnalyticsRow) => ({
           ...row,
@@ -585,14 +517,14 @@ export default class GoogleAnalyticsService {
     });
   }
 
-    static async getNewVsReturning(propertyId: string, period: string = "30d") {
+  public static async getNewVsReturning(propertyId: string, period: string = "30d") {
     const key = `retention:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [{ name: "newVsReturning" }],
         metrics: [
           { name: "totalUsers" },
@@ -616,14 +548,14 @@ export default class GoogleAnalyticsService {
     });
   }
 
-    static async getTopEvents(propertyId: string, period: string = "30d") {
+  public static async getTopEvents(propertyId: string, period: string = "30d") {
     const key = `events:${propertyId}:${period}`;
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [periodToDateRange(period)],
+        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
         dimensions: [{ name: "eventName" }],
         metrics: [
           { name: "eventCount" },

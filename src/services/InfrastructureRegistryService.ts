@@ -1,11 +1,8 @@
-// ─── Infrastructure Registry Service ────────────────────────
-
 import { MongoClient } from "mongodb";
 import { Client as MinioClient, type BucketItemFromList } from "minio";
 import type { InfrastructureEntry, InfraStatus } from "../types.ts";
 import {
   INFRASTRUCTURE,
-  DEVICES,
   HEALTH_CHECK_TIMEOUT_MS,
   MINIO_ENDPOINT,
   MINIO_ACCESS_KEY,
@@ -14,39 +11,12 @@ import {
 } from "../config.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { DeviceResolver } from "../utils/DeviceResolver.ts";
 
-function buildHostnameToDeviceMap() {
-  const map = new Map();
-  for (const [_key, device] of Object.entries(DEVICES)) {
-    if (device.hostname) map.set(device.hostname, device.name);
-  }
-  // Localhost aliases → local device (imports os at top if needed)
-  map.set("localhost", DEVICES.workstation?.name || "Workstation");
-  map.set("127.0.0.1", DEVICES.workstation?.name || "Workstation");
-  return map;
-}
-
-const HOSTNAME_TO_DEVICE = buildHostnameToDeviceMap();
-
-function deriveHost(url: string | null | undefined, infra: InfrastructureEntry) {
-  if (!url) return DEVICES[infra.device]?.name || infra.device || "Unknown";
-  try {
-    const parsed = new URL(url);
-    return HOSTNAME_TO_DEVICE.get(parsed.hostname)
-      || DEVICES[infra.device]?.name
-      || infra.device
-      || "Unknown";
-  } catch {
-    return DEVICES[infra.device]?.name || infra.device || "Unknown";
-  }
-}
-
-
-
-const statusCache = new Map();
+const statusCache = new Map<string, InfraStatus>();
 
 export default class InfrastructureRegistryService {
-    static list(): InfraStatus[] {
+  public static list(): InfraStatus[] {
     return Object.entries(INFRASTRUCTURE).map(([id, infra]) => {
       const cached = statusCache.get(id);
       return cached || {
@@ -59,7 +29,7 @@ export default class InfrastructureRegistryService {
         environment: infra.environment,
         visibility: infra.visibility,
         domain: infra.domain || null,
-        device: deriveHost(infra.url, infra),
+        device: DeviceResolver.deriveHost(infra.url, infra.device),
         dependsOn: infra.dependsOn || [],
         deployTier: infra.deployTier ?? 0,
         healthy: false,
@@ -72,7 +42,7 @@ export default class InfrastructureRegistryService {
     });
   }
 
-    static async checkAll(): Promise<InfraStatus[]> {
+  public static async checkAll(): Promise<InfraStatus[]> {
     const results = await Promise.all(
       Object.entries(INFRASTRUCTURE).map(([id, infra]) =>
         InfrastructureRegistryService._checkInfra(id, infra as InfrastructureEntry),
@@ -86,7 +56,7 @@ export default class InfrastructureRegistryService {
     return results;
   }
 
-  static async _checkInfra(id: string, infra: InfrastructureEntry): Promise<InfraStatus> {
+  public static async _checkInfra(id: string, infra: InfrastructureEntry): Promise<InfraStatus> {
     const base = {
       id,
       name: infra.name,
@@ -97,7 +67,7 @@ export default class InfrastructureRegistryService {
       environment: infra.environment,
       visibility: infra.visibility,
       domain: infra.domain || null,
-      device: deriveHost(infra.url, infra),
+      device: DeviceResolver.deriveHost(infra.url, infra.device),
       dependsOn: infra.dependsOn || [],
       deployTier: infra.deployTier ?? 0,
       isInfrastructure: true,
@@ -138,7 +108,7 @@ export default class InfrastructureRegistryService {
     }
   }
 
-    static async _checkMongo() {
+  public static async _checkMongo() {
     if (!MONGO_URI) throw new Error("No MONGO_URI configured");
 
     const client = new MongoClient(MONGO_URI, {
@@ -150,10 +120,8 @@ export default class InfrastructureRegistryService {
       await client.connect();
       const admin = client.db("admin");
 
-      // Ping for liveness (always succeeds if connected)
       await admin.command({ ping: 1 });
 
-      // Gather server metadata — may fail if user lacks clusterMonitor role
       const metadata = { version: null, uptime: null, connections: null, databases: null };
 
       try {
@@ -178,7 +146,7 @@ export default class InfrastructureRegistryService {
     }
   }
 
-    static async _checkMinio() {
+  public static async _checkMinio() {
     if (!MINIO_ENDPOINT) throw new Error("No MINIO_ENDPOINT configured");
 
     const url = new URL(MINIO_ENDPOINT);
@@ -190,7 +158,6 @@ export default class InfrastructureRegistryService {
       secretKey: MINIO_SECRET_KEY || "",
     });
 
-    // listBuckets is the lightest authenticated S3 call
     const buckets = await Promise.race<BucketItemFromList[]>([
       client.listBuckets(),
       new Promise<BucketItemFromList[]>((_, reject) =>
@@ -207,7 +174,7 @@ export default class InfrastructureRegistryService {
     };
   }
 
-    static async _checkHttp(infra: InfrastructureEntry) {
+  public static async _checkHttp(infra: InfrastructureEntry) {
     const baseUrl = infra.url;
     const healthPath = infra.healthPath || "/";
     if (!baseUrl) throw new Error("No URL configured");

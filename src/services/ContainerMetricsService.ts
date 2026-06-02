@@ -1,14 +1,9 @@
-// ─── Container Metrics Persistence Service ──────────────────
-// Persists Docker container CPU/memory/network snapshots to a
-// MongoDB time-series collection for historical trend analysis.
-// Downsamples writes to 30s intervals while the ring buffer
-// in DockerStatsService continues at 5s for live polling.
-
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../config.ts";
 import { COLLECTIONS } from "../constants.ts";
 import logger from "../utils/logger.ts";
 import type { ContainerStats, MetricsHistoryResult } from "../types.ts";
+import { DateHelpers } from "../utils/DateHelpers.ts";
 
 interface AggregateHistoryDocument {
   _id: {
@@ -26,16 +21,15 @@ interface AggregateHistoryDocument {
   }[];
 }
 
-// ── Configuration ────────────────────────────────────────────────
-const PERSIST_INTERVAL_MS = 30_000;       // Write one sample every 30s
-const TTL_DAYS = 7;                        // Auto-expire after 7 days
+const PERSIST_INTERVAL_MS = 30_000;
+const TTL_DAYS = 7;
 const TTL_SECONDS = TTL_DAYS * 24 * 60 * 60;
 
 export default class ContainerMetricsService {
   static _timer: ReturnType<typeof setTimeout> | null = null;
   static _initialized = false;
 
-    static async ensureCollection(): Promise<void> {
+  public static async ensureCollection(): Promise<void> {
     const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
     if (!db) {
       logger.warn("[ContainerMetrics] MongoDB not connected — skipping collection setup");
@@ -43,7 +37,6 @@ export default class ContainerMetricsService {
     }
 
     try {
-      // Check if collection already exists (time-series can't be modified after creation)
       const collections = await db.listCollections({ name: COLLECTIONS.CONTAINER_METRICS }).toArray();
 
       if (collections.length === 0) {
@@ -58,7 +51,6 @@ export default class ContainerMetricsService {
         logger.success(`[ContainerMetrics] Created time-series collection "${COLLECTIONS.CONTAINER_METRICS}" (TTL: ${TTL_DAYS}d)`);
       }
 
-      // Compound index on metadata fields for efficient per-container queries
       const metricsCollection = db.collection(COLLECTIONS.CONTAINER_METRICS);
       await metricsCollection.createIndex(
         { "metadata.container": 1, "metadata.device": 1, timestamp: -1 },
@@ -78,7 +70,7 @@ export default class ContainerMetricsService {
     }
   }
 
-    static async persistSnapshot(deviceId: string, containers: ContainerStats[]): Promise<void> {
+  public static async persistSnapshot(deviceId: string, containers: ContainerStats[]): Promise<void> {
     if (!ContainerMetricsService._initialized) return;
 
     const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
@@ -116,7 +108,7 @@ export default class ContainerMetricsService {
     }
   }
 
-    static async getHistory({
+  public static async getHistory({
     container,
     device,
     range = "1h",
@@ -132,16 +124,13 @@ export default class ContainerMetricsService {
 
     const metricsCollection = db.collection(COLLECTIONS.CONTAINER_METRICS);
 
-    // Parse time range
-    const rangeMs = ContainerMetricsService._parseRange(range);
+    const rangeMs = DateHelpers.parseRangeToMilliseconds(range);
     const since = new Date(Date.now() - rangeMs);
 
-    // Build match filter
     const match: Record<string, unknown> = { timestamp: { $gte: since } };
     if (container) match["metadata.container"] = container;
     if (device) match["metadata.device"] = device;
 
-    // For longer ranges, use $bucketAuto to downsample and reduce payload
     const bucketCount = Math.min(limit, 120);
 
     try {
@@ -168,7 +157,6 @@ export default class ContainerMetricsService {
           },
         },
         {
-          // Trim to `limit` most recent points per container
           $project: {
             points: { $slice: ["$points", -bucketCount] },
           },
@@ -177,7 +165,6 @@ export default class ContainerMetricsService {
 
       const results = await metricsCollection.aggregate(pipeline).toArray();
 
-      // Reshape into { containerName: { device, points: [...] } }
       const containers: MetricsHistoryResult["containers"] = {};
       let totalSamples = 0;
 
@@ -206,20 +193,7 @@ export default class ContainerMetricsService {
     }
   }
 
-    static _parseRange(range: string): number {
-    const match = range.match(/^(\d+)(m|h|d)$/);
-    if (!match) return 60 * 60 * 1000; // default 1h
-
-    const value = parseInt(match[1], 10);
-    switch (match[2]) {
-      case "m": return value * 60 * 1000;
-      case "h": return value * 60 * 60 * 1000;
-      case "d": return value * 24 * 60 * 60 * 1000;
-      default:  return 60 * 60 * 1000;
-    }
-  }
-
-    static get persistIntervalMs(): number {
+  public static get persistIntervalMs(): number {
     return PERSIST_INTERVAL_MS;
   }
 }

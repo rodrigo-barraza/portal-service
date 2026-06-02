@@ -1,0 +1,185 @@
+import http from "http";
+import type { DeviceEntry, DockerActionResponse, DockerTransport } from "../types.ts";
+
+export class DockerClient {
+  public static parseTransport(dockerApiUrl: string, requestPath: string): DockerTransport {
+    if (dockerApiUrl.startsWith("unix://")) {
+      return { socketPath: dockerApiUrl.slice(7), path: requestPath };
+    }
+
+    if (dockerApiUrl.startsWith("tcp://")) {
+      const parsedUrl = new URL(dockerApiUrl.replace("tcp://", "http://"));
+      return {
+        hostname: parsedUrl.hostname,
+        port: parseInt(parsedUrl.port, 10) || 2375,
+        path: requestPath,
+      };
+    }
+
+    throw new Error(`Unsupported Docker API protocol: ${dockerApiUrl}`);
+  }
+
+  public static dockerRequest(
+    deviceEntry: DeviceEntry,
+    httpMethod: string,
+    requestPath: string,
+    options: { timeout?: number } = {}
+  ): Promise<DockerActionResponse> {
+    const timeoutMilliseconds = options.timeout ?? 30000;
+
+    return new Promise<DockerActionResponse>((resolve, reject) => {
+      if (!deviceEntry.dockerApi) {
+        return reject(new Error("No Docker API endpoint configured for this device"));
+      }
+
+      const transportOptions = this.parseTransport(deviceEntry.dockerApi, requestPath);
+
+      const clientRequest = http.request(
+        {
+          ...transportOptions,
+          method: httpMethod,
+          headers: { "Content-Type": "application/json" },
+        },
+        (clientResponse: http.IncomingMessage) => {
+          let responseBody = "";
+          clientResponse.on("data", (chunk: Buffer) => {
+            responseBody += chunk;
+          });
+          clientResponse.on("end", () => {
+            resolve({
+              statusCode: clientResponse.statusCode ?? 0,
+              body: responseBody,
+            });
+          });
+        }
+      );
+
+      clientRequest.setTimeout(timeoutMilliseconds, () => {
+        clientRequest.destroy(new Error(`Docker API timeout after ${timeoutMilliseconds}ms`));
+      });
+
+      clientRequest.on("error", reject);
+      clientRequest.end();
+    });
+  }
+
+  public static dockerGet(
+    deviceEntry: DeviceEntry,
+    requestPath: string,
+    timeoutMilliseconds: number = 8000
+  ): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      if (!deviceEntry.dockerApi) {
+        return reject(new Error("No Docker API endpoint configured for this device"));
+      }
+
+      const transportOptions = this.parseTransport(deviceEntry.dockerApi, requestPath);
+
+      const clientRequest = http.request(
+        {
+          ...transportOptions,
+          method: "GET",
+          headers: { Accept: "application/json" },
+        },
+        (clientResponse: http.IncomingMessage) => {
+          let responseBody = "";
+          clientResponse.on("data", (chunk: Buffer) => {
+            responseBody += chunk;
+          });
+          clientResponse.on("end", () => {
+            if (
+              clientResponse.statusCode &&
+              clientResponse.statusCode >= 200 &&
+              clientResponse.statusCode < 300
+            ) {
+              resolve(responseBody);
+            } else {
+              reject(
+                new Error(
+                  `Docker API GET returned status ${clientResponse.statusCode}: ${responseBody.substring(0, 200)}`
+                )
+              );
+            }
+          });
+        }
+      );
+
+      clientRequest.setTimeout(timeoutMilliseconds, () => {
+        clientRequest.destroy(new Error(`Docker API timeout after ${timeoutMilliseconds}ms`));
+      });
+
+      clientRequest.on("error", reject);
+      clientRequest.end();
+    });
+  }
+
+  public static streamLogs(
+    deviceEntry: DeviceEntry,
+    containerName: string,
+    queryParameters: Record<string, string>,
+    onData: (chunk: Buffer) => void,
+    onEnd: () => void,
+    onError: (error: Error) => void
+  ): http.ClientRequest {
+    if (!deviceEntry.dockerApi) {
+      throw new Error("No Docker API endpoint configured for this device");
+    }
+
+    const searchParameters = new URLSearchParams(queryParameters);
+    const requestPath = `/containers/${containerName}/logs?${searchParameters.toString()}`;
+    const transportOptions = this.parseTransport(deviceEntry.dockerApi, requestPath);
+
+    const clientRequest = http.request(
+      {
+        ...transportOptions,
+        method: "GET",
+      },
+      (clientResponse: http.IncomingMessage) => {
+        if (clientResponse.statusCode !== 200) {
+          let errorResponseBody = "";
+          clientResponse.on("data", (chunk: Buffer) => {
+            errorResponseBody += chunk;
+          });
+          clientResponse.on("end", () => {
+            try {
+              const parsedError = JSON.parse(errorResponseBody);
+              onError(new Error(parsedError.message || `Docker API error: ${clientResponse.statusCode}`));
+            } catch {
+              onError(new Error(`Docker API error: ${clientResponse.statusCode}`));
+            }
+            onEnd();
+          });
+          return;
+        }
+
+        let dataBuffer = Buffer.alloc(0);
+
+        clientResponse.on("data", (chunk: Buffer) => {
+          dataBuffer = Buffer.concat([dataBuffer, chunk]);
+
+          while (dataBuffer.length >= 8) {
+            const frameSize = dataBuffer.readUInt32BE(4);
+            const totalFrameSize = 8 + frameSize;
+
+            if (dataBuffer.length < totalFrameSize) {
+              break; // Frame is incomplete, wait for more data
+            }
+
+            const framePayload = dataBuffer.subarray(8, totalFrameSize);
+            dataBuffer = dataBuffer.subarray(totalFrameSize);
+
+            onData(framePayload);
+          }
+        });
+
+        clientResponse.on("end", onEnd);
+        clientResponse.on("error", onError);
+      }
+    );
+
+    clientRequest.on("error", onError);
+    clientRequest.end();
+
+    return clientRequest;
+  }
+}

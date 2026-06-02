@@ -1,0 +1,133 @@
+import { execSync } from "child_process";
+import os from "os";
+import logger from "../../utils/logger.ts";
+import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import type { DeviceEntry } from "../../types.ts";
+import { DockerClient } from "../../wrappers/DockerClient.ts";
+
+export class DockerSystemHelper {
+  public static async getSystemInfoForDevice(
+    deviceId: string,
+    deviceEntry: DeviceEntry,
+    systemRequestTimeout: number = 30000
+  ): Promise<Record<string, unknown>> {
+    const [infoResponseBody, diskFreeResponseBody] = await Promise.all([
+      DockerClient.dockerGet(deviceEntry, "/info", systemRequestTimeout),
+      DockerClient.dockerGet(deviceEntry, "/system/df", systemRequestTimeout),
+    ]);
+
+    const infoParsed = JSON.parse(infoResponseBody);
+    const diskFreeStats = JSON.parse(diskFreeResponseBody);
+
+    const imagesMapped = ((diskFreeStats.Images as Record<string, unknown>[]) || []).map(
+      (imageEntry: Record<string, unknown>) => ({
+        id: (imageEntry.Id as string)?.substring(0, 12) || "unknown",
+        tags: (imageEntry.RepoTags as string[]) || [],
+        size: (imageEntry.Size as number) || 0,
+        sharedSize: (imageEntry.SharedSize as number) || 0,
+        created: (imageEntry.Created as number) || 0,
+        containers: (imageEntry.Containers as number) || 0,
+      })
+    );
+
+    const totalImageSize = imagesMapped.reduce((sum, image) => sum + image.size, 0);
+    const totalImageShared = imagesMapped.reduce((sum, image) => sum + image.sharedSize, 0);
+
+    const volumesMapped = ((diskFreeStats.Volumes as Record<string, unknown>[]) || []).map(
+      (volumeEntry: Record<string, unknown>) => ({
+        name: volumeEntry.Name as string,
+        driver: volumeEntry.Driver as string,
+        size: (volumeEntry.UsageData as Record<string, number>)?.Size || 0,
+        refCount: (volumeEntry.UsageData as Record<string, number>)?.RefCount || 0,
+      })
+    );
+
+    const totalVolumeSize = volumesMapped.reduce((sum, volume) => sum + volume.size, 0);
+
+    const buildCacheEntries = (diskFreeStats.BuildCache as Record<string, unknown>[]) || [];
+    const totalBuildCacheSize = buildCacheEntries.reduce(
+      (sum, entry) => sum + ((entry.Size as number) || 0),
+      0
+    );
+
+    const containersDiskFree = ((diskFreeStats.Containers as Record<string, unknown>[]) || []).map(
+      (containerEntry: Record<string, unknown>) => ({
+        id: (containerEntry.Id as string)?.substring(0, 12) || "unknown",
+        names: (containerEntry.Names as string[]) || [],
+        sizeRw: (containerEntry.SizeRw as number) || 0,
+        sizeRootFs: (containerEntry.SizeRootFs as number) || 0,
+        state: containerEntry.State as string,
+      })
+    );
+
+    const totalContainerWritableSize = containersDiskFree.reduce(
+      (sum, container) => sum + container.sizeRw,
+      0
+    );
+
+    let hostDiskStats = null;
+    if (deviceEntry.dockerApi?.startsWith("unix://")) {
+      try {
+        const dfOutput = execSync("df -B1 / | tail -1", { encoding: "utf8", timeout: 3000 });
+        const dfOutputParts = dfOutput.trim().split(/\s+/);
+        if (dfOutputParts.length >= 5) {
+          const totalBytes = parseInt(dfOutputParts[1], 10) || 0;
+          const usedBytes = parseInt(dfOutputParts[2], 10) || 0;
+          const availableBytes = parseInt(dfOutputParts[3], 10) || 0;
+          const usagePercent =
+            totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 10000) / 100 : 0;
+
+          hostDiskStats = {
+            total: totalBytes,
+            used: usedBytes,
+            available: availableBytes,
+            percent: usagePercent,
+          };
+        }
+      } catch (error: unknown) {
+        logger.warn(
+          `[DockerSystemHelper:${deviceId}] Host disk stats failed: ${getErrorMessage(error)}`
+        );
+      }
+    }
+
+    return {
+      deviceId,
+      serverVersion: infoParsed.ServerVersion,
+      os: infoParsed.OperatingSystem,
+      architecture: infoParsed.Architecture,
+      totalMemory:
+        infoParsed.MemTotal || (deviceEntry.dockerApi?.startsWith("unix://") ? os.totalmem() : 0),
+      cpus: infoParsed.NCPU || (deviceEntry.dockerApi?.startsWith("unix://") ? os.cpus().length : 0),
+      containersRunning: infoParsed.ContainersRunning,
+      containersStopped: infoParsed.ContainersStopped,
+      containersPaused: infoParsed.ContainersPaused,
+      containersTotal: infoParsed.Containers,
+      hostDisk: hostDiskStats,
+      disk: {
+        images: {
+          count: imagesMapped.length,
+          totalSize: totalImageSize,
+          sharedSize: totalImageShared,
+          items: imagesMapped.sort((a, b) => b.size - a.size).slice(0, 20),
+        },
+        volumes: {
+          count: volumesMapped.length,
+          totalSize: totalVolumeSize,
+          items: volumesMapped.sort((a, b) => b.size - a.size),
+        },
+        buildCache: {
+          count: buildCacheEntries.length,
+          totalSize: totalBuildCacheSize,
+        },
+        containers: {
+          count: containersDiskFree.length,
+          totalWritableSize: totalContainerWritableSize,
+        },
+        totalReclaimable:
+          totalImageSize + totalVolumeSize + totalBuildCacheSize + totalContainerWritableSize,
+      },
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+}
