@@ -68,11 +68,11 @@ function formatRows(
 
   return response.rows.map((row: GoogleAnalyticsResponseRow) => {
     const entry: TransformedGoogleAnalyticsRow = {};
-    dimensionNames.forEach((name: string, i: number) => {
-      entry[name] = row.dimensionValues?.[i]?.value || "";
+    dimensionNames.forEach((name: string, index: number) => {
+      entry[name] = row.dimensionValues?.[index]?.value || "";
     });
-    metricNames.forEach((name: string, i: number) => {
-      const raw = row.metricValues?.[i]?.value || "0";
+    metricNames.forEach((name: string, index: number) => {
+      const raw = row.metricValues?.[index]?.value || "0";
       entry[name] = name.includes("Rate") || name.includes("Duration")
         ? parseFloat(raw)
         : parseInt(raw, 10);
@@ -135,9 +135,9 @@ export default class GoogleAnalyticsService {
       return {
         activeUsers: totalActive,
         topPages: pages
-          .sort((a: TransformedGoogleAnalyticsRow, b: TransformedGoogleAnalyticsRow) => {
-            const aUsers = typeof a.activeUsers === "number" ? a.activeUsers : 0;
-            const bUsers = typeof b.activeUsers === "number" ? b.activeUsers : 0;
+          .sort((firstRow: TransformedGoogleAnalyticsRow, secondRow: TransformedGoogleAnalyticsRow) => {
+            const aUsers = typeof firstRow.activeUsers === "number" ? firstRow.activeUsers : 0;
+            const bUsers = typeof secondRow.activeUsers === "number" ? secondRow.activeUsers : 0;
             return bUsers - aUsers;
           })
           .slice(0, 10),

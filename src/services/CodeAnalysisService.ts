@@ -91,9 +91,9 @@ export default class CodeAnalysisService {
     analysisCache = analysisResult;
     analysisCacheTimestamp = currentTimestamp;
 
-    const totalImports = Object.values(dependencies).reduce((sum, d) => sum + d.imports.length, 0);
+    const totalImports = Object.values(dependencies).reduce((sum, projectDependency) => sum + projectDependency.imports.length, 0);
     const totalApiCalls = Object.values(dependencies).reduce(
-      (sum, d) => sum + d.apiCalls.length,
+      (sum, projectDependency) => sum + projectDependency.apiCalls.length,
       0
     );
     logger.info(

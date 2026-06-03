@@ -109,12 +109,12 @@ export class DockerSystemHelper {
           count: imagesMapped.length,
           totalSize: totalImageSize,
           sharedSize: totalImageShared,
-          items: imagesMapped.sort((a, b) => b.size - a.size).slice(0, 20),
+          items: imagesMapped.sort((firstImage, secondImage) => secondImage.size - firstImage.size).slice(0, 20),
         },
         volumes: {
           count: volumesMapped.length,
           totalSize: totalVolumeSize,
-          items: volumesMapped.sort((a, b) => b.size - a.size),
+          items: volumesMapped.sort((firstVolume, secondVolume) => secondVolume.size - firstVolume.size),
         },
         buildCache: {
           count: buildCacheEntries.length,

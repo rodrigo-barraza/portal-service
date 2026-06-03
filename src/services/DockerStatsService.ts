@@ -50,7 +50,7 @@ export default class DockerStatsService {
       }
     }
 
-    return combined.sort((a, b) => a.name.localeCompare(b.name));
+    return combined.sort((firstContainer, secondContainer) => firstContainer.name.localeCompare(secondContainer.name));
   }
 
   public static async _getAllForDevice(
@@ -111,8 +111,8 @@ export default class DockerStatsService {
         })
       );
 
-      const result = (stats.filter(Boolean) as ContainerStats[]).sort((a, b) =>
-        a.name.localeCompare(b.name)
+      const result = (stats.filter(Boolean) as ContainerStats[]).sort((firstContainer, secondContainer) =>
+        firstContainer.name.localeCompare(secondContainer.name)
       );
 
       const counters = cpuCounterMap.get(deviceId);
