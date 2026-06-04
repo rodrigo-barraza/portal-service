@@ -36,7 +36,6 @@ const INTEGRATIONS = [
   { envKey: "FRED_API_KEY",         provider: "FRED",        category: "Finance",          docs: "https://fred.stlouisfed.org/docs/api/api_key.html" },
 
   // ── Product / eCommerce ────────────────────────────────────
-  { envKey: "BESTBUY_API_KEY",       provider: "Best Buy",        category: "eCommerce",    docs: "https://developer.bestbuy.com" },
   { envKey: "PRODUCTHUNT_API_KEY",   provider: "Product Hunt",    category: "eCommerce",    docs: "https://www.producthunt.com/v2/oauth/applications" },
   { envKey: "EBAY_CLIENT_ID",        provider: "eBay",            category: "eCommerce",    docs: "https://developer.ebay.com/my/keys" },
   { envKey: "ETSY_API_KEY",          provider: "Etsy",            category: "eCommerce",    docs: "https://www.etsy.com/developers/your-apps" },
