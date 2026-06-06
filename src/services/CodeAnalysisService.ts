@@ -1,7 +1,7 @@
 import { PROJECTS } from "../config.ts";
 import logger from "../utils/logger.ts";
 import { GitHubClient } from "../wrappers/GitHubClient.ts";
-import { EcosystemResolver } from "./code-analysis/EcosystemResolver.ts";
+import { EcosystemResolver, type EcosystemOwners } from "./code-analysis/EcosystemResolver.ts";
 
 const CACHE_TTL_MILLISECONDS = 15 * 60 * 1000;
 const CONFIG_PATHS = ["config.ts", "src/config.ts", "config.js", "src/config.js"];
@@ -112,7 +112,7 @@ export default class CodeAnalysisService {
     repoSlug: string,
     selfId: string,
     projectIds: Set<string>,
-    ecosystemOwners: any
+    ecosystemOwners: EcosystemOwners
   ): Promise<ImportEdge[]> {
     const packageJsonContent = await GitHubClient.fetchFile(repoSlug, "package.json");
     if (!packageJsonContent) return [];

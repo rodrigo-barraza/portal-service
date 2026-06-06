@@ -96,9 +96,11 @@ export default class DockerStatsService {
               previousCpuState
             );
 
+            const rawCpuStats = rawStats.cpu_stats as Record<string, unknown> | undefined;
+            const rawCpuUsage = rawCpuStats?.cpu_usage as Record<string, unknown> | undefined;
             deviceCounters.set(containerId, {
-              cpuTotal: (rawStats.cpu_stats as any)?.cpu_usage?.total_usage || 0,
-              systemTotal: (rawStats.cpu_stats as any)?.system_cpu_usage || 0,
+              cpuTotal: (rawCpuUsage?.total_usage as number) || 0,
+              systemTotal: (rawCpuStats?.system_cpu_usage as number) || 0,
             });
 
             return parsedStats;
@@ -260,7 +262,7 @@ export default class DockerStatsService {
 
     return results
       .filter(
-        (promiseResult): promiseResult is PromiseFulfilledResult<any> =>
+        (promiseResult): promiseResult is PromiseFulfilledResult<{ deviceId: string; deviceName: string }> =>
           promiseResult.status === "fulfilled"
       )
       .map((promiseResult) => promiseResult.value);
