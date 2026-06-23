@@ -16,15 +16,13 @@ const INTEGRATIONS = [
   // ── AI / LLM ───────────────────────────────────────────────
   { envKey: "OPENAI_API_KEY",       provider: "OpenAI",       category: "AI / LLM",         docs: "https://platform.openai.com/api-keys" },
   { envKey: "ANTHROPIC_API_KEY",    provider: "Anthropic",    category: "AI / LLM",         docs: "https://console.anthropic.com/settings/keys" },
-  { envKey: "GOOGLE_API_KEY",       provider: "Google AI",    category: "AI / LLM",         docs: "https://aistudio.google.com/apikey" },
+  { envKey: "GOOGLE_CLOUD_GEMINI_API_KEY", provider: "Google AI",  category: "AI / LLM",         docs: "https://aistudio.google.com/apikey" },
   { envKey: "ELEVENLABS_API_KEY",   provider: "ElevenLabs",   category: "AI / LLM",         docs: "https://elevenlabs.io/app/settings/api-keys" },
   { envKey: "INWORLD_BASIC",        provider: "Inworld AI",   category: "AI / LLM",         docs: "https://studio.inworld.ai" },
 
   // ── Google (Service-Specific) ──────────────────────────────
-  { envKey: "GOOGLE_PLACES_API_KEY",  provider: "Google Places",     category: "Google Cloud", docs: "https://console.cloud.google.com/apis/credentials" },
-  { envKey: "GOOGLE_CSE_CX",          provider: "Google CSE",        category: "Google Cloud", docs: "https://programmablesearchengine.google.com" },
   { envKey: "GOOGLE_CLOUD_API_KEY",   provider: "Google Cloud",      category: "Google Cloud", docs: "https://console.cloud.google.com/apis/credentials" },
-  { envKey: "GOOGLE_STICKERS_API_KEY",provider: "Google (Stickers)", category: "Google Cloud", docs: "https://console.cloud.google.com/apis/credentials" },
+  { envKey: "GOOGLE_CSE_CX",          provider: "Google CSE",        category: "Google Cloud", docs: "https://programmablesearchengine.google.com" },
 
   // ── Events & Entertainment ─────────────────────────────────
   { envKey: "TICKETMASTER_API_KEY", provider: "Ticketmaster", category: "Events & Entertainment", docs: "https://developer.ticketmaster.com" },
