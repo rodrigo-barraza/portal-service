@@ -1,5 +1,7 @@
 // ── Smoke tests — validates core modules load without side-effects ──
 
+import { describe, it, expect } from "vitest";
+
 describe('portal-service smoke', () => {
   it('config.ts should export valid configuration', async () => {
     const config = await import('../src/config.ts');
@@ -11,4 +13,5 @@ describe('portal-service smoke', () => {
     expect(constants).toBeTruthy();
   });
 });
+
 
