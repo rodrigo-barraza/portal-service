@@ -1,8 +1,21 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { EcosystemResolver } from "../src/services/code-analysis/EcosystemResolver.ts";
 import { PROJECTS } from "../src/config.ts";
 
 describe("EcosystemResolver", () => {
+  let projectsBackup: Record<string, any>;
+
+  beforeEach(() => {
+    projectsBackup = { ...PROJECTS };
+  });
+
+  afterEach(() => {
+    for (const key of Object.keys(PROJECTS)) {
+      delete PROJECTS[key];
+    }
+    Object.assign(PROJECTS, projectsBackup);
+  });
+
   describe("deriveEcosystemOwners", () => {
     it("should extract owners and scope prefixes from projects registry", () => {
       // Setup mock projects registry entries

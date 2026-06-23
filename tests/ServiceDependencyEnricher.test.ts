@@ -52,7 +52,7 @@ describe("ServiceDependencyEnricher", () => {
     const servicesList = [
       { id: "lone-service", name: "Lone Service" },
     ];
-    const infrastructureList = [] as any[];
+    const infrastructureList = [] as Record<string, unknown>[];
 
     const result = ServiceDependencyEnricher.enrich(servicesList, infrastructureList);
 

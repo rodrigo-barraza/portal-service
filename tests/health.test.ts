@@ -1,16 +1,41 @@
 // ── Health + Config tests for portal-service ──
 // Hand-rolled Express app — tests config and health contract shape.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import type { Request, Response } from "express";
+
+vi.mock("express", async (importOriginal) => {
+  const original = await importOriginal<typeof import("express")>();
+  return {
+    ...original,
+    Router: () => ({
+      get: (path: string, handler: any) => {
+        if (path === "/") {
+          (globalThis as any).healthHandler = handler;
+        }
+      },
+    }),
+  };
+});
+
+import "../src/routes/HealthRoutes.ts";
 
 // ── Health ─────────────────────────────────────────────────────
 describe("Health", () => {
   it("health endpoint returns expected shape", () => {
-    const response = {
-      status: "ok",
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-    };
+    const healthHandler = (globalThis as any).healthHandler;
+    expect(healthHandler).toBeDefined();
+
+    const requestMock = {} as Request;
+    const jsonSpy = vi.fn();
+    const responseMock = {
+      json: jsonSpy,
+    } as unknown as Response;
+
+    healthHandler(requestMock, responseMock);
+
+    expect(jsonSpy).toHaveBeenCalled();
+    const response = jsonSpy.mock.calls[0][0];
     expect(response.status).toBe("ok");
     expect(response.uptime).toBeGreaterThanOrEqual(0);
     expect(typeof response.timestamp).toBe("string");
