@@ -11,7 +11,7 @@ interface GoogleCloudApiDefinition {
   displayName: string;
   category: string;
   consumer: string;
-  docsUrl: string;
+  documentationUrl: string;
 }
 
 const TRACKED_API_DEFINITIONS: GoogleCloudApiDefinition[] = [
@@ -20,63 +20,63 @@ const TRACKED_API_DEFINITIONS: GoogleCloudApiDefinition[] = [
     displayName: "Places API (New)",
     category: "Maps & Location",
     consumer: "tools-service",
-    docsUrl: "https://developers.google.com/maps/documentation/places/web-service",
+    documentationUrl: "https://developers.google.com/maps/documentation/places/web-service",
   },
   {
     serviceIdentifier: "geocoding-backend",
     displayName: "Geocoding API",
     category: "Maps & Location",
     consumer: "tools-service",
-    docsUrl: "https://developers.google.com/maps/documentation/geocoding",
+    documentationUrl: "https://developers.google.com/maps/documentation/geocoding",
   },
   {
     serviceIdentifier: "static-maps-backend",
     displayName: "Static Maps API",
     category: "Maps & Location",
     consumer: "tools-service",
-    docsUrl: "https://developers.google.com/maps/documentation/maps-static",
+    documentationUrl: "https://developers.google.com/maps/documentation/maps-static",
   },
   {
     serviceIdentifier: "airquality.googleapis.com",
     displayName: "Air Quality API",
     category: "Environmental",
     consumer: "tools-service",
-    docsUrl: "https://developers.google.com/maps/documentation/air-quality",
+    documentationUrl: "https://developers.google.com/maps/documentation/air-quality",
   },
   {
     serviceIdentifier: "pollen.googleapis.com",
     displayName: "Pollen API",
     category: "Environmental",
     consumer: "tools-service",
-    docsUrl: "https://developers.google.com/maps/documentation/pollen",
+    documentationUrl: "https://developers.google.com/maps/documentation/pollen",
   },
   {
     serviceIdentifier: "customsearch.googleapis.com",
     displayName: "Custom Search JSON API",
     category: "Search",
     consumer: "tools-service",
-    docsUrl: "https://developers.google.com/custom-search/v1",
+    documentationUrl: "https://developers.google.com/custom-search/v1",
   },
   {
     serviceIdentifier: "youtube.googleapis.com",
     displayName: "YouTube Data API v3",
     category: "Media",
     consumer: "tools-service",
-    docsUrl: "https://developers.google.com/youtube/v3",
+    documentationUrl: "https://developers.google.com/youtube/v3",
   },
   {
     serviceIdentifier: "calendar-json.googleapis.com",
     displayName: "Google Calendar API",
     category: "Productivity",
     consumer: "tools-service",
-    docsUrl: "https://developers.google.com/calendar",
+    documentationUrl: "https://developers.google.com/calendar",
   },
   {
     serviceIdentifier: "analyticsdata.googleapis.com",
     displayName: "GA4 Data API",
     category: "Analytics",
     consumer: "portal-service",
-    docsUrl: "https://developers.google.com/analytics/devguides/reporting/data/v1",
+    documentationUrl: "https://developers.google.com/analytics/devguides/reporting/data/v1",
   },
 ];
 
@@ -87,7 +87,7 @@ interface ApiUsageSummary {
   displayName: string;
   category: string;
   consumer: string;
-  docsUrl: string;
+  documentationUrl: string;
   totalRequests: number;
   successRequests: number;
   errorRequests: number;
@@ -296,7 +296,7 @@ export default class GoogleCloudUsageService {
         displayName: definition.displayName,
         category: definition.category,
         consumer: definition.consumer,
-        docsUrl: definition.docsUrl,
+        documentationUrl: definition.documentationUrl,
         totalRequests: serviceData.totalRequests,
         successRequests: serviceData.successRequests,
         errorRequests: serviceData.errorRequests,

@@ -71,15 +71,4 @@ router.get("/timeseries", async (request: Request, response: Response) => {
   }
 });
 
-// ── GET /apis — List tracked API definitions ──────────────────
-// Returns the static list of all Google Cloud APIs we track,
-// regardless of whether they have usage data.
-
-router.get("/apis", (_request: Request, response: Response) => {
-  response.json({
-    apis: GoogleCloudUsageService.getTrackedApis(),
-    count: GoogleCloudUsageService.getTrackedApis().length,
-  });
-});
-
 export default router;
