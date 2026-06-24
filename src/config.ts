@@ -163,5 +163,11 @@ export const STATS_CACHE_TTL_MS = 30_000;
 export const GOOGLE_ANALYTICS_CREDENTIALS = process.env.GOOGLE_ANALYTICS_CREDENTIALS;
 // Note: ANALYTICS_PROPERTIES is derived from registry entries (see initializeRegistry above)
 
+// ── Cloud Monitoring (API Usage Dashboard) ────────────────────
+// The GCP project ID to query for API usage metrics (serviceruntime.googleapis.com).
+// This may differ from the GA4 service account's project_id when API keys
+// (Places, YouTube, Geocoding, etc.) belong to a separate GCP project.
+export const GOOGLE_CLOUD_MONITORING_PROJECT_ID = process.env.GOOGLE_CLOUD_MONITORING_PROJECT_ID;
+
 // ── Sessions Service (first-party analytics) ──────────────────
 export const SESSIONS_SERVICE_URL = process.env.SESSIONS_SERVICE_URL;

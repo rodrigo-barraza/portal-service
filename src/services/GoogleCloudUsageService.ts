@@ -1,6 +1,6 @@
 import { MetricServiceClient } from "@google-cloud/monitoring";
 import logger from "../utils/logger.ts";
-import { GOOGLE_ANALYTICS_CREDENTIALS } from "../config.ts";
+import { GOOGLE_ANALYTICS_CREDENTIALS, GOOGLE_CLOUD_MONITORING_PROJECT_ID } from "../config.ts";
 
 // ── Known Google Cloud APIs Used ──────────────────────────────────
 // Curated allowlist of GCP APIs consumed by our infrastructure.
@@ -184,14 +184,18 @@ export default class GoogleCloudUsageService {
       projectId: credentials.project_id,
     });
 
-    GoogleCloudUsageService.cachedProjectId = credentials.project_id;
-    logger.success("[CloudUsage] Monitoring client initialized");
+    // Prefer the explicit monitoring project ID over the service account's own project,
+    // since API keys (Places, YouTube, etc.) may belong to a different GCP project.
+    const targetProjectId = GOOGLE_CLOUD_MONITORING_PROJECT_ID || credentials.project_id;
+    GoogleCloudUsageService.cachedProjectId = targetProjectId;
+    logger.success(`[CloudUsage] Monitoring client initialized — querying project: ${targetProjectId}`);
 
     return {
       client: GoogleCloudUsageService.monitoringClient,
-      projectId: credentials.project_id,
+      projectId: targetProjectId,
     };
   }
+
 
   static getTrackedApis(): GoogleCloudApiDefinition[] {
     return TRACKED_API_DEFINITIONS;
