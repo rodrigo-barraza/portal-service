@@ -117,7 +117,7 @@ export class DockerClient {
     deviceEntry: DeviceEntry,
     containerName: string,
     queryParameters: Record<string, string>,
-    onData: (chunk: Buffer) => void,
+    onData: (chunk: Buffer, streamType: number) => void,
     onEnd: () => void,
     onError: (error: Error) => void
   ): http.ClientRequest {
@@ -158,6 +158,7 @@ export class DockerClient {
           dataBuffer = Buffer.concat([dataBuffer, chunk]);
 
           while (dataBuffer.length >= 8) {
+            const streamType = dataBuffer.readUInt8(0);
             const frameSize = dataBuffer.readUInt32BE(4);
             const totalFrameSize = 8 + frameSize;
 
@@ -168,7 +169,7 @@ export class DockerClient {
             const framePayload = dataBuffer.subarray(8, totalFrameSize);
             dataBuffer = dataBuffer.subarray(totalFrameSize);
 
-            onData(framePayload);
+            onData(framePayload, streamType);
           }
         });
 
