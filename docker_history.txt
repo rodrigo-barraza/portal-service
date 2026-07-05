@@ -1,2 +1,0 @@
-6a3f12d refactor: rename project branding from Portal API to API throughout documentation and source files
-d6152c1 feat: add Docker support, centralized deployment scripts, and improve Vault secret resolution logic
