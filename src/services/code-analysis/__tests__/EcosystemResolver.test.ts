@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { EcosystemResolver } from "../src/services/code-analysis/EcosystemResolver.ts";
-import { PROJECTS } from "../src/config.ts";
+import { EcosystemResolver } from "../EcosystemResolver.ts";
+import { PROJECTS } from "../../../config.ts";
 
 describe("EcosystemResolver", () => {
   let projectsBackup: Record<string, any>;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getErrorMessage } from "../src/utils/ErrorHelpers.ts";
+import { getErrorMessage } from "../ErrorHelpers.ts";
 
 describe("ErrorHelpers", () => {
   it("should extract message from Error instance", () => {

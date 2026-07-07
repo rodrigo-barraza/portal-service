@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { errorHandler } from "../src/utils/errors.ts";
-import logger from "../src/utils/logger.ts";
+import { errorHandler } from "../errors.ts";
+import logger from "../logger.ts";
 import type { Request, Response } from "express";
 
 describe("errorHandler middleware", () => {

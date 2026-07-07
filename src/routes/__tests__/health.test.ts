@@ -18,7 +18,7 @@ vi.mock("express", async (importOriginal) => {
   };
 });
 
-import "../src/routes/HealthRoutes.ts";
+import "../HealthRoutes.ts";
 
 // ── Health ─────────────────────────────────────────────────────
 describe("Health", () => {
@@ -46,17 +46,17 @@ describe("Health", () => {
 // ── Config ─────────────────────────────────────────────────────
 describe("Config", () => {
   it("should export PORT constant", async () => {
-    const config = await import("../src/config.ts");
+    const config = await import("../../config.ts");
     expect("PORT" in config).toBe(true);
   });
 
   it("should export MONGO_URI constant", async () => {
-    const config = await import("../src/config.ts");
+    const config = await import("../../config.ts");
     expect("MONGO_URI" in config).toBe(true);
   });
 
   it("should export MONGO_DB_NAME constant", async () => {
-    const config = await import("../src/config.ts");
+    const config = await import("../../config.ts");
     expect("MONGO_DB_NAME" in config).toBe(true);
   });
 });

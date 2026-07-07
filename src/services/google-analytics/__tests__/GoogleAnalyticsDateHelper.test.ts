@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { GoogleAnalyticsDateHelper } from "../src/services/google-analytics/GoogleAnalyticsDateHelper.ts";
+import { GoogleAnalyticsDateHelper } from "../GoogleAnalyticsDateHelper.ts";
 
 describe("GoogleAnalyticsDateHelper", () => {
   describe("periodToDateRange", () => {

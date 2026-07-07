@@ -4,12 +4,12 @@ import { describe, it, expect } from "vitest";
 
 describe('portal-service smoke', () => {
   it('config.ts should export valid configuration', async () => {
-    const config = await import('../src/config.ts');
+    const config = await import('../config.ts');
     expect(config).toBeTruthy();
   });
 
   it('constants.ts should export values', async () => {
-    const constants = await import('../src/constants.ts');
+    const constants = await import('../constants.ts');
     expect(constants).toBeTruthy();
   });
 });

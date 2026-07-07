@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ServiceDependencyEnricher } from "../src/routes/helpers/ServiceDependencyEnricher.ts";
+import { ServiceDependencyEnricher } from "../ServiceDependencyEnricher.ts";
 
 describe("ServiceDependencyEnricher", () => {
   it("should enrich service dependencies and inverse dependedOnBy mapping", () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DockerStatsParser } from "../src/services/docker/DockerStatsParser.ts";
+import { DockerStatsParser } from "../DockerStatsParser.ts";
 
 describe("DockerStatsParser", () => {
   const mockContainerDetails = {

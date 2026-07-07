@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DateHelpers } from "../src/utils/DateHelpers.ts";
+import { DateHelpers } from "../DateHelpers.ts";
 
 describe("DateHelpers", () => {
   it("should parse range string '5m' to correct milliseconds", () => {
