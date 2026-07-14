@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { AUTH_HEADERS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { SESSIONS_SERVICE_URL, SESSIONS_STATS_API_SECRET } from "../config.ts";
 
 /**
@@ -40,7 +41,7 @@ async function proxy(
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        ...(SESSIONS_STATS_API_SECRET ? { "x-api-secret": SESSIONS_STATS_API_SECRET } : {}),
+        ...(SESSIONS_STATS_API_SECRET ? { [AUTH_HEADERS.apiSecret]: SESSIONS_STATS_API_SECRET } : {}),
       },
       signal: AbortSignal.timeout(15_000),
     });
