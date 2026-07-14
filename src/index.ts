@@ -7,7 +7,7 @@ import cors from "cors";
 
 import { errorHandler } from "./utils/errors.ts";
 import { getErrorMessage, MILLISECONDS_PER_MINUTE } from "@rodrigo-barraza/utilities-library";
-import { installShutdownHandlers, registerCleanup } from "@rodrigo-barraza/service-library";
+import { installShutdownHandlers, registerCleanup } from "@rodrigo-barraza/utilities-library/service";
 import logger from "./utils/logger.ts";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
 import MongoWrapper from "./wrappers/MongoWrapper.ts";

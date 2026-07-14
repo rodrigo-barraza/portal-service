@@ -28,7 +28,6 @@
   "dependencies": {
     "@google-analytics/data": "^5.2.2",
     "@google-cloud/monitoring": "^4.1.0",
-    "@rodrigo-barraza/service-library": "github:rodrigo-barraza/service-library",
     "@rodrigo-barraza/utilities-library": "github:rodrigo-barraza/utilities-library",
     "cors": "^2.8.6",
     "express": "^5.2.1",

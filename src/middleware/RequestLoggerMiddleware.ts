@@ -1,8 +1,8 @@
 // ─── Request Logger Middleware ──────────────────────────────
-// Delegates to @rodrigo-barraza/service-library's standard implementation.
+// Delegates to @rodrigo-barraza/utilities-library/service's standard implementation.
 // ─────────────────────────────────────────────────────────────
 
-import { createRequestLoggerMiddleware } from "@rodrigo-barraza/service-library";
+import { createRequestLoggerMiddleware } from "@rodrigo-barraza/utilities-library/service";
 import logger from "../utils/logger.ts";
 
 export const requestLoggerMiddleware = createRequestLoggerMiddleware(logger, {

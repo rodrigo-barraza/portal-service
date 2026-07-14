@@ -1,10 +1,10 @@
 // ─── MongoDB Connection Wrapper ─────────────────────────────
-// Delegates to @rodrigo-barraza/service-library/mongo.
+// Delegates to @rodrigo-barraza/utilities-library/service/mongo.
 // Preserves the MongoWrapper.createClient / getDb interface
 // that portal-service consumers expect.
 // ─────────────────────────────────────────────────────────────
 
-import { connectDatabase, getDatabase, disconnectDatabase } from "@rodrigo-barraza/service-library/mongo";
+import { connectDatabase, getDatabase, disconnectDatabase } from "@rodrigo-barraza/utilities-library/service/mongo";
 import type { Db } from "mongodb";
 import logger from "../utils/logger.ts";
 
