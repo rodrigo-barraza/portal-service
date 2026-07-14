@@ -131,12 +131,17 @@ export default class ContainerMetricsService {
     if (container) match["metadata.container"] = container;
     if (device) match["metadata.device"] = device;
 
-    const bucketCount = Math.min(limit, 120);
+    const bucketCount = Math.min(
+      Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 120,
+      120,
+    );
 
     try {
+      // $topN keeps only the newest bucketCount samples per container while
+      // grouping, instead of sorting and accumulating the entire range into
+      // memory just to $slice most of it away (requires MongoDB 5.2+).
       const pipeline: Record<string, unknown>[] = [
         { $match: match },
-        { $sort: { "metadata.container": 1, timestamp: 1 } },
         {
           $group: {
             _id: {
@@ -144,21 +149,20 @@ export default class ContainerMetricsService {
               device: "$metadata.device",
             },
             points: {
-              $push: {
-                t: "$timestamp",
-                cpu: "$cpu",
-                mem: "$memoryUsed",
-                memLimit: "$memoryLimit",
-                netRx: "$netRx",
-                netTx: "$netTx",
-                pids: "$pids",
+              $topN: {
+                n: bucketCount,
+                sortBy: { timestamp: -1 },
+                output: {
+                  t: "$timestamp",
+                  cpu: "$cpu",
+                  mem: "$memoryUsed",
+                  memLimit: "$memoryLimit",
+                  netRx: "$netRx",
+                  netTx: "$netTx",
+                  pids: "$pids",
+                },
               },
             },
-          },
-        },
-        {
-          $project: {
-            points: { $slice: ["$points", -bucketCount] },
           },
         },
       ];
@@ -170,6 +174,8 @@ export default class ContainerMetricsService {
 
       for (const doc of results as unknown as AggregateHistoryDocument[]) {
         const name = doc._id.container;
+        // $topN returns newest-first; callers expect chronological order
+        doc.points.reverse();
         containers[name] = {
           device: doc._id.device,
           points: doc.points.map((point) => ({

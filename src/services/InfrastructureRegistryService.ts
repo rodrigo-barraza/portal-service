@@ -108,16 +108,30 @@ export default class InfrastructureRegistryService {
     }
   }
 
+  // Persistent health-check client — reconnecting via a fresh MongoClient on
+  // every 60s sweep costs a full TCP + auth handshake and spams the server's
+  // connection log. The driver's topology monitoring handles reconnects; on
+  // command failure we discard the client so the next sweep starts clean.
+  static _healthCheckClient: MongoClient | null = null;
+
+  static async _getHealthCheckMongoClient(): Promise<MongoClient> {
+    if (!InfrastructureRegistryService._healthCheckClient) {
+      const client = new MongoClient(String(MONGO_URI), {
+        serverSelectionTimeoutMS: HEALTH_CHECK_TIMEOUT_MS,
+        connectTimeoutMS: HEALTH_CHECK_TIMEOUT_MS,
+        maxPoolSize: 2,
+      });
+      await client.connect();
+      InfrastructureRegistryService._healthCheckClient = client;
+    }
+    return InfrastructureRegistryService._healthCheckClient;
+  }
+
   public static async _checkMongo() {
     if (!MONGO_URI) throw new Error("No MONGO_URI configured");
 
-    const client = new MongoClient(MONGO_URI, {
-      serverSelectionTimeoutMS: HEALTH_CHECK_TIMEOUT_MS,
-      connectTimeoutMS: HEALTH_CHECK_TIMEOUT_MS,
-    });
-
     try {
-      await client.connect();
+      const client = await InfrastructureRegistryService._getHealthCheckMongoClient();
       const admin = client.db("admin");
 
       await admin.command({ ping: 1 });
@@ -141,8 +155,12 @@ export default class InfrastructureRegistryService {
       }
 
       return metadata;
-    } finally {
-      await client.close();
+    } catch (error: unknown) {
+      // Discard the cached client so the next sweep reconnects from scratch
+      const staleClient = InfrastructureRegistryService._healthCheckClient;
+      InfrastructureRegistryService._healthCheckClient = null;
+      if (staleClient) await staleClient.close().catch(() => {});
+      throw error;
     }
   }
 
