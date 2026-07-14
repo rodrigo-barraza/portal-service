@@ -34,10 +34,9 @@ const LEVEL_FILTER_MINIMUM_SEVERITY: Record<string, number> = {
 
 // Matches the logger format: [HH:MM:SS] LEVEL  or ANSI-wrapped equivalent.
 // After ANSI stripping, the level token appears after "] " as a padded 5-char word.
-const LOG_LEVEL_PATTERN = /\]\s+(ERROR|WARN |INFO |OK   |DEBUG)\s/;
+const LOG_LEVEL_PATTERN = /\]\s+(ERROR|WARN |INFO |OK {3}|DEBUG)\s/;
 
-// Docker mux stream types
-const DOCKER_STREAM_STDOUT = 1;
+// Docker mux stream type (1 = stdout, 2 = stderr)
 const DOCKER_STREAM_STDERR = 2;
 
 // eslint-disable-next-line no-control-regex

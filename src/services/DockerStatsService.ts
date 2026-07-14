@@ -1,5 +1,5 @@
 import logger from "../utils/logger.ts";
-import { getErrorMessage, MILLISECONDS_PER_MINUTE, seconds } from "@rodrigo-barraza/utilities-library";
+import { getErrorMessage, seconds } from "@rodrigo-barraza/utilities-library";
 import { DEVICES } from "../config.ts";
 import ContainerMetricsService from "./ContainerMetricsService.ts";
 import type {
@@ -13,13 +13,11 @@ import { DockerStatsParser } from "./docker/DockerStatsParser.ts";
 import { DockerSystemHelper } from "./docker/DockerSystemHelper.ts";
 
 const STATS_CACHE_TTL_MS = 10_000;
-const SYSTEM_CACHE_TTL_MS = MILLISECONDS_PER_MINUTE;
 const SYSTEM_REQUEST_TIMEOUT_MS = seconds(30);
 const HISTORY_INTERVAL_MS = 5_000;
 const HISTORY_MAX_SAMPLES = 60;
 
 const statsCacheMap = new Map<string, { data: ContainerStats[]; fetchedAt: number }>();
-const systemCacheMap = new Map<string, { data: Record<string, unknown>; fetchedAt: number }>();
 const cpuCounterMap = new Map<string, Map<string, { cpuTotal: number; systemTotal: number }>>();
 const historyMap = new Map<string, ContainerSnapshot[]>();
 const lastPersistMap = new Map<string, number>();
@@ -150,10 +148,8 @@ export default class DockerStatsService {
   public static invalidate(deviceId?: string): void {
     if (deviceId) {
       statsCacheMap.delete(deviceId);
-      systemCacheMap.delete(deviceId);
     } else {
       statsCacheMap.clear();
-      systemCacheMap.clear();
     }
   }
 
