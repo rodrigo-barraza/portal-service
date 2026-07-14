@@ -220,32 +220,66 @@ router.get("/:containerName", asyncHandler(async (req: Request, res: Response) =
   }
 
   try {
+    // TTY containers stream raw output (no stdout/stderr mux framing) —
+    // the parser must know which mode to use before connecting.
+    let isTty = false;
+    try {
+      const inspectBody = await DockerClient.dockerGet(
+        deviceEntry,
+        `/containers/${encodeURIComponent(String(containerName))}/json`
+      );
+      isTty = JSON.parse(inspectBody)?.Config?.Tty === true;
+    } catch {
+      // Inspect failure: assume non-TTY (the overwhelmingly common case)
+    }
+
+    // A log line can be split across mux frames / network chunks — buffer
+    // the partial tail per stream so filters always see complete lines.
+    const lineRemainders: Record<string, string> = { stdout: "", stderr: "" };
+
+    function processLine(line: string, streamSource: string) {
+      if (line.length === 0) return;
+
+      totalLineCount++;
+
+      if (isFiltering) {
+        const strippedLine = stripAnsiCodes(line);
+        if (!shouldIncludeLine(line, strippedLine, minimumSeverity, searchFilter)) {
+          return;
+        }
+      }
+
+      emittedLineCount++;
+      sendLine(line, streamSource);
+    }
+
     const dockerRequest = DockerClient.streamLogs(
       deviceEntry,
       String(containerName),
       dockerQueryParameters,
+      isTty,
       (payloadChunk: Buffer, streamType: number) => {
         const streamSource = streamType === DOCKER_STREAM_STDERR ? "stderr" : "stdout";
-        const payloadLines = payloadChunk.toString("utf8").split("\n");
+        const text = lineRemainders[streamSource] + payloadChunk.toString("utf8");
+        const payloadLines = text.split("\n");
+        // The final element is either "" (chunk ended on a newline) or a
+        // partial line — hold it back until the rest arrives.
+        lineRemainders[streamSource] = payloadLines.pop() ?? "";
 
         for (const line of payloadLines) {
-          if (line.length === 0) continue;
-
-          totalLineCount++;
-
-          if (isFiltering) {
-            const strippedLine = stripAnsiCodes(line);
-            if (!shouldIncludeLine(line, strippedLine, minimumSeverity, searchFilter)) {
-              continue;
-            }
-          }
-
-          emittedLineCount++;
-          sendLine(line, streamSource);
+          // TTY output uses \r\n line endings
+          processLine(line.endsWith("\r") ? line.slice(0, -1) : line, streamSource);
         }
       },
       () => {
         logger.info(`[Logs] Docker stream ended for ${containerName}`);
+        // Flush any partial trailing lines before closing
+        for (const streamSource of ["stdout", "stderr"]) {
+          if (lineRemainders[streamSource]) {
+            processLine(lineRemainders[streamSource], streamSource);
+            lineRemainders[streamSource] = "";
+          }
+        }
         if (!res.writableEnded) {
           sendMeta();
           res.write(`event: end\ndata: ${JSON.stringify({ code: 0 })}\n\n`);

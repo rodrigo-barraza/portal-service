@@ -268,7 +268,7 @@ export default class DockerStatsService {
     device: DeviceEntry,
     method: string,
     path: string,
-    options?: { timeout?: number }
+    options?: { timeout?: number; body?: unknown }
   ): Promise<DockerActionResponse> {
     return DockerClient.dockerRequest(device, method, path, options);
   }

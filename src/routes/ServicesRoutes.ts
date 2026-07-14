@@ -13,7 +13,7 @@ import {
 } from "../config.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import type { ProjectEntry, TtlCache, VaultRegistry } from "../types.ts";
+import type { DeviceEntry, ProjectEntry, TtlCache, VaultRegistry } from "../types.ts";
 import { ServiceDependencyEnricher } from "./helpers/ServiceDependencyEnricher.ts";
 import { GitHubClient } from "../wrappers/GitHubClient.ts";
 
@@ -28,6 +28,151 @@ function resolveDockerDevice(service: ProjectEntry) {
   }
 
   return { id: deviceId, device };
+}
+
+/**
+ * Stop, rename, and replace a container so it runs the given image tag.
+ * Docker binds a container to an image ID at creation time, so re-tagging
+ * :latest does nothing until the container is recreated from it.
+ * On failure the original container is renamed back and restarted.
+ */
+async function recreateContainerWithImage(
+  device: DeviceEntry,
+  containerName: string,
+  imageTag: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  // Snapshot the running container's configuration
+  let inspect: Record<string, any>;
+  try {
+    const inspectBody = await DockerStatsService.dockerGet(
+      device,
+      `/containers/${encodeURIComponent(containerName)}/json`,
+      undefined
+    );
+    inspect = JSON.parse(inspectBody);
+  } catch (error: unknown) {
+    return { success: false, error: `Failed to inspect container: ${getErrorMessage(error)}` };
+  }
+
+  const oldContainerId = String(inspect.Id);
+  const holdingName = `${containerName}-rollback-old`;
+
+  // Networks: keep only creation-time fields — runtime fields (assigned IP,
+  // endpoint ID, MAC) belong to the old container.
+  const endpointsConfig: Record<string, unknown> = {};
+  const networks = (inspect.NetworkSettings?.Networks || {}) as Record<
+    string,
+    Record<string, unknown>
+  >;
+  for (const [networkName, endpoint] of Object.entries(networks)) {
+    endpointsConfig[networkName] = {
+      Aliases: endpoint.Aliases || undefined,
+      Links: endpoint.Links || undefined,
+      IPAMConfig: endpoint.IPAMConfig || undefined,
+    };
+  }
+
+  const createPayload = {
+    ...(inspect.Config || {}),
+    Image: imageTag,
+    HostConfig: inspect.HostConfig || {},
+    NetworkingConfig: { EndpointsConfig: endpointsConfig },
+  };
+
+  // Stop the old container (304 = already stopped) and move it aside
+  const stopResult = await DockerStatsService.dockerRequest(
+    device,
+    "POST",
+    `/containers/${oldContainerId}/stop?t=10`
+  );
+  if (stopResult.statusCode !== 204 && stopResult.statusCode !== 304) {
+    return {
+      success: false,
+      error:
+        tryParseDockerError(stopResult.body) ||
+        `Failed to stop container (${stopResult.statusCode})`,
+    };
+  }
+
+  const renameResult = await DockerStatsService.dockerRequest(
+    device,
+    "POST",
+    `/containers/${oldContainerId}/rename?name=${encodeURIComponent(holdingName)}`
+  );
+  if (renameResult.statusCode !== 204) {
+    // Old container still owns its name — just restart it
+    await DockerStatsService.dockerRequest(
+      device,
+      "POST",
+      `/containers/${oldContainerId}/start`
+    ).catch(() => {});
+    return {
+      success: false,
+      error:
+        tryParseDockerError(renameResult.body) ||
+        `Failed to rename old container (${renameResult.statusCode})`,
+    };
+  }
+
+  const restoreOldContainer = async () => {
+    await DockerStatsService.dockerRequest(
+      device,
+      "POST",
+      `/containers/${oldContainerId}/rename?name=${encodeURIComponent(containerName)}`
+    ).catch(() => {});
+    await DockerStatsService.dockerRequest(
+      device,
+      "POST",
+      `/containers/${oldContainerId}/start`
+    ).catch(() => {});
+  };
+
+  // Create and start the replacement from the rolled-back image
+  const createResult = await DockerStatsService.dockerRequest(
+    device,
+    "POST",
+    `/containers/create?name=${encodeURIComponent(containerName)}`,
+    { body: createPayload }
+  );
+  if (createResult.statusCode !== 201) {
+    await restoreOldContainer();
+    return {
+      success: false,
+      error:
+        tryParseDockerError(createResult.body) ||
+        `Failed to create replacement container (${createResult.statusCode})`,
+    };
+  }
+
+  const newContainerId = String(JSON.parse(createResult.body).Id || "");
+  const startResult = await DockerStatsService.dockerRequest(
+    device,
+    "POST",
+    `/containers/${newContainerId}/start`
+  );
+  if (startResult.statusCode !== 204) {
+    await DockerStatsService.dockerRequest(
+      device,
+      "DELETE",
+      `/containers/${newContainerId}?force=true`
+    ).catch(() => {});
+    await restoreOldContainer();
+    return {
+      success: false,
+      error:
+        tryParseDockerError(startResult.body) ||
+        `Failed to start replacement container (${startResult.statusCode})`,
+    };
+  }
+
+  // Success — the old container is disposable now
+  await DockerStatsService.dockerRequest(
+    device,
+    "DELETE",
+    `/containers/${oldContainerId}?force=true`
+  ).catch(() => {});
+
+  return { success: true };
 }
 
 router.get(
@@ -388,15 +533,17 @@ router.post(
         `/images/${encodeURIComponent(backupTag)}?noprune=true`
       ).catch(() => {});
 
-      logger.info(`[Rollback] Restarting ${service.name} with rolled-back image`);
-      const restartResult = await DockerStatsService.dockerRequest(
+      // Recreate the container — a restart alone reuses the container's
+      // original image ID, so the re-tagged :latest would never run.
+      logger.info(`[Rollback] Recreating ${service.name} from rolled-back image`);
+      const recreateResult = await recreateContainerWithImage(
         target.device,
-        "POST",
-        `/containers/${service.dockerProject}/restart?t=10`
+        service.dockerProject,
+        latestTag
       );
 
-      if (restartResult.statusCode === 204) {
-        logger.success(`[Rollback] ${service.name} rolled back and restarted successfully`);
+      if (recreateResult.success) {
+        logger.success(`[Rollback] ${service.name} rolled back and recreated successfully`);
 
         setTimeout(() => {
           ServiceRegistryService.checkAll().catch(() => {});
@@ -406,14 +553,11 @@ router.post(
           success: true,
           service: service.name,
           device: target.id,
-          message: "Rolled back to previous image and restarted",
+          message: "Rolled back to previous image and recreated container",
         });
       } else {
-        const message =
-          tryParseDockerError(restartResult.body) ||
-          `Restart after rollback failed: ${restartResult.statusCode}`;
-        logger.error(`[Rollback] ${message}`);
-        res.status(502).json({ error: message });
+        logger.error(`[Rollback] ${recreateResult.error}`);
+        res.status(502).json({ error: recreateResult.error });
       }
     } catch (error: unknown) {
       logger.error(`[Rollback] Failed: ${getErrorMessage(error)}`);

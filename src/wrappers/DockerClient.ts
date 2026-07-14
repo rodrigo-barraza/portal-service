@@ -23,9 +23,11 @@ export class DockerClient {
     deviceEntry: DeviceEntry,
     httpMethod: string,
     requestPath: string,
-    options: { timeout?: number } = {}
+    options: { timeout?: number; body?: unknown } = {}
   ): Promise<DockerActionResponse> {
     const timeoutMilliseconds = options.timeout ?? 30000;
+    const requestBody =
+      options.body === undefined ? null : JSON.stringify(options.body);
 
     return new Promise<DockerActionResponse>((resolve, reject) => {
       if (!deviceEntry.dockerApi) {
@@ -38,7 +40,12 @@ export class DockerClient {
         {
           ...transportOptions,
           method: httpMethod,
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(requestBody !== null
+              ? { "Content-Length": Buffer.byteLength(requestBody) }
+              : {}),
+          },
         },
         (clientResponse: http.IncomingMessage) => {
           let responseBody = "";
@@ -59,6 +66,7 @@ export class DockerClient {
       });
 
       clientRequest.on("error", reject);
+      if (requestBody !== null) clientRequest.write(requestBody);
       clientRequest.end();
     });
   }
@@ -117,6 +125,7 @@ export class DockerClient {
     deviceEntry: DeviceEntry,
     containerName: string,
     queryParameters: Record<string, string>,
+    isTty: boolean,
     onData: (chunk: Buffer, streamType: number) => void,
     onEnd: () => void,
     onError: (error: Error) => void
@@ -149,6 +158,17 @@ export class DockerClient {
             }
             onEnd();
           });
+          return;
+        }
+
+        // TTY containers stream raw bytes with no mux framing — parsing the
+        // 8-byte headers there reads garbage frame sizes and buffers forever.
+        if (isTty) {
+          clientResponse.on("data", (chunk: Buffer) => {
+            onData(chunk, 1); // everything is stdout on a TTY
+          });
+          clientResponse.on("end", onEnd);
+          clientResponse.on("error", onError);
           return;
         }
 
