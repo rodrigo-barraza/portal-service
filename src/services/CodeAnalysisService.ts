@@ -1,3 +1,4 @@
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROJECTS } from "../config.ts";
 import logger from "../utils/logger.ts";
 import { GitHubClient } from "../wrappers/GitHubClient.ts";
@@ -70,7 +71,7 @@ export default class CodeAnalysisService {
             repoSizes[projectId] = sizeDetails;
           }
         } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorMessage = getErrorMessage(error);
           logger.warn(`[CodeAnalysis] Failed for ${projectId}: ${errorMessage}`);
           dependencies[projectId] = { imports: [], apiCalls: [] };
         }

@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { SESSIONS_SERVICE_URL } from "../config.ts";
 
 /**

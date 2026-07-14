@@ -2,7 +2,7 @@
 
 import { PROJECTS, STATS_CACHE_TTL_MS } from "../config.ts";
 import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 interface CacheEntry {
   data: Record<string, unknown>;

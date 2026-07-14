@@ -8,7 +8,7 @@ import DockerStatsService from "../services/DockerStatsService.ts";
 import ServiceRegistryService from "../services/ServiceRegistryService.ts";
 import { DEVICES } from "../config.ts";
 import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const router = Router();
 

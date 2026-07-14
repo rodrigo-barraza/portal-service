@@ -4,6 +4,7 @@
 // internal tools-service URL.
 
 import { Router, Request, Response } from "express";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROJECTS } from "../config.ts";
 import logger from "../utils/logger.ts";
 import MinioService from "../services/MinioService.ts";
@@ -55,8 +56,7 @@ router.get("/agents", async (_req: Request, res: Response) => {
     const agentsPayload = await response.json();
     res.json(agentsPayload);
   } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
+    const errorMessage = getErrorMessage(error);
     logger.warn(`[Workspaces] Failed to fetch agents: ${errorMessage}`);
     res.status(503).json({
       error: "Unable to reach tools-service",
@@ -78,8 +78,7 @@ router.get("/download/agent", async (_req: Request, res: Response) => {
 
     objectStream.pipe(res);
   } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
+    const errorMessage = getErrorMessage(error);
     logger.warn(`[Workspaces] Failed to serve agent download: ${errorMessage}`);
     res.status(404).json({ error: "Workspace agent file not available" });
   }

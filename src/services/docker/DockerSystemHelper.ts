@@ -1,7 +1,7 @@
 import { execSync } from "child_process";
 import os from "os";
 import logger from "../../utils/logger.ts";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { DeviceEntry } from "../../types.ts";
 import { DockerClient } from "../../wrappers/DockerClient.ts";
 

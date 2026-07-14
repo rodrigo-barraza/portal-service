@@ -1,3 +1,4 @@
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../config.ts";
 import { COLLECTIONS } from "../constants.ts";
@@ -64,7 +65,7 @@ export default class ContainerMetricsService {
         ContainerMetricsService._initialized = true;
         logger.info("[ContainerMetrics] Collection already exists");
       } else {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage = getErrorMessage(error);
         logger.error(`[ContainerMetrics] Setup failed: ${errorMessage}`);
       }
     }
@@ -103,7 +104,7 @@ export default class ContainerMetricsService {
     try {
       await metricsCollection.insertMany(documents, { ordered: false });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       logger.warn(`[ContainerMetrics] Insert failed: ${errorMessage}`);
     }
   }
@@ -193,7 +194,7 @@ export default class ContainerMetricsService {
 
       return { containers, range, since: since.toISOString(), samples: totalSamples };
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       logger.error(`[ContainerMetrics] Query failed: ${errorMessage}`);
       return { containers: {}, range, samples: 0 };
     }

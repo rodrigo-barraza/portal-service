@@ -7,7 +7,7 @@ import {
   MINIO_SECRET_KEY,
 } from "../config.ts";
 import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 interface MinioObjectEntry {
   name: string;

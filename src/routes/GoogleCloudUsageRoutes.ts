@@ -1,5 +1,6 @@
 // ─── Google Cloud API Usage Routes ───────────────────────────
 
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { Router, Request, Response } from "express";
 import GoogleCloudUsageService from "../services/GoogleCloudUsageService.ts";
 import logger from "../utils/logger.ts";
@@ -22,7 +23,7 @@ router.get("/", async (request: Request, response: Response) => {
     const summary = await GoogleCloudUsageService.getSummary(sanitizedPeriod);
     response.json(summary);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = getErrorMessage(error);
     logger.error(`[CloudUsage] Summary failed: ${errorMessage}`);
     response.status(500).json({ error: "Failed to fetch cloud usage summary" });
   }
@@ -65,7 +66,7 @@ router.get("/timeseries", async (request: Request, response: Response) => {
     );
     response.json(timeSeries);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = getErrorMessage(error);
     logger.error(`[CloudUsage] TimeSeries failed: ${errorMessage}`);
     response.status(500).json({ error: "Failed to fetch cloud usage time series" });
   }

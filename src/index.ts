@@ -5,7 +5,7 @@ import express from "express";
 import cors from "cors";
 
 import { errorHandler } from "./utils/errors.ts";
-import { getErrorMessage } from "./utils/ErrorHelpers.ts";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import logger from "./utils/logger.ts";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
 import MongoWrapper from "./wrappers/MongoWrapper.ts";

@@ -4,7 +4,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response, NextFunction } from "express";
 import MinioService from "../services/MinioService.ts";
 import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { ObjectListResult } from "../types.ts";
 
 const router = Router();

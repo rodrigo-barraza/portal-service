@@ -12,7 +12,7 @@ import {
   initializeRegistry,
 } from "../config.ts";
 import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { ProjectEntry, TtlCache, VaultRegistry } from "../types.ts";
 import { ServiceDependencyEnricher } from "./helpers/ServiceDependencyEnricher.ts";
 import { GitHubClient } from "../wrappers/GitHubClient.ts";

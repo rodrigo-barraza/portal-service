@@ -1,3 +1,4 @@
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
 import logger from "../utils/logger.ts";
 import {
@@ -106,7 +107,7 @@ export default class GoogleAnalyticsService {
       logger.success("[GoogleAnalytics] Client initialized");
       return GoogleAnalyticsService.client;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       throw new Error(`Failed to initialize GA client: ${errorMessage}`);
     }
   }

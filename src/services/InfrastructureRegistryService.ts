@@ -10,7 +10,7 @@ import {
   MONGO_URI,
 } from "../config.ts";
 import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { DeviceResolver } from "../utils/DeviceResolver.ts";
 
 const statusCache = new Map<string, InfraStatus>();

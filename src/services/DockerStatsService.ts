@@ -1,5 +1,5 @@
 import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { DEVICES } from "../config.ts";
 import ContainerMetricsService from "./ContainerMetricsService.ts";
 import type {

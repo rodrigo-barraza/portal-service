@@ -1,3 +1,4 @@
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { GITHUB_PAT } from "../config.ts";
 import logger from "../utils/logger.ts";
 
@@ -54,7 +55,7 @@ export class GitHubClient {
       return (await response.json()) as T;
     } catch (error: unknown) {
       clearTimeout(timeoutTimer);
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       logger.warn(`[GitHubClient] Request to ${requestPath} failed: ${errorMessage}`);
       return null;
     }
