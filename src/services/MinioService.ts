@@ -156,6 +156,11 @@ export default class MinioService {
     return minioClient.getObject(bucketName, objectName);
   }
 
+  static async getPartialObject(bucketName: string, objectName: string, offset: number, length: number) {
+    const minioClient = MinioService._getClient();
+    return minioClient.getPartialObject(bucketName, objectName, offset, length);
+  }
+
   static async deleteObject(bucketName: string, objectName: string) {
     const minioClient = MinioService._getClient();
     return minioClient.removeObject(bucketName, objectName);

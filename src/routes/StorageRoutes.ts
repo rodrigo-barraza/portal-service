@@ -36,27 +36,74 @@ const EXT_TO_MIME: Record<string, string> = {
   ".gif": "image/gif",
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
+  ".bmp": "image/bmp",
+  ".ico": "image/x-icon",
   ".mp3": "audio/mpeg",
   ".wav": "audio/wav",
   ".ogg": "audio/ogg",
+  ".flac": "audio/flac",
+  ".aac": "audio/aac",
+  ".m4a": "audio/mp4",
   ".mp4": "video/mp4",
+  ".m4v": "video/x-m4v",
   ".webm": "video/webm",
+  ".mov": "video/quicktime",
+  ".mkv": "video/x-matroska",
+  ".avi": "video/x-msvideo",
   ".pdf": "application/pdf",
   ".json": "application/json",
   ".txt": "text/plain",
+  ".md": "text/markdown",
+  ".log": "text/plain",
   ".csv": "text/csv",
   ".html": "text/html",
   ".css": "text/css",
   ".js": "text/javascript",
   ".xml": "application/xml",
+  ".yml": "application/yaml",
+  ".yaml": "application/yaml",
   ".zip": "application/zip",
   ".gz": "application/gzip",
   ".tar": "application/x-tar",
+  ".rar": "application/vnd.rar",
+  ".7z": "application/x-7z-compressed",
 };
 
 function guessMime(filename: string | null | undefined) {
   const ext = (filename || "").match(/\.[^.]+$/)?.[0]?.toLowerCase();
   return (ext && EXT_TO_MIME[ext]) || "application/octet-stream";
+}
+
+/**
+ * Build a Content-Disposition header value that survives quotes and
+ * non-ASCII filenames (RFC 6266/5987). Raw non-ASCII in setHeader throws.
+ */
+function contentDisposition(disposition: string, filename: string | undefined) {
+  const fallback = (filename || "download").replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "'");
+  const encoded = encodeURIComponent(filename || "download");
+  return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
+/** Parse a single-range `Range: bytes=start-end` header against a known size. */
+function parseRangeHeader(rangeHeader: string, size: number): { start: number; end: number } | null {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+  if (!match || (match[1] === "" && match[2] === "")) return null;
+
+  let start: number;
+  let end: number;
+  if (match[1] === "") {
+    // Suffix range: last N bytes
+    const suffixLength = parseInt(match[2], 10);
+    if (suffixLength === 0) return null;
+    start = Math.max(size - suffixLength, 0);
+    end = size - 1;
+  } else {
+    start = parseInt(match[1], 10);
+    end = match[2] === "" ? size - 1 : Math.min(parseInt(match[2], 10), size - 1);
+  }
+
+  if (start > end || start >= size) return null;
+  return { start, end };
 }
 
 router.get("/buckets", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
@@ -160,11 +207,38 @@ router.get("/buckets/:name/download/*objectPath", asyncHandler(async (req: Reque
     const disposition = req.query.inline === "true" ? "inline" : "attachment";
 
     res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Length", stat.size);
-    res.setHeader("Content-Disposition", `${disposition}; filename="${filename}"`);
+    res.setHeader("Content-Disposition", contentDisposition(disposition, filename));
     res.setHeader("ETag", stat.etag);
+    res.setHeader("Accept-Ranges", "bytes");
 
-    const stream = await MinioService.getObject(String(bucketName), objectName);
+    // Range requests — required for video/audio seeking and Safari playback
+    const rangeHeader = req.headers.range;
+    let stream;
+    if (rangeHeader) {
+      const range = parseRangeHeader(String(rangeHeader), stat.size);
+      if (!range) {
+        res.setHeader("Content-Range", `bytes */${stat.size}`);
+        return res.status(416).end();
+      }
+      res.status(206);
+      res.setHeader("Content-Range", `bytes ${range.start}-${range.end}/${stat.size}`);
+      res.setHeader("Content-Length", range.end - range.start + 1);
+      stream = await MinioService.getPartialObject(
+        String(bucketName),
+        objectName,
+        range.start,
+        range.end - range.start + 1,
+      );
+    } else {
+      res.setHeader("Content-Length", stat.size);
+      stream = await MinioService.getObject(String(bucketName), objectName);
+    }
+
+    stream.on("error", (streamError: unknown) => {
+      logger.error(`[ObjectStore] stream failed mid-transfer: ${getErrorMessage(streamError)}`);
+      res.destroy();
+    });
+    res.on("close", () => stream.destroy());
     stream.pipe(res);
   } catch (error: unknown) {
     const errorObject = error as Record<string, unknown>;
