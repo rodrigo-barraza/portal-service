@@ -38,9 +38,19 @@ async function proxy(
     const response = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(15_000),
     });
 
-    const data = await response.json();
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch {
+      // Upstream returned non-JSON (e.g. an HTML error page)
+      return res.status(502).json({
+        error: true,
+        message: `Sessions service returned a non-JSON response (${response.status})`,
+      });
+    }
     return res.status(response.status).json(data);
   } catch (error: unknown) {
     logger.error(`[SessionAnalytics] Proxy error: ${getErrorMessage(error)}`);

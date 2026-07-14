@@ -1,11 +1,13 @@
 import { Request, Response } from "express";
 // ─── Entry Point ────────────────────────────────────────────
 
+import http from "node:http";
 import express from "express";
 import cors from "cors";
 
 import { errorHandler } from "./utils/errors.ts";
 import { getErrorMessage, MILLISECONDS_PER_MINUTE } from "@rodrigo-barraza/utilities-library";
+import { installShutdownHandlers, registerCleanup } from "@rodrigo-barraza/service-library";
 import logger from "./utils/logger.ts";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
 import MongoWrapper from "./wrappers/MongoWrapper.ts";
@@ -30,6 +32,28 @@ import sessionAnalyticsRouter from "./routes/SessionAnalyticsRoutes.ts";
 import googleCloudUsageRouter from "./routes/GoogleCloudUsageRoutes.ts";
 
 
+// ─── Process Lifecycle ─────────────────────────────────────────────
+
+// Graceful shutdown on SIGTERM/SIGINT — runs everything registered via
+// registerCleanup (timers, Mongo, the HTTP server).
+installShutdownHandlers({ logger });
+
+// Crash guards: Node ≥15 kills the process on any unhandled promise
+// rejection. Log loudly and survive instead — per-request error paths
+// already handle their own failures. (Same rationale as prism-service.)
+process.on("unhandledRejection", (reason: unknown) => {
+  const detail =
+    reason instanceof Error
+      ? `${reason.message}\n${reason.stack}`
+      : JSON.stringify(reason);
+  logger.error(`[process] Unhandled promise rejection (survived): ${detail}`);
+});
+process.on("uncaughtException", (error: Error, origin: string) => {
+  logger.error(
+    `[process] Uncaught exception (${origin}, survived): ${error.message}\n${error.stack}`,
+  );
+});
+
 // ─── Express App ───────────────────────────────────────────────────
 
 const app = express();
@@ -52,9 +76,12 @@ app.use(
       if (/^http:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin)) return callback(null, true);
       // Allow whitelisted origins
       if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-      callback(new Error(`Origin ${origin} not allowed by CORS`));
+      // Disallowed: respond without CORS headers (browser blocks) instead
+      // of routing an Error through the 500 handler for every stray origin.
+      callback(null, false);
     },
     credentials: true,
+    maxAge: 86_400, // cache preflight for 24h — avoids OPTIONS storms
   }),
 );
 app.use(express.json({ limit: "5mb" }));
@@ -102,6 +129,7 @@ app.use(errorHandler);
 (async () => {
   // Connect to MongoDB
   await MongoWrapper.createClient(String(MONGO_DB_NAME), String(MONGO_URI));
+  registerCleanup(async () => MongoWrapper.closeAll());
 
   // Ensure indexes for query performance
   try {
@@ -185,10 +213,11 @@ app.use(errorHandler);
     });
 
   // Periodic health checks every 60 seconds
-  setInterval(() => {
+  const healthCheckTimer = setInterval(() => {
     ServiceRegistryService.checkAll().catch(() => {});
     InfrastructureRegistryService.checkAll().catch(() => {});
   }, MILLISECONDS_PER_MINUTE);
+  registerCleanup(() => clearInterval(healthCheckTimer));
 
   // ── Periodic Registry Refresh ──────────────────────────────────
   // Re-fetch the vault registry every 5 minutes so new projects
@@ -196,20 +225,24 @@ app.use(errorHandler);
   // requiring a portal-service container restart.
   const REGISTRY_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
-  setInterval(async () => {
+  // Compare full registry content, not just the project count — otherwise
+  // edits to an existing project (URL, device, dependsOn) never hot-reload.
+  let lastRegistrySnapshot = "";
+
+  const registryRefreshTimer = setInterval(async () => {
     try {
       const { vault } = await import("./boot.js");
       vault.clearRegistryCache();
       const registry = await vault.fetchRegistry();
 
       if (registry?.projects?.length > 0) {
-        const currentCount = Object.keys(PROJECTS).length;
-        const newCount = registry.projects.length;
+        const snapshot = JSON.stringify(registry.projects);
 
-        // Only re-initialize if the project count changed
-        if (newCount !== currentCount) {
+        if (snapshot !== lastRegistrySnapshot) {
+          const currentCount = Object.keys(PROJECTS).length;
+          lastRegistrySnapshot = snapshot;
           initializeRegistry(registry as unknown as VaultRegistry);
-          logger.info(`[Registry] Hot-reloaded — ${currentCount} → ${newCount} projects`);
+          logger.info(`[Registry] Hot-reloaded — ${currentCount} → ${registry.projects.length} projects`);
 
           // Trigger health checks for any newly registered services
           ServiceRegistryService.checkAll().catch(() => {});
@@ -220,13 +253,22 @@ app.use(errorHandler);
       logger.warn(`[Registry] Periodic refresh failed: ${getErrorMessage(error)}`);
     }
   }, REGISTRY_REFRESH_INTERVAL_MS);
+  registerCleanup(() => clearInterval(registryRefreshTimer));
 
-  // Start server
-  app.listen(PORT, () => {
+  // Start server. Wrap express in http.createServer so we can disable the
+  // default 5-minute requestTimeout, which would otherwise sever active SSE
+  // streams (/logs follow, /object-store/buckets/stream) at exactly 300s.
+  const server = http.createServer(app);
+  server.requestTimeout = 0;
+  server.listen(PORT, () => {
     logger.success(`API is running on port ${PORT}`);
     ENDPOINTS.rest.forEach((ep: string) =>
       logger.info(`  REST  →  http://localhost:${PORT}${ep}`),
     );
   });
-})();
+  registerCleanup(() => new Promise<void>((resolve) => server.close(() => resolve())));
+})().catch((error: unknown) => {
+  logger.error(`Fatal startup failure: ${getErrorMessage(error)}`);
+  process.exit(1);
+});
 

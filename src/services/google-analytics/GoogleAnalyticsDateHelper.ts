@@ -49,9 +49,11 @@ export class GoogleAnalyticsDateHelper {
       }
     }
 
+    // Current preset window is `NdaysAgo → today` = N+1 days inclusive, so
+    // the comparison window must also span N+1 days, ending the day before.
     const daysCount = parseInt(periodString, 10) || 30;
     return {
-      startDate: `${daysCount * 2}daysAgo`,
+      startDate: `${daysCount * 2 + 1}daysAgo`,
       endDate: `${daysCount + 1}daysAgo`,
     };
   }

@@ -12,6 +12,11 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const router = Router();
 
+// Docker container names: alphanumeric start, then [a-zA-Z0-9_.-].
+// Rejecting anything else prevents path/query injection into the Docker
+// Engine API (e.g. a %2F-encoded name rewriting the request path).
+const VALID_CONTAINER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
+
 function resolveDevice(deviceId: string) {
   const device = DEVICES[deviceId];
   if (!device || !device.dockerApi) return null;
@@ -30,6 +35,10 @@ router.post("/:name/restart", asyncHandler(async (req: Request, res: Response, n
   try {
     const { name } = req.params;
     const deviceId = typeof req.query.device === "string" ? req.query.device : undefined;
+
+    if (!VALID_CONTAINER_NAME_PATTERN.test(String(name))) {
+      return res.status(400).json({ error: "Invalid container name" });
+    }
 
     if (!deviceId) {
       return res.status(400).json({ error: "Missing required query parameter: device" });
@@ -75,6 +84,10 @@ router.post("/:name/stop", asyncHandler(async (req: Request, res: Response, next
     const { name } = req.params;
     const deviceId = typeof req.query.device === "string" ? req.query.device : undefined;
 
+    if (!VALID_CONTAINER_NAME_PATTERN.test(String(name))) {
+      return res.status(400).json({ error: "Invalid container name" });
+    }
+
     if (!deviceId) {
       return res.status(400).json({ error: "Missing required query parameter: device" });
     }
@@ -118,6 +131,10 @@ router.post("/:name/start", asyncHandler(async (req: Request, res: Response, nex
   try {
     const { name } = req.params;
     const deviceId = typeof req.query.device === "string" ? req.query.device : undefined;
+
+    if (!VALID_CONTAINER_NAME_PATTERN.test(String(name))) {
+      return res.status(400).json({ error: "Invalid container name" });
+    }
 
     if (!deviceId) {
       return res.status(400).json({ error: "Missing required query parameter: device" });

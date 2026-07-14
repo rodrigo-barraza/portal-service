@@ -35,12 +35,14 @@ describe("GoogleAnalyticsDateHelper", () => {
 
   describe("previousPeriodRange", () => {
     it("should calculate previous period for presets correctly", () => {
+      // Current window `30daysAgo → today` spans 31 days inclusive, so the
+      // previous window must also span 31 days (61daysAgo → 31daysAgo).
       expect(GoogleAnalyticsDateHelper.previousPeriodRange("30d")).toEqual({
-        startDate: "60daysAgo",
+        startDate: "61daysAgo",
         endDate: "31daysAgo",
       });
       expect(GoogleAnalyticsDateHelper.previousPeriodRange("7d")).toEqual({
-        startDate: "14daysAgo",
+        startDate: "15daysAgo",
         endDate: "8daysAgo",
       });
     });

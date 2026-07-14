@@ -1,5 +1,8 @@
-import { execSync } from "child_process";
+import { exec } from "child_process";
+import { promisify } from "util";
 import os from "os";
+
+const execAsync = promisify(exec);
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { DeviceEntry } from "../../types.ts";
@@ -68,7 +71,11 @@ export class DockerSystemHelper {
     let hostDiskStats = null;
     if (deviceEntry.dockerApi?.startsWith("unix://")) {
       try {
-        const dfOutput = execSync("df -B1 / | tail -1", { encoding: "utf8", timeout: 3000 });
+        // Async so a slow disk can't block the event loop for other requests
+        const { stdout: dfOutput } = await execAsync("df -B1 / | tail -1", {
+          encoding: "utf8",
+          timeout: 3000,
+        });
         const dfOutputParts = dfOutput.trim().split(/\s+/);
         if (dfOutputParts.length >= 5) {
           const totalBytes = parseInt(dfOutputParts[1], 10) || 0;

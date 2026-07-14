@@ -8,12 +8,27 @@ const router = Router();
 
 // ── Middleware: validate propertyId ────────────────────────────
 
+const PRESET_PERIOD_PATTERN = /^(7d|30d|90d)$/;
+const CUSTOM_RANGE_PATTERN = /^\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}$/;
+
 function validateProperty(req: Request, res: Response, next: NextFunction) {
   const { propertyId } = req.params;
   const properties = GoogleAnalyticsService.listProperties();
 
   if (!properties.find((p: { id: string }) => p.id === propertyId)) {
     return res.status(404).json({ error: `Unknown property: ${propertyId}` });
+  }
+
+  // Reject junk periods — they'd otherwise become permanent cache keys
+  const period = req.query.period;
+  if (
+    period !== undefined &&
+    (typeof period !== "string" ||
+      (!PRESET_PERIOD_PATTERN.test(period) && !CUSTOM_RANGE_PATTERN.test(period)))
+  ) {
+    return res.status(400).json({
+      error: "Invalid period — use 7d, 30d, 90d, or YYYY-MM-DD_YYYY-MM-DD",
+    });
   }
 
   next();

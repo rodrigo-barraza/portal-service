@@ -316,59 +316,61 @@ export default class GoogleAnalyticsService {
     return cached(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
-      const [catResponse] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [{ name: "deviceCategory" }],
-        metrics: [
-          { name: "activeUsers" },
-          { name: "sessions" },
-        ],
-        orderBys: [
-          { metric: { metricName: "sessions" }, desc: true },
-        ],
-      });
-
-      const [browserResponse] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [{ name: "browser" }],
-        metrics: [
-          { name: "activeUsers" },
-          { name: "sessions" },
-        ],
-        orderBys: [
-          { metric: { metricName: "sessions" }, desc: true },
-        ],
-        limit: 10,
-      });
-
-      const [osResponse] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [{ name: "operatingSystem" }],
-        metrics: [
-          { name: "activeUsers" },
-          { name: "sessions" },
-        ],
-        orderBys: [
-          { metric: { metricName: "sessions" }, desc: true },
-        ],
-        limit: 10,
-      });
-
-      const [resResponse] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [{ name: "screenResolution" }],
-        metrics: [
-          { name: "sessions" },
-        ],
-        orderBys: [
-          { metric: { metricName: "sessions" }, desc: true },
-        ],
-        limit: 8,
-      });
+      // Four independent reports — run them in parallel
+      const dateRanges = [GoogleAnalyticsDateHelper.periodToDateRange(period)];
+      const [[catResponse], [browserResponse], [osResponse], [resResponse]] =
+        await Promise.all([
+          analyticsClient.runReport({
+            property: `properties/${propertyId}`,
+            dateRanges,
+            dimensions: [{ name: "deviceCategory" }],
+            metrics: [
+              { name: "activeUsers" },
+              { name: "sessions" },
+            ],
+            orderBys: [
+              { metric: { metricName: "sessions" }, desc: true },
+            ],
+          }),
+          analyticsClient.runReport({
+            property: `properties/${propertyId}`,
+            dateRanges,
+            dimensions: [{ name: "browser" }],
+            metrics: [
+              { name: "activeUsers" },
+              { name: "sessions" },
+            ],
+            orderBys: [
+              { metric: { metricName: "sessions" }, desc: true },
+            ],
+            limit: 10,
+          }),
+          analyticsClient.runReport({
+            property: `properties/${propertyId}`,
+            dateRanges,
+            dimensions: [{ name: "operatingSystem" }],
+            metrics: [
+              { name: "activeUsers" },
+              { name: "sessions" },
+            ],
+            orderBys: [
+              { metric: { metricName: "sessions" }, desc: true },
+            ],
+            limit: 10,
+          }),
+          analyticsClient.runReport({
+            property: `properties/${propertyId}`,
+            dateRanges,
+            dimensions: [{ name: "screenResolution" }],
+            metrics: [
+              { name: "sessions" },
+            ],
+            orderBys: [
+              { metric: { metricName: "sessions" }, desc: true },
+            ],
+            limit: 8,
+          }),
+        ]);
 
       return {
         categories: formatRows(catResponse, ["category"], ["users", "sessions"]),

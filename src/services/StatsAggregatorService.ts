@@ -18,7 +18,7 @@ export default class StatsAggregatorService {
       return cached.data;
     }
 
-    const prismUrl = PROJECTS.prism.url;
+    const prismUrl = PROJECTS.prism?.url;
     if (!prismUrl) return { error: "Prism URL not configured" };
 
     try {
@@ -50,7 +50,7 @@ export default class StatsAggregatorService {
       return cached.data;
     }
 
-    const prismUrl = PROJECTS.prism.url;
+    const prismUrl = PROJECTS.prism?.url;
     if (!prismUrl) return { error: "Prism URL not configured" };
 
     try {
@@ -77,7 +77,7 @@ export default class StatsAggregatorService {
       return cached.data;
     }
 
-    const prismUrl = PROJECTS.prism.url;
+    const prismUrl = PROJECTS.prism?.url;
     if (!prismUrl) return { error: "Prism URL not configured" };
 
     try {
