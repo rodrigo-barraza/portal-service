@@ -1,14 +1,15 @@
 import { Router, Request, Response, NextFunction } from "express";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import { SESSIONS_SERVICE_URL } from "../config.ts";
+import { SESSIONS_SERVICE_URL, SESSIONS_STATS_API_SECRET } from "../config.ts";
 
 /**
  * SessionAnalyticsRoutes — Proxy layer for sessions-service stats API.
  *
  * Forwards all session analytics requests from portal-client through
- * portal-service to sessions-service. This keeps sessions-service
- * internal (no public domain) while exposing its stats to the portal.
+ * portal-service to sessions-service, attaching the shared stats secret.
+ * sessions-service is publicly reachable (api.sessions.rod.dev), so its
+ * /stats/* routes reject requests without the secret.
  */
 
 const router = Router();
@@ -37,7 +38,10 @@ async function proxy(
 
     const response = await fetch(url, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(SESSIONS_STATS_API_SECRET ? { "x-api-secret": SESSIONS_STATS_API_SECRET } : {}),
+      },
       signal: AbortSignal.timeout(15_000),
     });
 

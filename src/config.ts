@@ -171,3 +171,6 @@ export const GOOGLE_CLOUD_MONITORING_PROJECT_ID = process.env.GOOGLE_CLOUD_MONIT
 
 // ── Sessions Service (first-party analytics) ──────────────────
 export const SESSIONS_SERVICE_URL = process.env.SESSIONS_SERVICE_URL;
+// Shared secret required by sessions-service /stats/* (they expose raw
+// IPs/fingerprints, so the service fails closed without it).
+export const SESSIONS_STATS_API_SECRET = process.env.SESSIONS_STATS_API_SECRET;
