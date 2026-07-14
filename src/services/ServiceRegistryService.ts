@@ -1,3 +1,4 @@
+import { sleep } from "@rodrigo-barraza/utilities-library";
 import type { ProjectEntry, DependencyRef } from "../types.ts";
 import { PROJECTS, HEALTH_CHECK_TIMEOUT_MS } from "../config.ts";
 import logger from "../utils/logger.ts";
@@ -122,7 +123,7 @@ export default class ServiceRegistryService {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       if (attempt > 1) {
-        await new Promise((resolve) => setTimeout(resolve, ServiceRegistryService.HEALTH_CHECK_RETRY_DELAY_MS));
+        await sleep(ServiceRegistryService.HEALTH_CHECK_RETRY_DELAY_MS);
       }
 
       lastResult = await ServiceRegistryService._attemptHealthCheck(id, service);

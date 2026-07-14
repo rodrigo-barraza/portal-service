@@ -5,7 +5,7 @@ import express from "express";
 import cors from "cors";
 
 import { errorHandler } from "./utils/errors.ts";
-import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { getErrorMessage, MILLISECONDS_PER_MINUTE } from "@rodrigo-barraza/utilities-library";
 import logger from "./utils/logger.ts";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
 import MongoWrapper from "./wrappers/MongoWrapper.ts";
@@ -188,7 +188,7 @@ app.use(errorHandler);
   setInterval(() => {
     ServiceRegistryService.checkAll().catch(() => {});
     InfrastructureRegistryService.checkAll().catch(() => {});
-  }, 60_000);
+  }, MILLISECONDS_PER_MINUTE);
 
   // ── Periodic Registry Refresh ──────────────────────────────────
   // Re-fetch the vault registry every 5 minutes so new projects
