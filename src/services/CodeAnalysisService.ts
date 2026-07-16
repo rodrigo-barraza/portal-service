@@ -1,7 +1,7 @@
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import { PROJECTS } from "../config.ts";
+import { GITHUB_PAT, PROJECTS } from "../config.ts";
 import logger from "../utils/logger.ts";
-import { GitHubClient } from "../wrappers/GitHubClient.ts";
+import { GitHubClient, type GitHubFetchStats } from "../wrappers/GitHubClient.ts";
 import { EcosystemResolver, type EcosystemOwners } from "./code-analysis/EcosystemResolver.ts";
 
 const CACHE_TTL_MILLISECONDS = 15 * 60 * 1000;
@@ -22,11 +22,18 @@ interface ProjectAnalysis {
   apiCalls: ApiCallEdge[];
 }
 
+interface GitHubHealth {
+  tokenConfigured: boolean;
+  status: "ok" | "degraded" | "unavailable";
+  stats: GitHubFetchStats;
+}
+
 interface AnalysisResult {
   dependencies: Record<string, ProjectAnalysis>;
   repoSizes: Record<string, { sizeKB: number; sizeBytes: number }>;
   owners: Record<string, string>;
   analyzedAt: string;
+  github: GitHubHealth;
 }
 
 let analysisCache: AnalysisResult | null = null;
@@ -41,6 +48,7 @@ export default class CodeAnalysisService {
 
     logger.info("[CodeAnalysis] Starting ecosystem analysis...");
     const startTimestamp = Date.now();
+    GitHubClient.resetStats();
 
     const ecosystemOwners = EcosystemResolver.deriveEcosystemOwners();
     logger.info(
@@ -82,11 +90,30 @@ export default class CodeAnalysisService {
       ecosystemOwners.projectOwners
     );
 
+    const githubStats = GitHubClient.getStats();
+    const githubStatus: GitHubHealth["status"] =
+      githubStats.requests === 0 || githubStats.failures === 0
+        ? "ok"
+        : githubStats.failures >= githubStats.requests
+          ? "unavailable"
+          : "degraded";
+    if (githubStatus !== "ok") {
+      logger.warn(
+        `[CodeAnalysis] GitHub ${githubStatus}: ${githubStats.failures}/${githubStats.requests} requests failed` +
+          (GITHUB_PAT ? "" : " (GITHUB_PAT not configured — private repos are unreachable)")
+      );
+    }
+
     const analysisResult: AnalysisResult = {
       dependencies,
       repoSizes,
       owners: projectOwnerMapping,
       analyzedAt: new Date().toISOString(),
+      github: {
+        tokenConfigured: Boolean(GITHUB_PAT),
+        status: githubStatus,
+        stats: githubStats,
+      },
     };
 
     analysisCache = analysisResult;

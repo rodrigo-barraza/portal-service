@@ -137,7 +137,7 @@ export interface ProjectEntry {
   projectType: string;
   description: string | null;
   db: string | null;
-  minioBucket: string | null;
+  minioBucket: string | string[] | null;
   repo: string | null;
   npmPackage: string | null;
   device: string;
@@ -153,12 +153,15 @@ export interface ProjectEntry {
 export interface DependencyRef {
   id: string;
   criticality: string;
+  /** Where the edge came from: "registry" (hand-declared) or "derived" (computed from db/minioBucket fields). */
+  source?: string;
 }
 
 export interface EnrichedDependency {
   id: string;
   name: string;
   criticality: string;
+  source?: string;
 }
 
 export interface InfrastructureEntry {
@@ -219,7 +222,7 @@ export interface VaultRegistryProject {
   projectType?: string;
   description?: string;
   db?: string;
-  minioBucket?: string;
+  minioBucket?: string | string[];
   repo?: string;
   npmPackage?: string;
   device?: string;
@@ -270,7 +273,7 @@ export interface ServiceStatus {
   projectType: string | null;
   description: string | null;
   db: string | null;
-  minioBucket: string | null;
+  minioBucket: string | string[] | null;
   repo: string | null;
   npmPackage: string | null;
   device: string;

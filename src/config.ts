@@ -36,6 +36,32 @@ function inferDeployTier(projectType: string) {
   }
 }
 
+// Build a project's dependency list: hand-declared registry edges first,
+// then edges derived from structured registry fields (db → mongodb,
+// minioBucket → minio) so infrastructure connections never need to be
+// hand-listed. Derived edges are deduped against declared ones.
+function deriveDependencies(service: VaultRegistryProject) {
+  const dependencies = (service.dependsOn || []).map((dep) => ({
+    id: dep.id,
+    criticality: dep.criticality || "required",
+    source: "registry",
+  }));
+
+  const derived: Array<{ id: string; criticality: string; source: string }> = [];
+  if (service.db) derived.push({ id: "mongodb", criticality: "required", source: "derived" });
+  const hasMinioBucket = Array.isArray(service.minioBucket)
+    ? service.minioBucket.length > 0
+    : Boolean(service.minioBucket);
+  if (hasMinioBucket) derived.push({ id: "minio", criticality: "required", source: "derived" });
+
+  const declaredIds = new Set(dependencies.map((dep) => dep.id));
+  for (const dep of derived) {
+    if (!declaredIds.has(dep.id)) dependencies.push(dep);
+  }
+
+  return dependencies;
+}
+
 function normalizeRepoUrl(repo: string | null) {
   if (!repo) return null;
   const sshMatch = repo.match(/^git@github\.com:(.+?)(?:\.git)?$/);
@@ -80,10 +106,7 @@ export function initializeRegistry(registry: VaultRegistry) {
       deployTier: service.deployTier ?? inferDeployTier(inferProjectType(service.id, service)),
       essential: service.essential || false,
       watchdog: service.watchdog || null,
-      dependsOn: (service.dependsOn || []).map((dep: { id: string; criticality?: string }) => ({
-        id: dep.id,
-        criticality: dep.criticality || "required",
-      })),
+      dependsOn: deriveDependencies(service),
     };
   }
 

@@ -15,7 +15,7 @@ export type ServiceStatus = {
   projectType: string | null;
   description: string | null;
   db: string | null;
-  minioBucket: string | null;
+  minioBucket: string | string[] | null;
   repo: string | null;
   npmPackage: string | null;
   device: string;

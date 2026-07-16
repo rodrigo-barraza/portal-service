@@ -13,9 +13,34 @@ export interface GitHubContentDetails {
   [key: string]: unknown;
 }
 
+export interface GitHubFetchStats {
+  requests: number;
+  failures: number;
+  unauthorized: number;
+  rateLimited: number;
+  notFound: number;
+}
+
 export class GitHubClient {
   private static readonly GITHUB_API_BASE_URL = "https://api.github.com";
   private static readonly DEFAULT_TIMEOUT_MILLISECONDS = 8000;
+
+  // Rolling counters since the last resetStats() — lets callers (e.g. the
+  // code-analysis pipeline) distinguish "no edges found" from "GitHub was
+  // unreachable / unauthorized" and surface that to the UI.
+  private static stats: GitHubFetchStats = GitHubClient.emptyStats();
+
+  private static emptyStats(): GitHubFetchStats {
+    return { requests: 0, failures: 0, unauthorized: 0, rateLimited: 0, notFound: 0 };
+  }
+
+  public static resetStats(): void {
+    this.stats = this.emptyStats();
+  }
+
+  public static getStats(): GitHubFetchStats {
+    return { ...this.stats };
+  }
 
   public static async fetchJson<T>(
     requestPath: string,
@@ -36,6 +61,7 @@ export class GitHubClient {
         headers.Authorization = `Bearer ${GITHUB_PAT}`;
       }
 
+      this.stats.requests++;
       const response = await fetch(`${this.GITHUB_API_BASE_URL}${requestPath}`, {
         headers,
         signal: abortController.signal,
@@ -44,10 +70,18 @@ export class GitHubClient {
       clearTimeout(timeoutTimer);
 
       if (!response.ok) {
-        if (!GITHUB_PAT && response.status === 403) {
-          logger.warn(
-            `[GitHubClient] Rate limit or forbidden on ${requestPath}. Set GITHUB_PAT for access.`
-          );
+        this.stats.failures++;
+        if (response.status === 401) this.stats.unauthorized++;
+        if (response.status === 404) this.stats.notFound++;
+        if (response.status === 403) {
+          const remaining = response.headers.get("x-ratelimit-remaining");
+          if (remaining === "0") this.stats.rateLimited++;
+          else this.stats.unauthorized++;
+          if (!GITHUB_PAT) {
+            logger.warn(
+              `[GitHubClient] Rate limit or forbidden on ${requestPath}. Set GITHUB_PAT for access.`
+            );
+          }
         }
         return null;
       }
@@ -55,6 +89,7 @@ export class GitHubClient {
       return (await response.json()) as T;
     } catch (error: unknown) {
       clearTimeout(timeoutTimer);
+      this.stats.failures++;
       const errorMessage = getErrorMessage(error);
       logger.warn(`[GitHubClient] Request to ${requestPath} failed: ${errorMessage}`);
       return null;

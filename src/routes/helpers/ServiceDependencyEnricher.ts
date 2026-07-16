@@ -9,7 +9,7 @@ export class ServiceDependencyEnricher {
       Record<string, any> & {
         id: string;
         name: string;
-        dependsOn?: Array<string | { id: string; criticality?: string }>;
+        dependsOn?: Array<string | { id: string; criticality?: string; source?: string }>;
         dependedOnBy?: EnrichedDependency[];
       }
     >;
@@ -48,6 +48,9 @@ export class ServiceDependencyEnricher {
           id: dependencyId,
           name: serviceNameMapping[dependencyId] || dependencyId,
           criticality: getDependencyCriticality(dependency),
+          ...(typeof dependency === "object" && dependency.source
+            ? { source: dependency.source }
+            : {}),
         };
       });
       serviceItem.dependedOnBy = inverseDependenciesMap[serviceItem.id] || [];
