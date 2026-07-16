@@ -17,6 +17,8 @@ import { COLLECTIONS } from "./constants.ts";
 import ServiceRegistryService from "./services/ServiceRegistryService.ts";
 import InfrastructureRegistryService from "./services/InfrastructureRegistryService.ts";
 import ContainerMetricsService from "./services/ContainerMetricsService.ts";
+import WatchdogService from "./services/WatchdogService.ts";
+import { WATCHDOG_EVALUATE_INTERVAL_MS } from "./config.ts";
 
 // Routes
 import healthRouter from "./routes/HealthRoutes.ts";
@@ -30,6 +32,7 @@ import devicesRouter from "./routes/DevicesRoutes.ts";
 import containersRouter from "./routes/ContainersRoutes.ts";
 import sessionAnalyticsRouter from "./routes/SessionAnalyticsRoutes.ts";
 import googleCloudUsageRouter from "./routes/GoogleCloudUsageRoutes.ts";
+import watchdogRouter from "./routes/WatchdogRoutes.ts";
 
 
 // ─── Process Lifecycle ─────────────────────────────────────────────
@@ -90,7 +93,7 @@ app.use(requestLoggerMiddleware);
 // ─── Endpoint Registry ────────────────────────────────────────────
 
 const ENDPOINTS = {
-  rest: ["/health", "/services", "/devices", "/containers", "/stats", "/logs", "/integrations", "/object-store", "/google-analytics", "/session-analytics", "/cloud-usage"],
+  rest: ["/health", "/services", "/devices", "/containers", "/stats", "/logs", "/integrations", "/object-store", "/google-analytics", "/session-analytics", "/cloud-usage", "/watchdog"],
 };
 
 // ─── Root Health Check ─────────────────────────────────────────────
@@ -119,6 +122,7 @@ app.use("/devices", devicesRouter);
 app.use("/containers", containersRouter);
 app.use("/session-analytics", sessionAnalyticsRouter);
 app.use("/cloud-usage", googleCloudUsageRouter);
+app.use("/watchdog", watchdogRouter);
 
 // ─── Error Handler (must be last) ──────────────────────────────────
 
@@ -218,6 +222,15 @@ app.use(errorHandler);
     InfrastructureRegistryService.checkAll().catch(() => {});
   }, MILLISECONDS_PER_MINUTE);
   registerCleanup(() => clearInterval(healthCheckTimer));
+
+  // Watchdog: turn the health caches + push heartbeats into Discord
+  // alerts on sustained state transitions (see WatchdogService).
+  const watchdogTimer = setInterval(() => {
+    WatchdogService.evaluate().catch((error: unknown) => {
+      logger.error(`[Watchdog] Evaluation failed: ${getErrorMessage(error)}`);
+    });
+  }, WATCHDOG_EVALUATE_INTERVAL_MS);
+  registerCleanup(() => clearInterval(watchdogTimer));
 
   // ── Periodic Registry Refresh ──────────────────────────────────
   // Re-fetch the vault registry every 5 minutes so new projects

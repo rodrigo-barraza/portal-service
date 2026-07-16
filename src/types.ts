@@ -145,6 +145,8 @@ export interface ProjectEntry {
   dockerProject: string | null;
   deployTier: number;
   essential: boolean;
+  /** Watchdog mode from the registry: "push" (heartbeats), "off" (excluded), null/absent (pull). */
+  watchdog?: string | null;
   dependsOn: DependencyRef[];
 }
 
@@ -225,6 +227,7 @@ export interface VaultRegistryProject {
   dockerProject?: string;
   deployTier?: number;
   essential?: boolean;
+  watchdog?: string;
   dependsOn?: Array<{ id: string; criticality?: string }>;
   analyticsPropertyId?: string;
   analyticsMeasurementId?: string;

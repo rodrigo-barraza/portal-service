@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import ServiceRegistryService from "../services/ServiceRegistryService.ts";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.ts";
+import WatchdogService from "../services/WatchdogService.ts";
 import DockerStatsService from "../services/DockerStatsService.ts";
 import CodeAnalysisService from "../services/CodeAnalysisService.ts";
 import {
@@ -195,8 +196,29 @@ router.get(
         services,
         infrastructure as unknown as Record<string, unknown>[]
       );
+      // Fold in watchdog state (push heartbeat age, down-since) so the
+      // portal cards can render it next to checkedAt.
+      const decorateWithWatchdog = (item: { id?: unknown }, kind: "service" | "infrastructure") => {
+        const stateId = kind === "infrastructure" ? `infra:${String(item.id)}` : String(item.id);
+        const state = WatchdogService.getState(stateId);
+        if (!state) return item;
+        return {
+          ...item,
+          watchdogStatus: state.status,
+          lastHeartbeatAt:
+            state.lastHeartbeatAtMs !== null
+              ? new Date(state.lastHeartbeatAtMs).toISOString()
+              : null,
+          downSince:
+            state.unhealthySinceMs !== null
+              ? new Date(state.unhealthySinceMs).toISOString()
+              : null,
+        };
+      };
       res.json({
         ...enriched,
+        services: enriched.services.map((item: { id?: unknown }) => decorateWithWatchdog(item, "service")),
+        infrastructure: enriched.infrastructure.map((item: { id?: unknown }) => decorateWithWatchdog(item, "infrastructure")),
         projectTypeColors: PROJECT_TYPE_COLORS,
         deployTierColors: DEPLOY_TIER_COLORS,
       });

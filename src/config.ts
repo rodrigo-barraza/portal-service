@@ -79,6 +79,7 @@ export function initializeRegistry(registry: VaultRegistry) {
       dockerProject: service.dockerProject || null,
       deployTier: service.deployTier ?? inferDeployTier(inferProjectType(service.id, service)),
       essential: service.essential || false,
+      watchdog: service.watchdog || null,
       dependsOn: (service.dependsOn || []).map((dep: { id: string; criticality?: string }) => ({
         id: dep.id,
         criticality: dep.criticality || "required",
@@ -174,3 +175,21 @@ export const SESSIONS_SERVICE_URL = process.env.SESSIONS_SERVICE_URL;
 // Shared secret required by sessions-service /stats/* (they expose raw
 // IPs/fingerprints, so the service fails closed without it).
 export const SESSIONS_STATS_API_SECRET = process.env.SESSIONS_STATS_API_SECRET;
+
+// ── Watchdog (dead-man's-switch + down alerting) ───────────────
+// Path token authorizing heartbeat pushes — embedded in each pushing
+// service's HEARTBEAT_URL. Watchdog push endpoints 503 without it.
+export const WATCHDOG_PUSH_TOKEN = process.env.WATCHDOG_PUSH_TOKEN || "";
+// Discord webhook that receives down/recovery alerts. Alerting is
+// log-only when unset; state tracking still runs.
+export const WATCHDOG_DISCORD_WEBHOOK_URL = process.env.WATCHDOG_DISCORD_WEBHOOK_URL || "";
+// How often watchdog state is evaluated.
+export const WATCHDOG_EVALUATE_INTERVAL_MS = 30_000;
+// Push heartbeats arrive every ~60s; past this silence the pusher is down
+// (~4 missed beats — matches the tolerance the Kuma monitor had).
+export const WATCHDOG_PUSH_GRACE_MS = 4 * 60_000;
+// Pull targets must stay unhealthy this long before alerting (2+ polls of
+// the 60s health loop) — a single blip or in-place restart never pages.
+export const WATCHDOG_CONFIRM_DOWN_MS = 90_000;
+// Minimum gap between down alerts for one target — flapping can't spam.
+export const WATCHDOG_ALERT_COOLDOWN_MS = 10 * 60_000;
