@@ -28,6 +28,13 @@ RUN pnpm prune --prod
 FROM node:26-alpine
 WORKDIR /app
 
+# System Chromium for Playwright site screenshots (/containers/previews).
+# Alpine has no Playwright-bundled browser build, so Playwright is pointed
+# at the apk Chromium instead — same pattern as tools-service.
+RUN apk add --no-cache chromium font-noto font-noto-emoji
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 # Copy production node_modules and compiled dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

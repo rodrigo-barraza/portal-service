@@ -6,11 +6,16 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response, NextFunction } from "express";
 import DockerStatsService from "../services/DockerStatsService.ts";
 import ServiceRegistryService from "../services/ServiceRegistryService.ts";
+import ScreenshotService from "../services/ScreenshotService.ts";
 import { DEVICES } from "../config.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const router = Router();
+
+// Hostnames only — no ports, paths, or userinfo sneaking into the URL
+// ScreenshotService navigates to.
+const VALID_DOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
 
 // Docker container names: alphanumeric start, then [a-zA-Z0-9_.-].
 // Rejecting anything else prevents path/query injection into the Docker
@@ -30,6 +35,33 @@ function tryParseDockerError(body: string) {
     return null;
   }
 }
+
+// Cached site thumbnail for a registered client domain — the static
+// preview shown on the /containers card view instead of a live iframe.
+router.get("/previews/:domain", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const domain = String(req.params.domain);
+
+    if (!VALID_DOMAIN_PATTERN.test(domain)) {
+      return res.status(400).json({ error: "Invalid domain" });
+    }
+
+    if (!ScreenshotService.isAllowedDomain(domain)) {
+      return res.status(404).json({ error: `Unknown domain: ${domain}` });
+    }
+
+    const screenshot = await ScreenshotService.getScreenshot(domain);
+
+    res
+      .type(screenshot.contentType)
+      .setHeader("Cache-Control", "public, max-age=300")
+      .setHeader("X-Captured-At", new Date(screenshot.capturedAt).toISOString())
+      .send(screenshot.buffer);
+  } catch (error: unknown) {
+    logger.error(`[Container:Preview] Failed for ${req.params.domain}: ${getErrorMessage(error)}`);
+    next(error);
+  }
+}, "Containers_Preview"));
 
 router.post("/:name/restart", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {

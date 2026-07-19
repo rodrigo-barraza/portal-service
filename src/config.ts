@@ -14,6 +14,11 @@ export const MINIO_SECRET_KEY = process.env.MINIO_SECRET_KEY;
 
 export const GITHUB_PAT = process.env.GITHUB_PAT || "";
 
+// In Docker, points Playwright at system Chromium (see Dockerfile);
+// unset locally so Playwright uses its own downloaded browser.
+export const PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH =
+  process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || "";
+
 // ── Devices ────────────────────────────────────────────────────
 // Physical machines / hosts that run projects.
 // Populated from the registry's `devices` section at boot.
