@@ -1,6 +1,15 @@
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { createGitHubClient } from "@rodrigo-barraza/utilities-library/github";
 import { GITHUB_PAT } from "../config.ts";
 import logger from "../utils/logger.ts";
+
+// Shared transport: base URL, v3 Accept header, User-Agent, optional Bearer
+// auth. requestRaw() never throws on non-2xx, so the status/rate-limit
+// branching below sees the raw Response exactly as before.
+const gitHubApiClient = createGitHubClient({
+  token: GITHUB_PAT || undefined,
+  userAgent: "portal-service",
+});
 
 export interface GitHubRepoDetails {
   size: number;
@@ -22,7 +31,6 @@ export interface GitHubFetchStats {
 }
 
 export class GitHubClient {
-  private static readonly GITHUB_API_BASE_URL = "https://api.github.com";
   private static readonly DEFAULT_TIMEOUT_MILLISECONDS = 8000;
 
   // Rolling counters since the last resetStats() — lets callers (e.g. the
@@ -46,28 +54,9 @@ export class GitHubClient {
     requestPath: string,
     timeoutMilliseconds: number = this.DEFAULT_TIMEOUT_MILLISECONDS
   ): Promise<T | null> {
-    const abortController = new AbortController();
-    const timeoutTimer = setTimeout(() => {
-      abortController.abort();
-    }, timeoutMilliseconds);
-
     try {
-      const headers: Record<string, string> = {
-        Accept: "application/vnd.github.v3+json",
-        "User-Agent": "portal-service",
-      };
-
-      if (GITHUB_PAT) {
-        headers.Authorization = `Bearer ${GITHUB_PAT}`;
-      }
-
       this.stats.requests++;
-      const response = await fetch(`${this.GITHUB_API_BASE_URL}${requestPath}`, {
-        headers,
-        signal: abortController.signal,
-      });
-
-      clearTimeout(timeoutTimer);
+      const response = await gitHubApiClient.requestRaw(requestPath, { timeoutMilliseconds });
 
       if (!response.ok) {
         this.stats.failures++;
@@ -88,7 +77,6 @@ export class GitHubClient {
 
       return (await response.json()) as T;
     } catch (error: unknown) {
-      clearTimeout(timeoutTimer);
       this.stats.failures++;
       const errorMessage = getErrorMessage(error);
       logger.warn(`[GitHubClient] Request to ${requestPath} failed: ${errorMessage}`);

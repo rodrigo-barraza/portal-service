@@ -1,4 +1,5 @@
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { createTtlCache } from "@rodrigo-barraza/utilities-library/cache";
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
 import logger from "../utils/logger.ts";
 import {
@@ -32,26 +33,9 @@ interface TransformedOverviewMetricPeriod {
   engagementRate: number;
 }
 
-const cache = new Map<string, { data: unknown; ts: number }>();
-
-function cached<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> {
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.ts < ttlMs) return Promise.resolve(hit.data as T);
-
-  const promise = fetcher().then((data) => {
-    cache.set(key, { data, ts: Date.now() });
-    return data;
-  }).catch((error: unknown) => {
-    cache.delete(key);
-    throw error;
-  });
-
-  if (hit) {
-    promise.catch(() => {});
-    return Promise.resolve(hit.data as T);
-  }
-  return promise;
-}
+// Stale-while-revalidate, delete-on-background-failure — matches the
+// previous hand-rolled cached() semantics exactly.
+const analyticsCache = createTtlCache({ staleWhileRevalidate: true });
 
 const REALTIME_TTL = 15_000;
 const REPORT_TTL = 60_000;
@@ -118,7 +102,7 @@ export default class GoogleAnalyticsService {
 
   public static async getRealtimeReport(propertyId: string) {
     const key = `realtime:${propertyId}`;
-    return cached(key, REALTIME_TTL, async () => {
+    return analyticsCache.get(key, REALTIME_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runRealtimeReport({
@@ -149,7 +133,7 @@ export default class GoogleAnalyticsService {
 
   public static async getOverviewReport(propertyId: string, period: string = "30d") {
     const key = `overview:${propertyId}:${period}`;
-    return cached(key, REPORT_TTL, async () => {
+    return analyticsCache.get(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const metricNames = [
@@ -208,7 +192,7 @@ export default class GoogleAnalyticsService {
 
   public static async getTopPages(propertyId: string, period: string = "30d") {
     const key = `pages:${propertyId}:${period}`;
-    return cached(key, REPORT_TTL, async () => {
+    return analyticsCache.get(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
@@ -244,7 +228,7 @@ export default class GoogleAnalyticsService {
 
   public static async getTrafficSources(propertyId: string, period: string = "30d") {
     const key = `sources:${propertyId}:${period}`;
-    return cached(key, REPORT_TTL, async () => {
+    return analyticsCache.get(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
@@ -279,7 +263,7 @@ export default class GoogleAnalyticsService {
 
   public static async getGeography(propertyId: string, period: string = "30d") {
     const key = `geo:${propertyId}:${period}`;
-    return cached(key, REPORT_TTL, async () => {
+    return analyticsCache.get(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
@@ -313,7 +297,7 @@ export default class GoogleAnalyticsService {
 
   public static async getDevices(propertyId: string, period: string = "30d") {
     const key = `devices:${propertyId}:${period}`;
-    return cached(key, REPORT_TTL, async () => {
+    return analyticsCache.get(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       // Four independent reports — run them in parallel
@@ -385,7 +369,7 @@ export default class GoogleAnalyticsService {
 
   public static async getTimeSeries(propertyId: string, period: string = "30d") {
     const key = `timeseries:${propertyId}:${period}`;
-    return cached(key, REPORT_TTL, async () => {
+    return analyticsCache.get(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
@@ -421,7 +405,7 @@ export default class GoogleAnalyticsService {
 
   public static async getChannelGrouping(propertyId: string, period: string = "30d") {
     const key = `channels:${propertyId}:${period}`;
-    return cached(key, REPORT_TTL, async () => {
+    return analyticsCache.get(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
@@ -454,7 +438,7 @@ export default class GoogleAnalyticsService {
 
   public static async getLandingPages(propertyId: string, period: string = "30d") {
     const key = `landing:${propertyId}:${period}`;
-    return cached(key, REPORT_TTL, async () => {
+    return analyticsCache.get(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
@@ -488,7 +472,7 @@ export default class GoogleAnalyticsService {
 
   public static async getHourlyHeatmap(propertyId: string, period: string = "30d") {
     const key = `heatmap:${propertyId}:${period}`;
-    return cached(key, REPORT_TTL, async () => {
+    return analyticsCache.get(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
@@ -522,7 +506,7 @@ export default class GoogleAnalyticsService {
 
   public static async getNewVsReturning(propertyId: string, period: string = "30d") {
     const key = `retention:${propertyId}:${period}`;
-    return cached(key, REPORT_TTL, async () => {
+    return analyticsCache.get(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({
@@ -553,7 +537,7 @@ export default class GoogleAnalyticsService {
 
   public static async getTopEvents(propertyId: string, period: string = "30d") {
     const key = `events:${propertyId}:${period}`;
-    return cached(key, REPORT_TTL, async () => {
+    return analyticsCache.get(key, REPORT_TTL, async () => {
       const analyticsClient = GoogleAnalyticsService._getClient();
 
       const [response] = await analyticsClient.runReport({

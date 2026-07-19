@@ -1,5 +1,6 @@
 import logger from "../utils/logger.ts";
 import { getErrorMessage, seconds } from "@rodrigo-barraza/utilities-library";
+import { createTtlCache } from "@rodrigo-barraza/utilities-library/cache";
 import { DEVICES } from "../config.ts";
 import ContainerMetricsService from "./ContainerMetricsService.ts";
 import type {
@@ -17,7 +18,9 @@ const SYSTEM_REQUEST_TIMEOUT_MS = seconds(30);
 const HISTORY_INTERVAL_MS = 5_000;
 const HISTORY_MAX_SAMPLES = 60;
 
-const statsCacheMap = new Map<string, { data: ContainerStats[]; fetchedAt: number }>();
+// Per-device TTL cache that keeps serving the last good stats when a
+// collection cycle fails — matches the previous stale-fallback semantics.
+const statsCache = createTtlCache({ serveStaleOnError: true });
 const cpuCounterMap = new Map<string, Map<string, { cpuTotal: number; systemTotal: number }>>();
 const historyMap = new Map<string, ContainerSnapshot[]>();
 const lastPersistMap = new Map<string, number>();
@@ -55,11 +58,20 @@ export default class DockerStatsService {
     deviceId: string,
     deviceEntry: DeviceEntry
   ): Promise<ContainerStats[]> {
-    const cached = statsCacheMap.get(deviceId);
-    if (cached && Date.now() - cached.fetchedAt < STATS_CACHE_TTL_MS) {
-      return cached.data;
+    try {
+      return await statsCache.get(deviceId, STATS_CACHE_TTL_MS, () =>
+        DockerStatsService._fetchAllForDevice(deviceId, deviceEntry)
+      );
+    } catch {
+      // No stale data available for this device — degrade to an empty list.
+      return [];
     }
+  }
 
+  private static async _fetchAllForDevice(
+    deviceId: string,
+    deviceEntry: DeviceEntry
+  ): Promise<ContainerStats[]> {
     try {
       const containerListBody = await DockerClient.dockerGet(
         deviceEntry,
@@ -123,13 +135,10 @@ export default class DockerStatsService {
         }
       }
 
-      statsCacheMap.set(deviceId, { data: result, fetchedAt: Date.now() });
       return result;
     } catch (error: unknown) {
       logger.error(`[DockerStats:${deviceId}] Failed to collect stats: ${getErrorMessage(error)}`);
-      const stale = statsCacheMap.get(deviceId);
-      if (stale) return stale.data;
-      return [];
+      throw error;
     }
   }
 
@@ -147,9 +156,9 @@ export default class DockerStatsService {
 
   public static invalidate(deviceId?: string): void {
     if (deviceId) {
-      statsCacheMap.delete(deviceId);
+      statsCache.delete(deviceId);
     } else {
-      statsCacheMap.clear();
+      statsCache.clear();
     }
   }
 

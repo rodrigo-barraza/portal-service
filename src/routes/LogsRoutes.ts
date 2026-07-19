@@ -1,6 +1,6 @@
 import type { ContainerStats } from "../types.ts";
 import { Router, Request, Response } from "express";
-import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
+import { asyncHandler, initSseResponse, createSseEmitter } from "@rodrigo-barraza/utilities-library/express";
 import { DEVICES } from "../config.ts";
 import DockerStatsService from "../services/DockerStatsService.ts";
 import { DockerClient } from "../wrappers/DockerClient.ts";
@@ -155,12 +155,7 @@ router.get("/:containerName", asyncHandler(async (req: Request, res: Response) =
 
   const isFiltering = minimumSeverity !== null || searchFilter !== null;
 
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "X-Accel-Buffering": "no",
-  });
+  initSseResponse(res);
 
   res.write(
     `event: connected\ndata: ${JSON.stringify({
@@ -179,9 +174,14 @@ router.get("/:containerName", asyncHandler(async (req: Request, res: Response) =
   let totalLineCount = 0;
   let emittedLineCount = 0;
 
+  // Library emitter for the plain `data:` log-line frames (guarded writes +
+  // force flush). The named-event frames below (connected/error/meta/end)
+  // stay hand-rolled — the emitter only writes `data:` frames.
+  const emitDataFrame = createSseEmitter(res);
+
   function sendLine(line: string, streamSource: string) {
     if (isClosed) return;
-    res.write(`data: ${JSON.stringify({ line, stream: streamSource })}\n\n`);
+    emitDataFrame({ line, stream: streamSource });
   }
 
   function sendError(message: string) {

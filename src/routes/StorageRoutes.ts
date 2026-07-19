@@ -1,4 +1,4 @@
-import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
+import { asyncHandler, initSseResponse } from "@rodrigo-barraza/utilities-library/express";
 // ─── Object Store Route ─────────────────────────────────────
 
 import { Router, Request, Response, NextFunction } from "express";
@@ -117,15 +117,10 @@ router.get("/buckets", asyncHandler(async (_req: Request, res: Response, next: N
 }, "Storage_ListBuckets"));
 
 router.get("/buckets/stream", asyncHandler(async (req: Request, res: Response) => {
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "X-Accel-Buffering": "no",
-  });
-
-  // Flush headers immediately
-  res.flushHeaders();
+  // Library SSE header setup (flushes headers immediately). The frames below
+  // use named `event:` types, which the library emitter (data-only frames)
+  // does not cover — they stay hand-rolled.
+  initSseResponse(res);
 
   try {
     for await (const event of MinioService.streamBuckets()) {
