@@ -47,13 +47,10 @@ router.get("/timeseries", async (request: Request, response: Response) => {
       return;
     }
 
-    // Validate against tracked APIs to prevent arbitrary service queries
-    const trackedApis = GoogleCloudUsageService.getTrackedApis();
-    const isTracked = trackedApis.some(
-      (apiDefinition) => apiDefinition.serviceIdentifier === serviceIdentifier,
-    );
-    if (!isTracked) {
-      response.status(400).json({ error: `Unrecognized service: ${serviceIdentifier}` });
+    // Discovery is dynamic, so any well-formed identifier is queryable —
+    // the format check prevents monitoring-filter injection.
+    if (!GoogleCloudUsageService.isValidServiceIdentifier(serviceIdentifier)) {
+      response.status(400).json({ error: `Invalid service identifier: ${serviceIdentifier}` });
       return;
     }
 

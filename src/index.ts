@@ -93,7 +93,7 @@ app.use(requestLoggerMiddleware);
 // ─── Endpoint Registry ────────────────────────────────────────────
 
 const ENDPOINTS = {
-  rest: ["/health", "/services", "/devices", "/containers", "/stats", "/logs", "/integrations", "/object-store", "/google-analytics", "/session-analytics", "/cloud-usage", "/watchdog"],
+  rest: ["/health", "/services", "/devices", "/containers", "/stats", "/logs", "/integrations", "/object-store", "/google-analytics", "/session-analytics", "/external-apis", "/watchdog"],
 };
 
 // ─── Root Health Check ─────────────────────────────────────────────
@@ -121,7 +121,7 @@ app.use("/google-analytics", googleAnalyticsRouter);
 app.use("/devices", devicesRouter);
 app.use("/containers", containersRouter);
 app.use("/session-analytics", sessionAnalyticsRouter);
-app.use("/cloud-usage", googleCloudUsageRouter);
+app.use("/external-apis", googleCloudUsageRouter);
 app.use("/watchdog", watchdogRouter);
 
 // ─── Error Handler (must be last) ──────────────────────────────────
