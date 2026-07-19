@@ -1,5 +1,6 @@
 import { MongoClient } from "mongodb";
-import { Client as MinioClient, type BucketItemFromList } from "minio";
+import type { BucketItemFromList } from "minio";
+import { createMinioClient } from "@rodrigo-barraza/utilities-library/service/minio";
 import type { InfrastructureEntry, InfraStatus } from "../types.ts";
 import {
   INFRASTRUCTURE,
@@ -167,11 +168,8 @@ export default class InfrastructureRegistryService {
   public static async _checkMinio() {
     if (!MINIO_ENDPOINT) throw new Error("No MINIO_ENDPOINT configured");
 
-    const url = new URL(MINIO_ENDPOINT);
-    const client = new MinioClient({
-      endPoint: url.hostname,
-      port: parseInt(url.port, 10) || (url.protocol === "https:" ? 443 : 80),
-      useSSL: url.protocol === "https:",
+    const client = await createMinioClient({
+      endpoint: MINIO_ENDPOINT,
       accessKey: MINIO_ACCESS_KEY || "",
       secretKey: MINIO_SECRET_KEY || "",
     });

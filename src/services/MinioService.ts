@@ -1,7 +1,8 @@
 // ─── MinIO Storage Service ──────────────────────────────────
 
 import { createHmac } from "node:crypto";
-import { Client } from "minio";
+import type { Client } from "minio";
+import { createMinioClient } from "@rodrigo-barraza/utilities-library/service/minio";
 import {
   MINIO_ENDPOINT,
   MINIO_ACCESS_KEY,
@@ -73,18 +74,15 @@ function base64url(input: Buffer | string) {
 export default class MinioService {
   static client: Client | null = null;
 
-  static _getClient() {
+  static async _getClient() {
     if (MinioService.client) return MinioService.client;
 
     if (!MINIO_ENDPOINT) {
       throw new Error("No MINIO_ENDPOINT configured");
     }
 
-    const url = new URL(MINIO_ENDPOINT);
-    MinioService.client = new Client({
-      endPoint: url.hostname,
-      port: parseInt(url.port, 10) || (url.protocol === "https:" ? 443 : 80),
-      useSSL: url.protocol === "https:",
+    MinioService.client = await createMinioClient({
+      endpoint: MINIO_ENDPOINT,
       accessKey: MINIO_ACCESS_KEY || "",
       secretKey: MINIO_SECRET_KEY || "",
     });
@@ -175,7 +173,7 @@ export default class MinioService {
 
   /** Count one bucket the slow way — a full recursive object enumeration. */
   static async _countBucket(bucketName: string): Promise<BucketUsage> {
-    const minioClient = MinioService._getClient();
+    const minioClient = await MinioService._getClient();
     let objectCount = 0;
     let totalSize = 0;
 
@@ -263,7 +261,7 @@ export default class MinioService {
         return statsSnapshot;
       }
 
-      const minioClient = MinioService._getClient();
+      const minioClient = await MinioService._getClient();
       const names = (await minioClient.listBuckets()).map((bucket) => bucket.name);
       const usage = new Map<string, BucketUsage>();
       for await (const result of MinioService._scanUsageIncremental(names)) {
@@ -280,7 +278,7 @@ export default class MinioService {
   }
 
   static async listBuckets() {
-    const minioClient = MinioService._getClient();
+    const minioClient = await MinioService._getClient();
     const [rawBuckets, stats] = await Promise.all([
       minioClient.listBuckets(),
       MinioService.getBucketUsage(),
@@ -298,7 +296,7 @@ export default class MinioService {
   }
 
   static async *streamBuckets(): AsyncGenerator<BucketStreamServerEvent> {
-    const minioClient = MinioService._getClient();
+    const minioClient = await MinioService._getClient();
     const rawBuckets = await minioClient.listBuckets();
 
     // Names + creation dates are known instantly — send them all up front so
@@ -388,7 +386,7 @@ export default class MinioService {
   }
 
   static async listObjects(bucketName: string, prefix: string = "", recursive: boolean = false) {
-    const minioClient = MinioService._getClient();
+    const minioClient = await MinioService._getClient();
 
     return new Promise<{ objects: MinioObjectEntry[], prefixes: string[] }>((resolve, reject) => {
       const objects: MinioObjectEntry[] = [];
@@ -422,22 +420,22 @@ export default class MinioService {
   }
 
   static async statObject(bucketName: string, objectName: string) {
-    const minioClient = MinioService._getClient();
+    const minioClient = await MinioService._getClient();
     return minioClient.statObject(bucketName, objectName);
   }
 
   static async getObject(bucketName: string, objectName: string) {
-    const minioClient = MinioService._getClient();
+    const minioClient = await MinioService._getClient();
     return minioClient.getObject(bucketName, objectName);
   }
 
   static async getPartialObject(bucketName: string, objectName: string, offset: number, length: number) {
-    const minioClient = MinioService._getClient();
+    const minioClient = await MinioService._getClient();
     return minioClient.getPartialObject(bucketName, objectName, offset, length);
   }
 
   static async deleteObject(bucketName: string, objectName: string) {
-    const minioClient = MinioService._getClient();
+    const minioClient = await MinioService._getClient();
     return minioClient.removeObject(bucketName, objectName);
   }
 
@@ -445,7 +443,7 @@ export default class MinioService {
     query: string,
     { bucket, limit = 200 }: { bucket?: string; limit?: number } = {},
   ): Promise<{ results: Array<MinioObjectEntry & { bucket: string }>; totalScanned: number; truncated: boolean }> {
-    const minioClient = MinioService._getClient();
+    const minioClient = await MinioService._getClient();
     const normalizedQuery = query.toLowerCase();
     const results: Array<MinioObjectEntry & { bucket: string }> = [];
     let totalScanned = 0;

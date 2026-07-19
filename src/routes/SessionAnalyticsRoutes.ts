@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { createApiClient } from "@rodrigo-barraza/utilities-library/http";
 import { AUTH_HEADERS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { SESSIONS_SERVICE_URL, SESSIONS_STATS_API_SECRET } from "../config.ts";
 
@@ -16,6 +17,14 @@ import { SESSIONS_SERVICE_URL, SESSIONS_STATS_API_SECRET } from "../config.ts";
 const router = Router();
 
 const SESSIONS_STATS_BASE = `${SESSIONS_SERVICE_URL}/stats`;
+
+const sessionsClient = createApiClient(SESSIONS_STATS_BASE, {
+  headers: {
+    "Content-Type": "application/json",
+    ...(SESSIONS_STATS_API_SECRET ? { [AUTH_HEADERS.apiSecret]: SESSIONS_STATS_API_SECRET } : {}),
+  },
+  timeoutMilliseconds: 15_000,
+});
 
 /**
  * Generic proxy helper — forwards GET requests to sessions-service.
@@ -35,16 +44,11 @@ async function proxy(
     }
 
     const queryString = new URLSearchParams(query).toString();
-    const url = `${SESSIONS_STATS_BASE}${sessionsPath}${queryString ? `?${queryString}` : ""}`;
+    const path = `${sessionsPath}${queryString ? `?${queryString}` : ""}`;
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(SESSIONS_STATS_API_SECRET ? { [AUTH_HEADERS.apiSecret]: SESSIONS_STATS_API_SECRET } : {}),
-      },
-      signal: AbortSignal.timeout(15_000),
-    });
+    // requestRaw: upstream status and body pass through verbatim (no throw
+    // on non-2xx), preserving the proxy's exact response semantics.
+    const response = await sessionsClient.requestRaw(path, { method: "GET" });
 
     let data: unknown;
     try {

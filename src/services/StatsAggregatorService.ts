@@ -3,6 +3,7 @@
 import { PROJECTS, STATS_CACHE_TTL_MS } from "../config.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { createApiClient, ApiError, type ApiClient } from "@rodrigo-barraza/utilities-library/http";
 
 interface CacheEntry {
   data: Record<string, unknown>;
@@ -10,6 +11,22 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>();
+
+// PROJECTS is hydrated from the registry after boot, so the client is
+// cached against whatever base URL is current rather than built at import.
+let prismClient: ApiClient | null = null;
+let prismClientBaseUrl: string | null = null;
+
+function getPrismClient(baseUrl: string): ApiClient {
+  if (!prismClient || prismClientBaseUrl !== baseUrl) {
+    prismClient = createApiClient(baseUrl, {
+      headers: { Accept: "application/json" },
+      timeoutMilliseconds: 5000,
+    });
+    prismClientBaseUrl = baseUrl;
+  }
+  return prismClient;
+}
 
 export default class StatsAggregatorService {
     static async getOverview() {
@@ -23,8 +40,8 @@ export default class StatsAggregatorService {
 
     try {
       const [statsRes, healthRes] = await Promise.all([
-        StatsAggregatorService._fetch(`${prismUrl}/admin/stats/overview`),
-        StatsAggregatorService._fetch(`${prismUrl}/admin/health`),
+        StatsAggregatorService._fetch(prismUrl, "/admin/stats/overview"),
+        StatsAggregatorService._fetch(prismUrl, "/admin/health"),
       ]);
 
       const data = {
@@ -58,7 +75,8 @@ export default class StatsAggregatorService {
       if (params.period) queryString.set("period", params.period);
 
       const data = await StatsAggregatorService._fetch(
-        `${prismUrl}/admin/stats/breakdown?${queryString}`,
+        prismUrl,
+        `/admin/stats/breakdown?${queryString}`,
       );
 
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
@@ -82,7 +100,8 @@ export default class StatsAggregatorService {
 
     try {
       const data = await StatsAggregatorService._fetch(
-        `${prismUrl}/admin/stats/projects`,
+        prismUrl,
+        "/admin/stats/projects",
       );
 
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
@@ -94,24 +113,13 @@ export default class StatsAggregatorService {
     }
   }
 
-    static async _fetch(url: string) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
+    static async _fetch(baseUrl: string, path: string) {
     try {
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: { Accept: "application/json" },
-      });
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      return response.json() as Promise<Record<string, unknown>>;
+      return await getPrismClient(baseUrl).get<Record<string, unknown>>(path);
     } catch (error: unknown) {
-      clearTimeout(timeout);
+      // Preserve the historical "HTTP {status}" failure messages surfaced
+      // through getErrorMessage() at the call sites.
+      if (error instanceof ApiError) throw new Error(`HTTP ${error.status}`);
       throw error;
     }
   }
