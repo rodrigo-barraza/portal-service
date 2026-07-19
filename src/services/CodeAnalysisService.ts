@@ -1,4 +1,5 @@
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { createSimpleCache } from "@rodrigo-barraza/utilities-library/cache";
 import { GITHUB_PAT, PROJECTS } from "../config.ts";
 import logger from "../utils/logger.ts";
 import { GitHubClient, type GitHubFetchStats } from "../wrappers/GitHubClient.ts";
@@ -36,14 +37,20 @@ interface AnalysisResult {
   github: GitHubHealth;
 }
 
-let analysisCache: AnalysisResult | null = null;
-let analysisCacheTimestamp = 0;
+const analysisCache = createSimpleCache<AnalysisResult | null>();
 
 export default class CodeAnalysisService {
   public static async analyze(forceRefresh = false): Promise<AnalysisResult> {
     const currentTimestamp = Date.now();
-    if (!forceRefresh && analysisCache && currentTimestamp - analysisCacheTimestamp < CACHE_TTL_MILLISECONDS) {
-      return analysisCache;
+    const cachedAnalysis = analysisCache.getData();
+    const lastFetchTimestamp = analysisCache.getLastFetch();
+    if (
+      !forceRefresh &&
+      cachedAnalysis &&
+      lastFetchTimestamp &&
+      currentTimestamp - Date.parse(lastFetchTimestamp) < CACHE_TTL_MILLISECONDS
+    ) {
+      return cachedAnalysis;
     }
 
     logger.info("[CodeAnalysis] Starting ecosystem analysis...");
@@ -116,8 +123,7 @@ export default class CodeAnalysisService {
       },
     };
 
-    analysisCache = analysisResult;
-    analysisCacheTimestamp = currentTimestamp;
+    analysisCache.update(analysisResult);
 
     const totalImports = Object.values(dependencies).reduce((sum, projectDependency) => sum + projectDependency.imports.length, 0);
     const totalApiCalls = Object.values(dependencies).reduce(

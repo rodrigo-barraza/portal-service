@@ -1,4 +1,5 @@
 import { MetricServiceClient, protos } from "@google-cloud/monitoring";
+import { createTtlCache } from "@rodrigo-barraza/utilities-library/cache";
 import logger from "../utils/logger.ts";
 import { GOOGLE_ANALYTICS_CREDENTIALS, GOOGLE_CLOUD_MONITORING_PROJECT_ID } from "../config.ts";
 
@@ -184,20 +185,8 @@ interface CloudUsageTimeSeriesResponse {
 
 // ── Cache ──────────────────────────────────────────────────────────
 
-const usageCache = new Map<string, { data: unknown; timestamp: number }>();
+const usageCache = createTtlCache();
 const CACHE_TTL_MILLISECONDS = 5 * 60 * 1000; // 5 minutes
-
-function getCached<T>(cacheKey: string): T | null {
-  const entry = usageCache.get(cacheKey);
-  if (entry && Date.now() - entry.timestamp < CACHE_TTL_MILLISECONDS) {
-    return entry.data as T;
-  }
-  return null;
-}
-
-function setCache(cacheKey: string, data: unknown): void {
-  usageCache.set(cacheKey, { data, timestamp: Date.now() });
-}
 
 // ── Period Parsing ─────────────────────────────────────────────────
 
@@ -318,10 +307,12 @@ export default class GoogleCloudUsageService {
   }
 
   static async getSummary(period = "30d"): Promise<CloudUsageSummaryResponse> {
-    const cacheKey = `cloud-usage:summary:${period}`;
-    const cached = getCached<CloudUsageSummaryResponse>(cacheKey);
-    if (cached) return cached;
+    return usageCache.get(`cloud-usage:summary:${period}`, CACHE_TTL_MILLISECONDS, () =>
+      GoogleCloudUsageService.computeSummary(period),
+    );
+  }
 
+  private static async computeSummary(period: string): Promise<CloudUsageSummaryResponse> {
     // No service filter — discover everything with traffic, then classify.
     const { timeSeries, reachableProjectIds, unreachableProjectIds } =
       await GoogleCloudUsageService.listTimeSeriesAcrossProjects(
@@ -447,7 +438,6 @@ export default class GoogleCloudUsageService {
       fetchedAt: new Date().toISOString(),
     };
 
-    setCache(cacheKey, result);
     return result;
   }
 
@@ -459,10 +449,17 @@ export default class GoogleCloudUsageService {
       throw new Error(`Invalid service identifier: ${serviceIdentifier}`);
     }
 
-    const cacheKey = `cloud-usage:timeseries:${serviceIdentifier}:${period}`;
-    const cached = getCached<CloudUsageTimeSeriesResponse>(cacheKey);
-    if (cached) return cached;
+    return usageCache.get(
+      `cloud-usage:timeseries:${serviceIdentifier}:${period}`,
+      CACHE_TTL_MILLISECONDS,
+      () => GoogleCloudUsageService.computeTimeSeries(serviceIdentifier, period),
+    );
+  }
 
+  private static async computeTimeSeries(
+    serviceIdentifier: string,
+    period: string,
+  ): Promise<CloudUsageTimeSeriesResponse> {
     const { timeSeries } = await GoogleCloudUsageService.listTimeSeriesAcrossProjects(
       `metric.type = "serviceruntime.googleapis.com/api/request_count" AND resource.labels.service = "${serviceIdentifier}"`,
       period,
@@ -519,7 +516,6 @@ export default class GoogleCloudUsageService {
       fetchedAt: new Date().toISOString(),
     };
 
-    setCache(cacheKey, result);
     return result;
   }
 }
