@@ -8,7 +8,7 @@
 // requiring pushers to set auth headers — the URL is the secret, exactly
 // like a Healthchecks ping URL or Kuma push token.
 
-import express, { Router, Request, Response } from "express";
+import express, { Router, type Request, type Response } from "express";
 import WatchdogService from "../services/WatchdogService.ts";
 import { WATCHDOG_PUSH_TOKEN } from "../config.ts";
 

@@ -1,7 +1,7 @@
 // ─── Google Cloud API Usage Routes ───────────────────────────
 
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import { Router, Request, Response } from "express";
+import { Router, type Request, type Response } from "express";
 import GoogleCloudUsageService from "../services/GoogleCloudUsageService.ts";
 import logger from "../utils/logger.ts";
 

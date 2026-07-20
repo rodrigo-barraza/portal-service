@@ -1,5 +1,5 @@
 import type { ContainerStats } from "../types.ts";
-import { Router, Request, Response } from "express";
+import { Router, type Request, type Response } from "express";
 import { asyncHandler, initSseResponse, createSseEmitter } from "@rodrigo-barraza/utilities-library/express";
 import { DEVICES } from "../config.ts";
 import DockerStatsService from "../services/DockerStatsService.ts";

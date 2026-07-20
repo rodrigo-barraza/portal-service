@@ -20,7 +20,7 @@ RUN --mount=type=ssh \
 FROM deps AS build
 WORKDIR /app
 COPY . .
-RUN pnpm run build
+RUN pnpm run typecheck
 # Prune devDependencies for the runtime image
 RUN pnpm prune --prod
 
@@ -37,7 +37,7 @@ ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Copy production node_modules and compiled dist
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
+COPY --from=build /app/src ./src
 COPY --from=build /app/package.json ./package.json
 
 # Non-root user for security
@@ -50,4 +50,4 @@ EXPOSE 4001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget --no-verbose --tries=1 -O /dev/null http://127.0.0.1:4001/health || exit 1
 
-CMD ["node", "dist/boot.js"]
+CMD ["node", "src/boot.ts"]

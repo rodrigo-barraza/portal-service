@@ -1,6 +1,6 @@
 // ─── Devices Route ──────────────────────────────────────────
 
-import { Router, Request, Response } from "express";
+import { Router, type Request, type Response } from "express";
 import { DEVICES, PROJECTS, INFRASTRUCTURE } from "../config.ts";
 import ServiceRegistryService from "../services/ServiceRegistryService.ts";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.ts";

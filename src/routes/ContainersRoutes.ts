@@ -3,7 +3,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // Direct Docker container control by name + device.
 // Used for containers that may not have a PROJECTS registry entry.
 
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import DockerStatsService from "../services/DockerStatsService.ts";
 import ServiceRegistryService from "../services/ServiceRegistryService.ts";
 import ScreenshotService from "../services/ScreenshotService.ts";

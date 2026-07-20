@@ -7,7 +7,7 @@
 // are served immediately while a background refresh runs, so the
 // UI never waits on a capture after first load.
 
-import { chromium, Browser } from "playwright";
+import { chromium, type Browser } from "playwright";
 import { PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } from "../config.ts";
 import ServiceRegistryService from "./ServiceRegistryService.ts";
 import logger from "../utils/logger.ts";

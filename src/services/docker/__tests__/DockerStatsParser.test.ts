@@ -9,7 +9,7 @@ describe("DockerStatsParser", () => {
     State: "running",
     Status: "Up 2 hours",
     Created: 1680000000,
-    Command: "node dist/index.js",
+    Command: "node src/index.ts",
     Ports: [
       { IP: "0.0.0.0", PrivatePort: 3000, PublicPort: 3000, Type: "tcp" }
     ],
@@ -29,7 +29,7 @@ describe("DockerStatsParser", () => {
       expect(result.state).toBe("running");
       expect(result.status).toBe("Up 2 hours");
       expect(result.created).toBe(1680000000);
-      expect(result.command).toBe("node dist/index.js");
+      expect(result.command).toBe("node src/index.ts");
       expect(result.device).toBe("my-device-id");
       expect(result.ports).toEqual([
         { ip: "0.0.0.0", privatePort: 3000, publicPort: 3000, type: "tcp" }

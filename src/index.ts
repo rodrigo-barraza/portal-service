@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { type Request, type Response } from "express";
 // ─── Entry Point ────────────────────────────────────────────
 
 import http from "node:http";
@@ -168,12 +168,12 @@ app.use(errorHandler);
       deferredAttempt++;
 
       try {
-        const { vault } = await import("./boot.js");
+        const { vault } = await import("./boot.ts");
         vault.clearRegistryCache();
         const registry = await vault.fetchRegistry();
 
         if (registry.projects?.length > 0) {
-          const { initializeRegistry } = await import("./config.js");
+          const { initializeRegistry } = await import("./config.ts");
           initializeRegistry(registry as unknown as import("./types.ts").VaultRegistry);
 
           // Run initial health checks now that we have services
@@ -244,7 +244,7 @@ app.use(errorHandler);
 
   const registryRefreshTimer = setInterval(async () => {
     try {
-      const { vault } = await import("./boot.js");
+      const { vault } = await import("./boot.ts");
       vault.clearRegistryCache();
       const registry = await vault.fetchRegistry();
 

@@ -2,7 +2,7 @@ import type { BucketInfo } from "../types.ts";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Stats Route ────────────────────────────────────────────
 
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import StatsAggregatorService from "../services/StatsAggregatorService.ts";
 import DockerStatsService from "../services/DockerStatsService.ts";
 import MinioService from "../services/MinioService.ts";

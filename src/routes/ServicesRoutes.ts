@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import ServiceRegistryService from "../services/ServiceRegistryService.ts";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.ts";
@@ -728,7 +728,7 @@ router.post(
   "/reload",
   asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      const { vault } = await import("../boot.js");
+      const { vault } = await import("../boot.ts");
       vault.clearRegistryCache();
       const registry = await vault.fetchRegistry();
 

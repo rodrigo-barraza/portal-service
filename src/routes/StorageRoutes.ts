@@ -1,7 +1,7 @@
 import { asyncHandler, initSseResponse } from "@rodrigo-barraza/utilities-library/express";
 // ─── Object Store Route ─────────────────────────────────────
 
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import MinioService from "../services/MinioService.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";

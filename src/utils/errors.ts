@@ -1,6 +1,6 @@
 // ─── Express Error Handler ──────────────────────────────────
 
-import { Request, Response, NextFunction } from "express";
+import { type Request, type Response, type NextFunction } from "express";
 import logger from "./logger.ts";
 
 export function errorHandler(error: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) {
