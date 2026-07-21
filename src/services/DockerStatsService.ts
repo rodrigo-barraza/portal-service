@@ -14,6 +14,10 @@ import { DockerStatsParser } from "./docker/DockerStatsParser.ts";
 import { DockerSystemHelper } from "./docker/DockerSystemHelper.ts";
 
 const STATS_CACHE_TTL_MS = 10_000;
+// System info fans out to Docker's /system/df — a disk-usage walk of every
+// image/volume that can take 30s+ on the NAS — so cache results and dedupe
+// concurrent callers onto a single in-flight fetch.
+const SYSTEM_INFO_CACHE_TTL_MS = 60_000;
 const SYSTEM_REQUEST_TIMEOUT_MS = seconds(30);
 const HISTORY_INTERVAL_MS = 5_000;
 const HISTORY_MAX_SAMPLES = 60;
@@ -21,6 +25,8 @@ const HISTORY_MAX_SAMPLES = 60;
 // Per-device TTL cache that keeps serving the last good stats when a
 // collection cycle fails — matches the previous stale-fallback semantics.
 const statsCache = createTtlCache({ serveStaleOnError: true });
+const systemInfoCache = createTtlCache({ serveStaleOnError: true });
+const systemInfoInflight = new Map<string, Promise<unknown>>();
 const cpuCounterMap = new Map<string, Map<string, { cpuTotal: number; systemTotal: number }>>();
 const historyMap = new Map<string, ContainerSnapshot[]>();
 const lastPersistMap = new Map<string, number>();
@@ -157,8 +163,10 @@ export default class DockerStatsService {
   public static invalidate(deviceId?: string): void {
     if (deviceId) {
       statsCache.delete(deviceId);
+      systemInfoCache.delete(deviceId);
     } else {
       statsCache.clear();
+      systemInfoCache.clear();
     }
   }
 
@@ -243,6 +251,22 @@ export default class DockerStatsService {
   }
 
   public static async getSystemInfo(deviceId?: string) {
+    const cacheKey = deviceId || "__all__";
+
+    const inflight = systemInfoInflight.get(cacheKey);
+    if (inflight) return inflight;
+
+    const fetchPromise = systemInfoCache
+      .get(cacheKey, SYSTEM_INFO_CACHE_TTL_MS, () =>
+        DockerStatsService._fetchSystemInfo(deviceId),
+      )
+      .finally(() => systemInfoInflight.delete(cacheKey));
+
+    systemInfoInflight.set(cacheKey, fetchPromise);
+    return fetchPromise;
+  }
+
+  public static async _fetchSystemInfo(deviceId?: string) {
     const devices = getDockerDevices();
 
     if (deviceId) {

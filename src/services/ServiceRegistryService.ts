@@ -34,6 +34,10 @@ export type ServiceStatus = {
 
 const statusCache = new Map<string, ServiceStatus>();
 
+// Consecutive fully-failed check rounds per service, used to debounce
+// healthy→down transitions (see _checkService).
+const consecutiveFailedRounds = new Map<string, number>();
+
 export default class ServiceRegistryService {
   public static list(): ServiceStatus[] {
     return Object.entries(PROJECTS).map(([id, service]) => {
@@ -83,6 +87,9 @@ export default class ServiceRegistryService {
 
   public static HEALTH_CHECK_RETRIES = 1;
   public static HEALTH_CHECK_RETRY_DELAY_MS = 1500;
+  // A healthy service must fail this many consecutive rounds (with retries
+  // exhausted each round) before it is reported as down.
+  public static UNHEALTHY_AFTER_ROUNDS = 2;
 
   public static async _checkService(id: string, service: ProjectEntry) {
     if (!service.url) {
@@ -114,10 +121,7 @@ export default class ServiceRegistryService {
       } as ServiceStatus;
     }
 
-    const wasPreviouslyDown = statusCache.has(id) && !statusCache.get(id)?.healthy;
-    const maxAttempts = wasPreviouslyDown
-      ? 1 + ServiceRegistryService.HEALTH_CHECK_RETRIES
-      : 1;
+    const maxAttempts = 1 + ServiceRegistryService.HEALTH_CHECK_RETRIES;
 
     let lastResult: ServiceStatus | null = null;
 
@@ -129,11 +133,30 @@ export default class ServiceRegistryService {
       lastResult = await ServiceRegistryService._attemptHealthCheck(id, service);
 
       if (lastResult?.healthy) {
+        consecutiveFailedRounds.delete(id);
         if (attempt > 1) {
           logger.info(`[ServiceRegistry] ${service.name} recovered on retry ${attempt - 1}`);
         }
         return lastResult;
       }
+    }
+
+    // Debounce healthy→down: one bad round (e.g. a host-wide stall that
+    // times out every probe at once) keeps the last healthy status; only
+    // UNHEALTHY_AFTER_ROUNDS consecutive failed rounds flip the flag.
+    const failedRounds = (consecutiveFailedRounds.get(id) || 0) + 1;
+    consecutiveFailedRounds.set(id, failedRounds);
+
+    const previous = statusCache.get(id);
+    if (previous?.healthy && failedRounds < ServiceRegistryService.UNHEALTHY_AFTER_ROUNDS) {
+      logger.warn(
+        `[ServiceRegistry] ${service.name} failed round ${failedRounds}/${ServiceRegistryService.UNHEALTHY_AFTER_ROUNDS} (${lastResult?.error}) — holding healthy until confirmed`,
+      );
+      return {
+        ...previous,
+        error: `Unconfirmed failure (${failedRounds}/${ServiceRegistryService.UNHEALTHY_AFTER_ROUNDS}): ${lastResult?.error}`,
+        checkedAt: lastResult?.checkedAt ?? previous.checkedAt,
+      } as ServiceStatus;
     }
 
     return lastResult as ServiceStatus;
