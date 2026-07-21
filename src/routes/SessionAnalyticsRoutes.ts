@@ -146,6 +146,22 @@ router.get("/session/:sessionId", (req: Request, res: Response, next: NextFuncti
   proxy(`/session/${encodeURIComponent(sessionId)}`, {}, res, next);
 });
 
+// ─── GET /session-analytics/session/:sessionId/replay ─────────
+// Full ordered rrweb event stream for one session (playback). The extra path
+// segment means it never collides with /session/:sessionId above.
+
+router.get("/session/:sessionId/replay", (req: Request, res: Response, next: NextFunction) => {
+  const sessionId = String(req.params.sessionId);
+  proxy(`/session/${encodeURIComponent(sessionId)}/replay`, {}, res, next);
+});
+
+// ─── GET /session-analytics/heatmap ───────────────────────────
+// Normalized cursor/click/scroll density grid for one page path + viewport band.
+
+router.get("/heatmap", (req: Request, res: Response, next: NextFunction) => {
+  proxy("/heatmap", req.query as Record<string, string>, res, next);
+});
+
 // ─── GET /session-analytics/visitors ──────────────────────────
 
 router.get("/visitors", (req: Request, res: Response, next: NextFunction) => {
