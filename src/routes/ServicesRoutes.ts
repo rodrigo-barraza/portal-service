@@ -8,8 +8,6 @@ import CodeAnalysisService from "../services/CodeAnalysisService.ts";
 import {
   PROJECTS,
   DEVICES,
-  PROJECT_TYPE_COLORS,
-  DEPLOY_TIER_COLORS,
   initializeRegistry,
 } from "../config.ts";
 import logger from "../utils/logger.ts";
@@ -219,8 +217,6 @@ router.get(
         ...enriched,
         services: enriched.services.map((item: { id?: unknown }) => decorateWithWatchdog(item, "service")),
         infrastructure: enriched.infrastructure.map((item: { id?: unknown }) => decorateWithWatchdog(item, "infrastructure")),
-        projectTypeColors: PROJECT_TYPE_COLORS,
-        deployTierColors: DEPLOY_TIER_COLORS,
       });
     } catch (error: unknown) {
       next(error);
@@ -240,11 +236,7 @@ router.post(
         services,
         infrastructure as unknown as Record<string, unknown>[]
       );
-      res.json({
-        ...enriched,
-        projectTypeColors: PROJECT_TYPE_COLORS,
-        deployTierColors: DEPLOY_TIER_COLORS,
-      });
+      res.json({ ...enriched });
     } catch (error: unknown) {
       next(error);
     }

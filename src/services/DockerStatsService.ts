@@ -6,6 +6,7 @@ import ContainerMetricsService from "./ContainerMetricsService.ts";
 import type {
   DockerActionResponse,
   DeviceEntry,
+  DeviceSpecs,
   ContainerStats,
   ContainerSnapshot,
 } from "../types.ts";
@@ -26,6 +27,10 @@ const HISTORY_MAX_SAMPLES = 60;
 // collection cycle fails — matches the previous stale-fallback semantics.
 const statsCache = createTtlCache({ serveStaleOnError: true });
 const systemInfoCache = createTtlCache({ serveStaleOnError: true });
+// Hardware specs come from the cheap /info call only (no /system/df walk),
+// change rarely, and survive fetch failures via stale-on-error.
+const deviceSpecsCache = createTtlCache({ serveStaleOnError: true });
+const DEVICE_SPECS_CACHE_TTL_MS = 300_000;
 const systemInfoInflight = new Map<string, Promise<unknown>>();
 const cpuCounterMap = new Map<string, Map<string, { cpuTotal: number; systemTotal: number }>>();
 const historyMap = new Map<string, ContainerSnapshot[]>();
@@ -248,6 +253,30 @@ export default class DockerStatsService {
     } catch (error: unknown) {
       logger.warn(`[DockerStats:${deviceId}] Snapshot failed: ${getErrorMessage(error)}`);
     }
+  }
+
+  /**
+   * Live hardware specs per Docker-reachable device, keyed by device id.
+   * Devices without a dockerApi endpoint are absent from the result.
+   */
+  public static async getDeviceSpecs(): Promise<Record<string, DeviceSpecs>> {
+    const devices = getDockerDevices();
+    const settled = await Promise.allSettled(
+      devices.map(async ({ id, device }) => {
+        const specs = await deviceSpecsCache.get(id, DEVICE_SPECS_CACHE_TTL_MS, () =>
+          DockerSystemHelper.getSpecsForDevice(device),
+        );
+        return [id, specs] as const;
+      }),
+    );
+
+    const specsByDevice: Record<string, DeviceSpecs> = {};
+    for (const result of settled) {
+      if (result.status === "fulfilled") {
+        specsByDevice[result.value[0]] = result.value[1] as DeviceSpecs;
+      }
+    }
+    return specsByDevice;
   }
 
   public static async getSystemInfo(deviceId?: string) {

@@ -188,7 +188,19 @@ export interface DeviceEntry {
   dockerBin: string | null;
   dockerApi: string | null;
   notes: string;
-  specs: Record<string, unknown> | null;
+}
+
+/**
+ * Live hardware specs collected from a device's Docker Engine `/info`
+ * endpoint — never declared statically in the registry.
+ */
+export interface DeviceSpecs {
+  cpus: number;
+  memoryBytes: number;
+  os: string;
+  architecture: string;
+  dockerVersion: string;
+  collectedAt: string;
 }
 
 export interface DockerDeviceTarget {
@@ -208,8 +220,6 @@ export interface VaultRegistry {
   projects: VaultRegistryProject[];
   infrastructure: VaultRegistryInfra[];
   devices: VaultRegistryDevice[];
-  projectTypeColors?: Record<string, string>;
-  deployTierColors?: Record<string, string>;
 }
 
 export interface VaultRegistryProject {
@@ -258,7 +268,6 @@ export interface VaultRegistryDevice {
   dockerBin?: string;
   dockerApi?: string;
   notes?: string;
-  specs?: Record<string, unknown>;
 }
 
 // ── Service Status ─────────────────────────────────────────────

@@ -5,10 +5,30 @@ import os from "os";
 const execAsync = promisify(exec);
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import type { DeviceEntry } from "../../types.ts";
+import type { DeviceEntry, DeviceSpecs } from "../../types.ts";
 import { DockerClient } from "../../wrappers/DockerClient.ts";
 
 export class DockerSystemHelper {
+  /**
+   * Lightweight hardware specs from Docker's /info only — skips the
+   * /system/df disk walk, so it's safe to call from list endpoints.
+   */
+  public static async getSpecsForDevice(
+    deviceEntry: DeviceEntry,
+    timeoutMs: number = 10000
+  ): Promise<DeviceSpecs> {
+    const infoResponseBody = await DockerClient.dockerGet(deviceEntry, "/info", timeoutMs);
+    const infoParsed = JSON.parse(infoResponseBody);
+    return {
+      cpus: (infoParsed.NCPU as number) || 0,
+      memoryBytes: (infoParsed.MemTotal as number) || 0,
+      os: (infoParsed.OperatingSystem as string) || "",
+      architecture: (infoParsed.Architecture as string) || "",
+      dockerVersion: (infoParsed.ServerVersion as string) || "",
+      collectedAt: new Date().toISOString(),
+    };
+  }
+
   public static async getSystemInfoForDevice(
     deviceId: string,
     deviceEntry: DeviceEntry,

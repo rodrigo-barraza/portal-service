@@ -85,8 +85,6 @@ function normalizeRepoUrl(repo: string | null) {
 // Until then, PROJECTS and INFRASTRUCTURE are empty objects.
 export let PROJECTS: Record<string, ProjectEntry> = {};
 export let INFRASTRUCTURE: Record<string, InfrastructureEntry> = {};
-export let PROJECT_TYPE_COLORS: Record<string, string> = {};
-export let DEPLOY_TIER_COLORS: Record<string, string> = {};
 export let ANALYTICS_PROPERTIES: AnalyticsProperty[] = [];
 
 export function initializeRegistry(registry: VaultRegistry) {
@@ -159,12 +157,6 @@ export function initializeRegistry(registry: VaultRegistry) {
 
   INFRASTRUCTURE = infra;
 
-  // ── Project Type Colors ─────────────────────────────────────
-  PROJECT_TYPE_COLORS = registry.projectTypeColors || {};
-
-  // ── Deploy Tier Colors ──────────────────────────────────────
-  DEPLOY_TIER_COLORS = registry.deployTierColors || {};
-
   const devices: Record<string, DeviceEntry> = {};
 
   for (const dev of registry.devices || []) {
@@ -177,7 +169,6 @@ export function initializeRegistry(registry: VaultRegistry) {
       dockerBin: dev.dockerBin || null,
       dockerApi: dev.dockerApi || null,
       notes: dev.notes || "",
-      specs: dev.specs || null,
     };
   }
 

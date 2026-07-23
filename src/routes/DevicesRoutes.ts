@@ -4,11 +4,21 @@ import { Router, type Request, type Response } from "express";
 import { DEVICES, PROJECTS, INFRASTRUCTURE } from "../config.ts";
 import ServiceRegistryService from "../services/ServiceRegistryService.ts";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.ts";
-import type { ServiceStatus, InfraStatus, ProjectEntry, InfrastructureEntry } from "../types.ts";
+import DockerStatsService from "../services/DockerStatsService.ts";
+import type { ServiceStatus, InfraStatus, ProjectEntry, InfrastructureEntry, DeviceSpecs } from "../types.ts";
 
 const router = Router();
 
-router.get("/", (_req: Request, res: Response) => {
+router.get("/", async (_req: Request, res: Response) => {
+  // Live hardware specs from each device's Docker Engine — cached, and
+  // absent (null) for devices without a reachable Docker API.
+  let specsByDevice: Record<string, DeviceSpecs> = {};
+  try {
+    specsByDevice = await DockerStatsService.getDeviceSpecs();
+  } catch {
+    // Specs are best-effort decoration — the device list must never fail on them.
+  }
+
   // Build service → health lookup from the registry cache
   const serviceStatuses = ServiceRegistryService.list();
   const statusMap = new Map(serviceStatuses.map((s: ServiceStatus) => [s.id, s]));
@@ -69,6 +79,7 @@ router.get("/", (_req: Request, res: Response) => {
     return {
       id: deviceId,
       ...device,
+      specs: specsByDevice[deviceId] ?? null,
       services: hostedServices,
       infrastructure: hostedInfra,
       serviceCount: allItems.length,
