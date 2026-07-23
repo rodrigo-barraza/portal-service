@@ -144,7 +144,7 @@ function resolveApiMetadata(serviceIdentifier: string): GoogleCloudApiMetadata {
 
 // ── Types ──────────────────────────────────────────────────────────
 
-interface ApiUsageSummary {
+export interface ApiUsageSummary {
   serviceIdentifier: string;
   displayName: string;
   category: string;
@@ -154,10 +154,12 @@ interface ApiUsageSummary {
   successRequests: number;
   errorRequests: number;
   errorRate: number;
+  /** Summed estimated spend (only sources that track cost, e.g. prism LLM requests). */
+  estimatedCost?: number;
   dailySeries: { date: string; requests: number }[];
 }
 
-interface CloudUsageSummaryResponse {
+export interface CloudUsageSummaryResponse {
   services: ApiUsageSummary[];
   totalRequests: number;
   totalErrors: number;
@@ -168,14 +170,14 @@ interface CloudUsageSummaryResponse {
   fetchedAt: string;
 }
 
-interface TimeSeriesDataPoint {
+export interface TimeSeriesDataPoint {
   date: string;
   requests: number;
   successRequests: number;
   errorRequests: number;
 }
 
-interface CloudUsageTimeSeriesResponse {
+export interface CloudUsageTimeSeriesResponse {
   serviceIdentifier: string;
   displayName: string;
   series: TimeSeriesDataPoint[];

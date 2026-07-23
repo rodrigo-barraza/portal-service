@@ -8,6 +8,12 @@ export const PORT = process.env.PORTAL_SERVICE_PORT;
 export const MONGO_URI = process.env.MONGO_URI;
 export const MONGO_DB_NAME = process.env.PORTAL_SERVICE_MONGO_DB_NAME || process.env.MONGO_DB_NAME;
 
+// Read-only cross-service databases for the External APIs dashboard:
+// prism's `requests` collection (LLM usage) and tools-service's
+// `external-api-usage` buckets live on the same Mongo server.
+export const PRISM_MONGO_DB_NAME = process.env.PRISM_SERVICE_MONGO_DB_NAME || "prism";
+export const TOOLS_MONGO_DB_NAME = process.env.TOOLS_SERVICE_MONGO_DB_NAME || "tools";
+
 export const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT;
 export const MINIO_ACCESS_KEY = process.env.MINIO_ACCESS_KEY;
 export const MINIO_SECRET_KEY = process.env.MINIO_SECRET_KEY;

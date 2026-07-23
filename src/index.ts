@@ -11,7 +11,15 @@ import { installShutdownHandlers, registerCleanup } from "@rodrigo-barraza/utili
 import logger from "./utils/logger.ts";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
 import MongoWrapper from "./wrappers/MongoWrapper.ts";
-import { PORT, MONGO_URI, MONGO_DB_NAME, PROJECTS, initializeRegistry } from "./config.ts";
+import {
+  PORT,
+  MONGO_URI,
+  MONGO_DB_NAME,
+  PRISM_MONGO_DB_NAME,
+  TOOLS_MONGO_DB_NAME,
+  PROJECTS,
+  initializeRegistry,
+} from "./config.ts";
 import type { VaultRegistry } from "./types.ts";
 import { COLLECTIONS } from "./constants.ts";
 import ServiceRegistryService from "./services/ServiceRegistryService.ts";
@@ -134,6 +142,20 @@ app.use(errorHandler);
   // Connect to MongoDB
   await MongoWrapper.createClient(String(MONGO_DB_NAME), String(MONGO_URI));
   registerCleanup(async () => MongoWrapper.closeAll());
+
+  // Read-only connections to sibling databases for the External APIs
+  // dashboard (prism LLM request log + tools-service usage buckets).
+  // Non-fatal: the dashboard degrades to Google-only data without them.
+  for (const externalDbName of new Set([PRISM_MONGO_DB_NAME, TOOLS_MONGO_DB_NAME])) {
+    if (externalDbName === MONGO_DB_NAME) continue;
+    try {
+      await MongoWrapper.createClient(String(externalDbName), String(MONGO_URI));
+    } catch (error: unknown) {
+      logger.warn(
+        `External usage database "${externalDbName}" unavailable: ${getErrorMessage(error)}`,
+      );
+    }
+  }
 
   // Ensure indexes for query performance
   try {
