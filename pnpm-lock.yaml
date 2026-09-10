@@ -16,7 +16,7 @@ importers:
         version: 4.1.0
       '@rodrigo-barraza/utilities-library':
         specifier: github:rodrigo-barraza/utilities-library
-        version: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/4382085984ca5b67c506b8cbcfa365aa4bd42cd7(express@5.2.1)
+        version: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/03bb23acaf5cc5594a1f999d472acd57c9336488(express@5.2.1)
       cors:
         specifier: ^2.8.6
         version: 2.8.6
@@ -398,8 +398,8 @@ packages:
   '@protobufjs/utf8@1.1.1':
     resolution: {integrity: sha512-oOAWABowe8EAbMyWKM0tYDKi8Yaox52D+HWZhAIJqQXbqe0xI/GV7FhLWqlEKreMkfDjshR5FKgi3mnle0h6Eg==}
 
-  '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/4382085984ca5b67c506b8cbcfa365aa4bd42cd7':
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/4382085984ca5b67c506b8cbcfa365aa4bd42cd7}
+  '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/03bb23acaf5cc5594a1f999d472acd57c9336488':
+    resolution: {gitHosted: true, integrity: sha512-fZGqWaoTMCA2jWnNH9AEorpeNa4WCmbWoAJNIbF2/gbBpQQepHkRYnTOE32MsrSrZuKddyFPvDwex0hQX/K1cg==, tarball: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/03bb23acaf5cc5594a1f999d472acd57c9336488}
     version: 0.7.0
     peerDependencies:
       express: '>=5.0.0'
@@ -2313,7 +2313,7 @@ snapshots:
 
   '@protobufjs/utf8@1.1.1': {}
 
-  '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/4382085984ca5b67c506b8cbcfa365aa4bd42cd7(express@5.2.1)':
+  '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/03bb23acaf5cc5594a1f999d472acd57c9336488(express@5.2.1)':
     dependencies:
       mongodb: 7.3.0
       nanoid: 5.1.16
