@@ -119,7 +119,7 @@ export default class StatsAggregatorService {
     } catch (error: unknown) {
       // Preserve the historical "HTTP {status}" failure messages surfaced
       // through getErrorMessage() at the call sites.
-      if (error instanceof ApiError) throw new Error(`HTTP ${error.status}`);
+      if (error instanceof ApiError) throw new Error(`HTTP ${error.status}`, { cause: error });
       throw error;
     }
   }

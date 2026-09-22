@@ -92,7 +92,7 @@ export default class GoogleAnalyticsService {
       return GoogleAnalyticsService.client;
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
-      throw new Error(`Failed to initialize GA client: ${errorMessage}`);
+      throw new Error(`Failed to initialize GA client: ${errorMessage}`, { cause: error });
     }
   }
 
