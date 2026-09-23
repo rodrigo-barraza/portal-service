@@ -37,6 +37,7 @@ describe("EcosystemResolver", () => {
         dockerProject: null,
         deployTier: 1,
         essential: false,
+        analyticsPropertyId: null,
         dependsOn: [],
       };
 
@@ -58,6 +59,7 @@ describe("EcosystemResolver", () => {
         dockerProject: null,
         deployTier: 1,
         essential: false,
+        analyticsPropertyId: null,
         dependsOn: [],
       };
 

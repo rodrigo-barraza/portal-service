@@ -52,6 +52,9 @@ function toStatus(id: string, service: ProjectEntry, probe: ProbeFields): Servic
     // Docker container — only containerized projects have one.
     restartable: Boolean(service.dockerProject),
     dockerProject: service.dockerProject || null,
+    // Lets the client open the project's Web Analytics tab without a
+    // second lookup against /google-analytics/properties.
+    analyticsPropertyId: service.analyticsPropertyId,
     ...probe,
   };
 }

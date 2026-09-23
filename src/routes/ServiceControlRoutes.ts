@@ -13,7 +13,11 @@ import {
   resolveDockerDevice,
   runContainerAction,
 } from "../services/docker/ContainerActions.ts";
-import { getPreviousImage, rollbackToPreviousImage } from "../services/docker/ContainerRollback.ts";
+import {
+  getPreviousImage,
+  rollbackToPreviousImage,
+  type PreviousImageInfo,
+} from "../services/docker/ContainerRollback.ts";
 import logger from "../utils/logger.ts";
 import { routeParam } from "../utils/http.ts";
 
@@ -54,20 +58,22 @@ for (const action of CONTAINER_ACTIONS) {
   });
 }
 
-router.get("/:id/rollback-status", async (req: Request, res: Response) => {
-  const id = routeParam(req, "id");
-  const service = Object.hasOwn(PROJECTS, id) ? PROJECTS[id] : undefined;
-  if (!service) {
-    throw new HttpError(`Unknown service: ${id}`, 404);
-  }
+interface RollbackStatus {
+  available: boolean;
+  reason?: string;
+  service?: string;
+  device?: string;
+  previousImage?: PreviousImageInfo;
+}
+
+/** Whether a project's container has a `:previous` image to roll back to. */
+async function rollbackStatus(service: ProjectEntry): Promise<RollbackStatus> {
   if (!service.dockerProject) {
-    res.json({ available: false, reason: "Not a containerized service" });
-    return;
+    return { available: false, reason: "Not a containerized service" };
   }
   const target = resolveDockerDevice(service.device);
   if (!target) {
-    res.json({ available: false, reason: "No Docker API configured" });
-    return;
+    return { available: false, reason: "No Docker API configured" };
   }
 
   let previousImage;
@@ -79,11 +85,27 @@ router.get("/:id/rollback-status", async (req: Request, res: Response) => {
   }
 
   if (!previousImage) {
-    res.json({ available: false, reason: "No previous image found" });
-    return;
+    return { available: false, reason: "No previous image found" };
   }
+  return { available: true, service: service.name, device: target.id, previousImage };
+}
 
-  res.json({ available: true, service: service.name, device: target.id, previousImage });
+// Every containerized project at once, keyed by project id — the Containers
+// and Projects pages ask for all of them on load, which as one request per
+// card was ~44 round trips (each a Docker image inspect).
+router.get("/rollback-status", async (_req: Request, res: Response) => {
+  const containerized = Object.entries(PROJECTS).filter(([, service]) => service.dockerProject);
+  const statuses = await Promise.all(containerized.map(([, service]) => rollbackStatus(service)));
+  res.json(Object.fromEntries(containerized.map(([id], index) => [id, statuses[index]])));
+});
+
+router.get("/:id/rollback-status", async (req: Request, res: Response) => {
+  const id = routeParam(req, "id");
+  const service = Object.hasOwn(PROJECTS, id) ? PROJECTS[id] : undefined;
+  if (!service) {
+    throw new HttpError(`Unknown service: ${id}`, 404);
+  }
+  res.json(await rollbackStatus(service));
 });
 
 router.post("/:id/rollback", async (req: Request, res: Response) => {

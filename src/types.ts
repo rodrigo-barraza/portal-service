@@ -106,6 +106,8 @@ export interface ProjectEntry {
   essential: boolean;
   /** Watchdog mode from the registry: "push" (heartbeats), "off" (excluded), null/absent (pull). */
   watchdog?: string | null;
+  /** GA4 property id when the project is tracked in Google Analytics. */
+  analyticsPropertyId: string | null;
   dependsOn: DependencyRef[];
 }
 
@@ -246,6 +248,7 @@ export interface ServiceStatus {
   essential: boolean;
   restartable: boolean;
   dockerProject: string | null;
+  analyticsPropertyId: string | null;
   healthy: boolean;
   responseTimeMs: number | null;
   metadata: Record<string, unknown> | null;

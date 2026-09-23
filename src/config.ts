@@ -115,6 +115,7 @@ export function initializeRegistry(registry: VaultRegistry) {
       deployTier: service.deployTier ?? inferDeployTier(inferProjectType(service.id, service)),
       essential: service.essential || false,
       watchdog: service.watchdog || null,
+      analyticsPropertyId: service.analyticsPropertyId || null,
       dependsOn: deriveDependencies(service),
     };
   }
