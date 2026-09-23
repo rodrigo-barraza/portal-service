@@ -108,3 +108,21 @@ describe("MinioService.getBucketUsage", () => {
     metricsSpy.mockRestore();
   });
 });
+
+describe("MinioService._scanUsageIncremental early exit", () => {
+  it("stops taking new buckets once the consumer stops reading", async () => {
+    const countSpy = vi
+      .spyOn(MinioService, "_countBucket")
+      .mockImplementation(async () => ({ objectCount: 1, totalSize: 1 }));
+
+    const buckets = Array.from({ length: 40 }, (_, index) => `bucket-${index}`);
+    for await (const _result of MinioService._scanUsageIncremental(buckets)) {
+      break; // client disconnected after the first bucket
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // At most the buckets already in flight on the 4 workers, not all 40
+    expect(countSpy.mock.calls.length).toBeLessThan(buckets.length);
+    countSpy.mockRestore();
+  });
+});

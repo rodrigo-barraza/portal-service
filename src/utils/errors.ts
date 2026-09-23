@@ -48,3 +48,8 @@ export function errorHandler(error: unknown, _req: Request, res: Response, next:
     error: exposeMessage && message ? message : GENERIC_SERVER_ERROR_MESSAGE,
   });
 }
+
+/** JSON 404 for unmatched routes, in the same envelope (Express's default is an HTML page). */
+export function notFoundHandler(req: Request, res: Response) {
+  res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });
+}

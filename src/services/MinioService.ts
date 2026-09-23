@@ -72,23 +72,30 @@ function base64url(input: Buffer | string) {
 }
 
 export default class MinioService {
-  static client: Client | null = null;
+  // The client promise, not the client: concurrent first callers (a page
+  // load fires the bucket stream and /stats/storage together) share one.
+  static clientPromise: Promise<Client> | null = null;
 
-  static async _getClient() {
-    if (MinioService.client) return MinioService.client;
-
+  static _getClient(): Promise<Client> {
     if (!MINIO_ENDPOINT) {
-      throw new Error("No MINIO_ENDPOINT configured");
+      return Promise.reject(new Error("No MINIO_ENDPOINT configured"));
     }
 
-    MinioService.client = await createMinioClient({
+    MinioService.clientPromise ??= createMinioClient({
       endpoint: MINIO_ENDPOINT,
       accessKey: MINIO_ACCESS_KEY || "",
       secretKey: MINIO_SECRET_KEY || "",
-    });
-
-    logger.info(`[MinioService] Client initialized → ${MINIO_ENDPOINT}`);
-    return MinioService.client;
+    }).then(
+      (client) => {
+        logger.info(`[MinioService] Client initialized → ${MINIO_ENDPOINT}`);
+        return client;
+      },
+      (error: unknown) => {
+        MinioService.clientPromise = null; // let the next call retry
+        throw error;
+      },
+    );
+    return MinioService.clientPromise;
   }
 
   // ── Bucket usage stats (metrics-first, scan fallback) ────────
@@ -204,11 +211,14 @@ export default class MinioService {
     const queue = [...bucketNames];
     const ready: Array<{ name: string; usage: BucketUsage }> = [];
     let notify: (() => void) | null = null;
+    // Set when the consumer stops early (client disconnect): workers
+    // finish their current bucket but take no new ones.
+    let abandoned = false;
 
     const workers = Array.from(
       { length: Math.min(SCAN_CONCURRENCY, queue.length) },
       async () => {
-        for (let name = queue.shift(); name !== undefined; name = queue.shift()) {
+        for (let name = queue.shift(); name !== undefined && !abandoned; name = queue.shift()) {
           const usage = await MinioService._countBucket(name);
           ready.push({ name, usage });
           notify?.();
@@ -217,19 +227,25 @@ export default class MinioService {
     );
 
     let allDone = false;
-    Promise.all(workers).then(() => {
+    // _countBucket never throws, but a worker failing must still end the
+    // loop below instead of leaving it waiting forever.
+    void Promise.allSettled(workers).then(() => {
       allDone = true;
       notify?.();
     });
 
-    while (true) {
-      if (ready.length > 0) {
-        yield ready.shift()!;
-        continue;
+    try {
+      while (true) {
+        if (ready.length > 0) {
+          yield ready.shift()!;
+          continue;
+        }
+        if (allDone) break;
+        await new Promise<void>((resolve) => { notify = resolve; });
+        notify = null;
       }
-      if (allDone) break;
-      await new Promise<void>((resolve) => { notify = resolve; });
-      notify = null;
+    } finally {
+      abandoned = true;
     }
   }
 

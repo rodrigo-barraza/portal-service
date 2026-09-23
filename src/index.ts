@@ -1,13 +1,12 @@
-import { type Request, type Response } from "express";
 // ─── Entry Point ────────────────────────────────────────────
 
 import http from "node:http";
-import express from "express";
+import express, { type Request, type Response } from "express";
 import cors from "cors";
-
-import { errorHandler } from "./utils/errors.ts";
 import { getErrorMessage, MILLISECONDS_PER_MINUTE } from "@rodrigo-barraza/utilities-library";
 import { installShutdownHandlers, registerCleanup } from "@rodrigo-barraza/utilities-library/service";
+
+import { errorHandler, notFoundHandler } from "./utils/errors.ts";
 import logger from "./utils/logger.ts";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
 import MongoWrapper from "./wrappers/MongoWrapper.ts";
@@ -18,19 +17,23 @@ import {
   PRISM_MONGO_DB_NAME,
   TOOLS_MONGO_DB_NAME,
   PROJECTS,
-  initializeRegistry,
+  WATCHDOG_EVALUATE_INTERVAL_MS,
 } from "./config.ts";
-import type { VaultRegistry } from "./types.ts";
-import { COLLECTIONS } from "./constants.ts";
 import ServiceRegistryService from "./services/ServiceRegistryService.ts";
 import InfrastructureRegistryService from "./services/InfrastructureRegistryService.ts";
 import ContainerMetricsService from "./services/ContainerMetricsService.ts";
+import DockerStatsService from "./services/DockerStatsService.ts";
 import WatchdogService from "./services/WatchdogService.ts";
-import { WATCHDOG_EVALUATE_INTERVAL_MS } from "./config.ts";
+import ScreenshotService from "./services/ScreenshotService.ts";
+import GoogleAnalyticsService from "./services/GoogleAnalyticsService.ts";
+import GoogleCloudUsageService from "./services/GoogleCloudUsageService.ts";
+import { reloadRegistry } from "./services/RegistryRefreshService.ts";
 
 // Routes
 import healthRouter from "./routes/HealthRoutes.ts";
 import servicesRouter from "./routes/ServicesRoutes.ts";
+import serviceControlRouter from "./routes/ServiceControlRoutes.ts";
+import repositoryInsightsRouter from "./routes/RepositoryInsightsRoutes.ts";
 import statsRouter from "./routes/StatsRoutes.ts";
 import logsRouter from "./routes/LogsRoutes.ts";
 import integrationsRouter from "./routes/IntegrationsRoutes.ts";
@@ -39,30 +42,24 @@ import googleAnalyticsRouter from "./routes/GoogleAnalyticsRoutes.ts";
 import devicesRouter from "./routes/DevicesRoutes.ts";
 import containersRouter from "./routes/ContainersRoutes.ts";
 import sessionAnalyticsRouter from "./routes/SessionAnalyticsRoutes.ts";
-import googleCloudUsageRouter from "./routes/GoogleCloudUsageRoutes.ts";
+import externalApisRouter from "./routes/ExternalApisRoutes.ts";
 import watchdogRouter from "./routes/WatchdogRoutes.ts";
-
 
 // ─── Process Lifecycle ─────────────────────────────────────────────
 
 // Graceful shutdown on SIGTERM/SIGINT — runs everything registered via
-// registerCleanup (timers, Mongo, the HTTP server).
+// registerCleanup (timers, Mongo, gRPC clients, Chromium, the HTTP server).
 installShutdownHandlers({ logger });
 
 // Crash guards: Node ≥15 kills the process on any unhandled promise
 // rejection. Log loudly and survive instead — per-request error paths
 // already handle their own failures. (Same rationale as prism-service.)
 process.on("unhandledRejection", (reason: unknown) => {
-  const detail =
-    reason instanceof Error
-      ? `${reason.message}\n${reason.stack}`
-      : JSON.stringify(reason);
+  const detail = reason instanceof Error ? `${reason.message}\n${reason.stack}` : JSON.stringify(reason);
   logger.error(`[process] Unhandled promise rejection (survived): ${detail}`);
 });
 process.on("uncaughtException", (error: Error, origin: string) => {
-  logger.error(
-    `[process] Uncaught exception (${origin}, survived): ${error.message}\n${error.stack}`,
-  );
+  logger.error(`[process] Uncaught exception (${origin}, survived): ${error.message}\n${error.stack}`);
 });
 
 // ─── Express App ───────────────────────────────────────────────────
@@ -71,31 +68,37 @@ const app = express();
 
 // ── CORS — restrict to portal client + local development ──────
 const ALLOWED_ORIGINS = [
-  process.env.AUTH_URL,            // e.g. https://portal.rod.dev (from Vault)
-  process.env.PORTAL_CLIENT_URL,   // e.g. http://localhost:4000 (from Vault registry)
-  process.env.PORTAL_SERVICE_PUBLIC_URL?.replace(/^https?:\/\/api\./, 'https://'),  // derive client origin from API domain
+  process.env.AUTH_URL, // e.g. https://portal.rod.dev (from Vault)
+  process.env.PORTAL_CLIENT_URL, // e.g. http://localhost:4000 (from Vault registry)
+  process.env.PORTAL_SERVICE_PUBLIC_URL?.replace(/^https?:\/\/api\./, "https://"), // derive client origin from API domain
 ].filter(Boolean);
+
+const LOCALHOST_ORIGIN_PATTERN = /^http:\/\/localhost(:\d+)?$/;
+const PRIVATE_NETWORK_ORIGIN_PATTERN =
+  /^http:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
 
 app.use(
   cors({
     origin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-      // Allow requests with no origin (server-to-server, curl, health checks)
-      if (!origin) return callback(null, true);
-      // Allow any localhost port (local development)
-      if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
-      // Allow private-network IPs (LAN access via IP address)
-      if (/^http:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin)) return callback(null, true);
-      // Allow whitelisted origins
-      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-      // Disallowed: respond without CORS headers (browser blocks) instead
-      // of routing an Error through the 500 handler for every stray origin.
-      callback(null, false);
+      // No origin: server-to-server, curl, health checks. Otherwise any
+      // localhost port (local development), private-network IPs (LAN
+      // access via IP address), or a whitelisted origin. Disallowed
+      // origins get no CORS headers (the browser blocks) instead of an
+      // Error routed through the 500 handler for every stray origin.
+      const allowed =
+        !origin ||
+        LOCALHOST_ORIGIN_PATTERN.test(origin) ||
+        PRIVATE_NETWORK_ORIGIN_PATTERN.test(origin) ||
+        ALLOWED_ORIGINS.includes(origin);
+      callback(null, allowed);
     },
     credentials: true,
     maxAge: 86_400, // cache preflight for 24h — avoids OPTIONS storms
   }),
 );
-app.use(express.json({ limit: "5mb" }));
+// No global body parser: no route reads a JSON body (the watchdog
+// heartbeat parses its own small text body). Parsing up to 5 MB of JSON
+// on every POST to a public API was pure attack surface.
 app.use(requestLoggerMiddleware);
 
 // ─── Endpoint Registry ────────────────────────────────────────────
@@ -120,23 +123,64 @@ app.get("/", (_req: Request, res: Response) => {
 
 app.use("/health", healthRouter);
 app.use("/services", servicesRouter);
+app.use("/services", serviceControlRouter);
+app.use("/services", repositoryInsightsRouter);
 app.use("/stats", statsRouter);
 app.use("/logs", logsRouter);
 app.use("/integrations", integrationsRouter);
 app.use("/object-store", storageRouter);
 app.use("/google-analytics", googleAnalyticsRouter);
-
 app.use("/devices", devicesRouter);
 app.use("/containers", containersRouter);
 app.use("/session-analytics", sessionAnalyticsRouter);
-app.use("/external-apis", googleCloudUsageRouter);
+app.use("/external-apis", externalApisRouter);
 app.use("/watchdog", watchdogRouter);
 
-// ─── Error Handler (must be last) ──────────────────────────────────
+// ─── Not Found + Error Handler (must be last) ──────────────────────
 
+app.use(notFoundHandler);
 app.use(errorHandler);
 
 // ─── Startup ───────────────────────────────────────────────────────
+
+/** Re-run both health rounds, logging (never throwing) on failure. */
+function checkRegistryHealth(): Promise<unknown> {
+  return Promise.all([ServiceRegistryService.checkAll(), InfrastructureRegistryService.checkAll()]).catch(
+    (error: unknown) => {
+      logger.warn(`[Registry] Health round failed: ${getErrorMessage(error)}`);
+    },
+  );
+}
+
+/** Deferred recovery: vault had no registry at boot — keep retrying until it does. */
+function scheduleDeferredRegistryRecovery(): void {
+  const DEFERRED_INTERVAL_MS = 10_000;
+  const MAX_DEFERRED_ATTEMPTS = 30; // give up after 5 minutes
+  let deferredAttempt = 0;
+
+  logger.warn("[Registry] No registry projects from boot — scheduling deferred recovery");
+
+  const deferredTimer = setInterval(async () => {
+    deferredAttempt++;
+    try {
+      const result = await reloadRegistry();
+      if (result) {
+        logger.success(`[Registry] Deferred recovery succeeded on attempt ${deferredAttempt}`);
+        clearInterval(deferredTimer);
+        return;
+      }
+      logger.warn(`[Registry] Deferred attempt ${deferredAttempt}/${MAX_DEFERRED_ATTEMPTS} — still empty`);
+    } catch (error: unknown) {
+      logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${getErrorMessage(error)}`);
+    }
+
+    if (deferredAttempt >= MAX_DEFERRED_ATTEMPTS) {
+      logger.error("[Registry] Deferred recovery exhausted — giving up");
+      clearInterval(deferredTimer);
+    }
+  }, DEFERRED_INTERVAL_MS);
+  registerCleanup(() => clearInterval(deferredTimer));
+}
 
 (async () => {
   // Connect to MongoDB
@@ -151,99 +195,37 @@ app.use(errorHandler);
     try {
       await MongoWrapper.createClient(String(externalDbName), String(MONGO_URI));
     } catch (error: unknown) {
-      logger.warn(
-        `External usage database "${externalDbName}" unavailable: ${getErrorMessage(error)}`,
-      );
+      logger.warn(`External usage database "${externalDbName}" unavailable: ${getErrorMessage(error)}`);
     }
   }
 
-  // Ensure indexes for query performance
-  try {
-    const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
-    if (db) {
-      await Promise.all([
-        db
-          .collection(COLLECTIONS.SERVICE_SNAPSHOTS)
-          .createIndex({ timestamp: -1 }),
-      ]);
-      logger.success("Database indexes ensured");
+  // Time-series collection (+ its index) for persisted container metrics
+  await ContainerMetricsService.ensureCollection();
 
-      // Ensure time-series collection for container metrics
-      await ContainerMetricsService.ensureCollection();
-    }
-  } catch (error: unknown) {
-    logger.error(`Failed to ensure indexes: ${getErrorMessage(error)}`);
-  }
-
-  // ── Deferred Registry Recovery ─────────────────────────────────
-  // If the registry was empty at boot (vault wasn't ready), keep
-  // retrying in the background until we get services populated.
-  const registryProjectCount = Object.keys(PROJECTS).length;
-  if (registryProjectCount === 0) {
-    logger.warn("[Registry] No registry projects from boot — scheduling deferred recovery");
-
-    const DEFERRED_INTERVAL_MS = 10_000;
-    const MAX_DEFERRED_ATTEMPTS = 30; // give up after 5 minutes
-    let deferredAttempt = 0;
-
-    const deferredTimer = setInterval(async () => {
-      deferredAttempt++;
-
-      try {
-        const { vault } = await import("./boot.ts");
-        vault.clearRegistryCache();
-        const registry = await vault.fetchRegistry();
-
-        if (registry.projects?.length > 0) {
-          const { initializeRegistry } = await import("./config.ts");
-          initializeRegistry(registry as unknown as import("./types.ts").VaultRegistry);
-
-          // Run initial health checks now that we have services
-          ServiceRegistryService.checkAll().catch(() => {});
-          InfrastructureRegistryService.checkAll().catch(() => {});
-
-          logger.success(`[Registry] Deferred recovery succeeded on attempt ${deferredAttempt}`);
-          clearInterval(deferredTimer);
-        } else if (deferredAttempt >= MAX_DEFERRED_ATTEMPTS) {
-          logger.error("[Registry] Deferred recovery exhausted — giving up");
-          clearInterval(deferredTimer);
-        } else {
-          logger.warn(`[Registry] Deferred attempt ${deferredAttempt}/${MAX_DEFERRED_ATTEMPTS} — still empty`);
-        }
-      } catch (error: unknown) {
-        logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${getErrorMessage(error)}`);
-        if (deferredAttempt >= MAX_DEFERRED_ATTEMPTS) {
-          clearInterval(deferredTimer);
-        }
-      }
-    }, DEFERRED_INTERVAL_MS);
+  if (Object.keys(PROJECTS).length === 0) {
+    scheduleDeferredRegistryRecovery();
   }
 
   // Initial health check of all services (fire-and-forget)
-  Promise.all([
-    ServiceRegistryService.checkAll(),
-    InfrastructureRegistryService.checkAll(),
-  ])
+  Promise.all([ServiceRegistryService.checkAll(), InfrastructureRegistryService.checkAll()])
     .then(([serviceResults, infraResults]) => {
-      const serviceHealthyCount = serviceResults.filter((result) => result && result.healthy).length;
-      const infraHealthyCount = infraResults.filter((result) => result && result.healthy).length;
-      logger.info(
-        `[ServiceRegistry] ${serviceHealthyCount}/${serviceResults.length} services healthy`,
-      );
-      logger.info(
-        `[InfraRegistry] ${infraHealthyCount}/${infraResults.length} infrastructure healthy`,
-      );
+      const serviceHealthyCount = serviceResults.filter((result) => result.healthy).length;
+      const infraHealthyCount = infraResults.filter((result) => result.healthy).length;
+      logger.info(`[ServiceRegistry] ${serviceHealthyCount}/${serviceResults.length} services healthy`);
+      logger.info(`[InfraRegistry] ${infraHealthyCount}/${infraResults.length} infrastructure healthy`);
     })
     .catch((error: unknown) => {
       logger.warn(`[Registry] Initial check failed: ${getErrorMessage(error)}`);
     });
 
   // Periodic health checks every 60 seconds
-  const healthCheckTimer = setInterval(() => {
-    ServiceRegistryService.checkAll().catch(() => {});
-    InfrastructureRegistryService.checkAll().catch(() => {});
-  }, MILLISECONDS_PER_MINUTE);
+  const healthCheckTimer = setInterval(() => void checkRegistryHealth(), MILLISECONDS_PER_MINUTE);
   registerCleanup(() => clearInterval(healthCheckTimer));
+  registerCleanup(() => InfrastructureRegistryService.closeHealthCheckClient());
+
+  // Docker stats ring buffer (+ persisted metrics every 30s)
+  DockerStatsService.startCollector();
+  registerCleanup(() => DockerStatsService.stopCollector());
 
   // Watchdog: turn the health caches + push heartbeats into Discord
   // alerts on sustained state transitions (see WatchdogService).
@@ -255,40 +237,26 @@ app.use(errorHandler);
   registerCleanup(() => clearInterval(watchdogTimer));
 
   // ── Periodic Registry Refresh ──────────────────────────────────
-  // Re-fetch the vault registry every 5 minutes so new projects
-  // (e.g. notes-service, notes-client) are picked up without
-  // requiring a portal-service container restart.
-  const REGISTRY_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-
-  // Compare full registry content, not just the project count — otherwise
-  // edits to an existing project (URL, device, dependsOn) never hot-reload.
-  let lastRegistrySnapshot = "";
-
+  // Re-fetch the vault registry every 5 minutes so new or edited projects
+  // are picked up without a portal-service restart; reloadRegistry
+  // compares the whole document against what is applied.
+  const REGISTRY_REFRESH_INTERVAL_MS = 5 * MILLISECONDS_PER_MINUTE;
   const registryRefreshTimer = setInterval(async () => {
     try {
-      const { vault } = await import("./boot.ts");
-      vault.clearRegistryCache();
-      const registry = await vault.fetchRegistry();
-
-      if (registry?.projects?.length > 0) {
-        const snapshot = JSON.stringify(registry.projects);
-
-        if (snapshot !== lastRegistrySnapshot) {
-          const currentCount = Object.keys(PROJECTS).length;
-          lastRegistrySnapshot = snapshot;
-          initializeRegistry(registry as unknown as VaultRegistry);
-          logger.info(`[Registry] Hot-reloaded — ${currentCount} → ${registry.projects.length} projects`);
-
-          // Trigger health checks for any newly registered services
-          ServiceRegistryService.checkAll().catch(() => {});
-          InfrastructureRegistryService.checkAll().catch(() => {});
-        }
+      const result = await reloadRegistry();
+      if (result?.changed) {
+        logger.info(`[Registry] Hot-reloaded — ${result.previousCount} → ${result.newCount} projects`);
       }
     } catch (error: unknown) {
       logger.warn(`[Registry] Periodic refresh failed: ${getErrorMessage(error)}`);
     }
   }, REGISTRY_REFRESH_INTERVAL_MS);
   registerCleanup(() => clearInterval(registryRefreshTimer));
+
+  // Long-lived clients that hold sockets or child processes
+  registerCleanup(() => ScreenshotService.shutdown());
+  registerCleanup(() => GoogleAnalyticsService.close());
+  registerCleanup(() => GoogleCloudUsageService.close());
 
   // Start server. Wrap express in http.createServer so we can disable the
   // default 5-minute requestTimeout, which would otherwise sever active SSE
@@ -297,13 +265,17 @@ app.use(errorHandler);
   server.requestTimeout = 0;
   server.listen(PORT, () => {
     logger.success(`API is running on port ${PORT}`);
-    ENDPOINTS.rest.forEach((ep: string) =>
-      logger.info(`  REST  →  http://localhost:${PORT}${ep}`),
-    );
+    ENDPOINTS.rest.forEach((endpoint: string) => logger.info(`  REST  →  http://localhost:${PORT}${endpoint}`));
   });
-  registerCleanup(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  registerCleanup(
+    () =>
+      new Promise<void>((resolve) => {
+        // Open SSE streams would otherwise hold close() until the shutdown timeout
+        server.closeAllConnections();
+        server.close(() => resolve());
+      }),
+  );
 })().catch((error: unknown) => {
   logger.error(`Fatal startup failure: ${getErrorMessage(error)}`);
   process.exit(1);
 });
-

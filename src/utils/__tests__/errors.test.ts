@@ -63,3 +63,14 @@ describe("resolveErrorStatus", () => {
     expect(resolveErrorStatus(null)).toBe(500);
   });
 });
+
+describe("notFoundHandler", () => {
+  it("answers unmatched routes with a JSON 404 in the shared envelope", async () => {
+    const { notFoundHandler } = await import("../errors.ts");
+    const status = vi.fn().mockReturnThis();
+    const json = vi.fn();
+    notFoundHandler({ method: "GET", path: "/nope" } as Request, { status, json } as unknown as Response);
+    expect(status).toHaveBeenCalledWith(404);
+    expect(json).toHaveBeenCalledWith({ error: "Not found: GET /nope" });
+  });
+});
