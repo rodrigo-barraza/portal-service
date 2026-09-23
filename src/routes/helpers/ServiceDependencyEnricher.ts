@@ -1,61 +1,68 @@
-import type { EnrichedDependency } from "../../types.ts";
+import type { DependencyRef, EnrichedDependency } from "../../types.ts";
+
+/** Anything that can sit in the dependency graph (a service or an infra store). */
+export interface DependencyNode {
+  id: string;
+  name: string;
+  dependsOn?: Array<string | DependencyRef>;
+}
+
+export type EnrichedNode<Node extends DependencyNode> = Omit<Node, "dependsOn"> & {
+  dependsOn: EnrichedDependency[];
+  dependedOnBy: EnrichedDependency[];
+};
+
+const DEFAULT_CRITICALITY = "required";
+
+function dependencyId(dependency: string | DependencyRef): string {
+  return typeof dependency === "string" ? dependency : dependency.id;
+}
+
+function dependencyCriticality(dependency: string | DependencyRef): string {
+  return typeof dependency === "string" ? DEFAULT_CRITICALITY : dependency.criticality || DEFAULT_CRITICALITY;
+}
 
 export class ServiceDependencyEnricher {
-  public static enrich(
-    servicesList: Record<string, any>[],
-    infrastructureList: Record<string, any>[]
-  ): { services: Record<string, any>[]; infrastructure: Record<string, any>[] } {
-    const combinedList = [...servicesList, ...infrastructureList] as Array<
-      Record<string, any> & {
-        id: string;
-        name: string;
-        dependsOn?: Array<string | { id: string; criticality?: string; source?: string }>;
-        dependedOnBy?: EnrichedDependency[];
-      }
-    >;
+  /**
+   * Resolve every `dependsOn` edge to `{ id, name, criticality, source? }`
+   * and add the inverse `dependedOnBy` list. Returns new objects — the
+   * inputs are the registry services' shared status cache and must not
+   * be mutated per request.
+   */
+  public static enrich<Service extends DependencyNode, Infrastructure extends DependencyNode>(
+    services: Service[],
+    infrastructure: Infrastructure[],
+  ): { services: EnrichedNode<Service>[]; infrastructure: EnrichedNode<Infrastructure>[] } {
+    const allNodes: DependencyNode[] = [...services, ...infrastructure];
+    const nameById = new Map(allNodes.map((node) => [node.id, node.name]));
 
-    const serviceNameMapping = Object.fromEntries(
-      combinedList.map((serviceEntry) => [serviceEntry.id, serviceEntry.name])
-    );
-
-    const getDependencyId = (dependency: string | { id: string }) =>
-      typeof dependency === "string" ? dependency : dependency.id;
-
-    const getDependencyCriticality = (
-      dependency: string | { id: string; criticality?: string }
-    ) => (typeof dependency === "string" ? "required" : dependency.criticality || "required");
-
-    const inverseDependenciesMap: Record<string, EnrichedDependency[]> = {};
-
-    for (const serviceItem of combinedList) {
-      for (const dependency of serviceItem.dependsOn || []) {
-        const dependencyId = getDependencyId(dependency);
-        if (!inverseDependenciesMap[dependencyId]) {
-          inverseDependenciesMap[dependencyId] = [];
-        }
-        inverseDependenciesMap[dependencyId].push({
-          id: serviceItem.id,
-          name: serviceItem.name,
-          criticality: getDependencyCriticality(dependency),
-        });
+    const dependedOnBy = new Map<string, EnrichedDependency[]>();
+    for (const node of allNodes) {
+      for (const dependency of node.dependsOn || []) {
+        const targetId = dependencyId(dependency);
+        const inverse = dependedOnBy.get(targetId) ?? [];
+        inverse.push({ id: node.id, name: node.name, criticality: dependencyCriticality(dependency) });
+        dependedOnBy.set(targetId, inverse);
       }
     }
 
-    for (const serviceItem of combinedList) {
-      serviceItem.dependsOn = (serviceItem.dependsOn || []).map((dependency) => {
-        const dependencyId = getDependencyId(dependency);
+    const enrichNode = <Node extends DependencyNode>(node: Node): EnrichedNode<Node> => ({
+      ...node,
+      dependsOn: (node.dependsOn || []).map((dependency) => {
+        const targetId = dependencyId(dependency);
         return {
-          id: dependencyId,
-          name: serviceNameMapping[dependencyId] || dependencyId,
-          criticality: getDependencyCriticality(dependency),
-          ...(typeof dependency === "object" && dependency.source
-            ? { source: dependency.source }
-            : {}),
+          id: targetId,
+          name: nameById.get(targetId) || targetId,
+          criticality: dependencyCriticality(dependency),
+          ...(typeof dependency === "object" && dependency.source ? { source: dependency.source } : {}),
         };
-      });
-      serviceItem.dependedOnBy = inverseDependenciesMap[serviceItem.id] || [];
-    }
+      }),
+      dependedOnBy: dependedOnBy.get(node.id) ?? [],
+    });
 
-    return { services: servicesList, infrastructure: infrastructureList };
+    return {
+      services: services.map(enrichNode),
+      infrastructure: infrastructure.map(enrichNode),
+    };
   }
 }

@@ -182,9 +182,6 @@ export function initializeRegistry(registry: VaultRegistry) {
 // Health check timeout (ms) — how long to wait before marking a service as down
 export const HEALTH_CHECK_TIMEOUT_MS = 3000;
 
-// Stats cache TTL (ms) — how long to cache aggregated stats before re-fetching
-export const STATS_CACHE_TTL_MS = 30_000;
-
 // ── Google Analytics (GA4 Data API) ───────────────────────────
 export const GOOGLE_ANALYTICS_CREDENTIALS = process.env.GOOGLE_ANALYTICS_CREDENTIALS;
 // Note: ANALYTICS_PROPERTIES is derived from registry entries (see initializeRegistry above)

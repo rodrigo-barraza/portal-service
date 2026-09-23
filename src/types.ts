@@ -1,24 +1,6 @@
 // ─── Centralized Types ─────────────────────────────────────
 
-
 // ── Docker Engine API ──────────────────────────────────────────
-
-export interface DockerActionResponse {
-  statusCode: number;
-  body: string;
-}
-
-export interface DockerTransport {
-  socketPath?: string;
-  hostname?: string;
-  port?: number;
-  path: string;
-}
-
-export interface CpuCounterState {
-  cpuTotal: number;
-  systemTotal: number;
-}
 
 export interface ContainerPort {
   ip: string;
@@ -102,29 +84,6 @@ export interface ContainerSnapshot {
   }>;
 }
 
-export interface DockerImageDisk {
-  id: string;
-  tags: string[];
-  size: number;
-  sharedSize: number;
-  created: number;
-  containers: number;
-}
-
-export interface DockerVolumeDisk {
-  name: string;
-  driver: string;
-  size: number;
-  refCount: number;
-}
-
-export interface HostDisk {
-  total: number;
-  used: number;
-  available: number;
-  percent: number;
-}
-
 // ── Registry & Config ──────────────────────────────────────────
 
 export interface ProjectEntry {
@@ -201,11 +160,6 @@ export interface DeviceSpecs {
   architecture: string;
   dockerVersion: string;
   collectedAt: string;
-}
-
-export interface DockerDeviceTarget {
-  id: string;
-  device: DeviceEntry;
 }
 
 export interface AnalyticsProperty {
@@ -287,8 +241,7 @@ export interface ServiceStatus {
   npmPackage: string | null;
   device: string;
   domain: string | null;
-  dependsOn: DependencyRef[] | EnrichedDependency[];
-  dependedOnBy?: EnrichedDependency[];
+  dependsOn: DependencyRef[];
   deployTier: number | null;
   essential: boolean;
   restartable: boolean;
@@ -311,8 +264,7 @@ export interface InfraStatus {
   visibility: string;
   domain: string | null;
   device: string;
-  dependsOn: DependencyRef[] | EnrichedDependency[];
-  dependedOnBy?: EnrichedDependency[];
+  dependsOn: DependencyRef[];
   deployTier: number;
   healthy: boolean;
   responseTimeMs: number | null;
@@ -320,40 +272,6 @@ export interface InfraStatus {
   error: string | null;
   checkedAt: string | null;
   isInfrastructure: boolean;
-}
-
-// ── MinIO Service ──────────────────────────────────────────────
-
-export interface BucketInfo {
-  name: string;
-  creationDate: string | null;
-  objectCount: number;
-  totalSize: number;
-}
-
-export type BucketStreamEvent =
-  | { type: "init"; totalBuckets: number }
-  | { type: "bucket"; bucket: BucketInfo };
-
-export interface ObjectListResult {
-  objects: ObjectInfo[];
-  prefixes: string[];
-}
-
-export interface ObjectInfo {
-  name: string;
-  size: number;
-  lastModified: string | null;
-  etag: string | null;
-}
-
-// ── Google Analytics ───────────────────────────────────────────
-
-export type GaReportRow = Record<string, string | number>;
-
-export interface CacheEntry<T = unknown> {
-  data: T;
-  ts: number;
 }
 
 // ── Integrations ───────────────────────────────────────────────
@@ -367,7 +285,12 @@ export interface IntegrationDef {
 
 export interface IntegrationStatus extends IntegrationDef {
   configured: boolean;
-  maskedKey: string | null;
+  /**
+   * First 8 hex chars of the key's SHA-256 — tells two keys apart (and
+   * shows a rotation took) without revealing any of the key. null when
+   * the key is not configured.
+   */
+  fingerprint: string | null;
 }
 
 export interface IntegrationCategory {
@@ -378,30 +301,6 @@ export interface IntegrationCategory {
 }
 
 // ── Container Metrics ──────────────────────────────────────────
-
-export interface MetricsDocument {
-  timestamp: Date;
-  metadata: {
-    container: string;
-    device: string;
-  };
-  cpu: number;
-  memoryUsed: number;
-  memoryLimit: number;
-  memoryPercent: number;
-  netRx: number;
-  netTx: number;
-  blockRead: number;
-  blockWrite: number;
-  pids: number;
-}
-
-export interface MetricsHistoryOptions {
-  container?: string;
-  device?: string;
-  range?: string;
-  limit?: number;
-}
 
 export interface MetricsPoint {
   t: Date;
@@ -414,27 +313,12 @@ export interface MetricsPoint {
 }
 
 export interface MetricsHistoryResult {
-  containers: Record<string, { device: string; points: MetricsPoint[] }>;
+  /**
+   * Keyed `<device>/<container>` — container names repeat across devices
+   * (every host runs its own "portainer", "watchtower", …).
+   */
+  containers: Record<string, { container: string; device: string; points: MetricsPoint[] }>;
   range: string;
   since?: string;
   samples: number;
 }
-
-// ── TTL Cache Utilities ────────────────────────────────────────
-
-export interface TtlCache<T> {
-  get: (now: number) => T | null;
-  set: (data: T, now: number) => void;
-}
-
-// ── Error Label Map ────────────────────────────────────────────
-
-export const ERROR_CODE_LABELS: Record<string, string> = {
-  ECONNREFUSED: "Connection refused",
-  EHOSTUNREACH: "Host unreachable",
-  ENETUNREACH: "Network unreachable",
-  ECONNRESET: "Connection reset",
-  ETIMEDOUT: "Connection timed out",
-  ENOTFOUND: "DNS lookup failed",
-  EPIPE: "Broken pipe",
-};
