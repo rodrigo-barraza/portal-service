@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import GoogleCloudUsageService, {
   __internal,
-} from "../src/services/GoogleCloudUsageService.ts";
+} from "../GoogleCloudUsageService.ts";
 
 const { KNOWN_API_METADATA, EXCLUDED_INFRASTRUCTURE_SERVICES, prettifyServiceIdentifier, resolveApiMetadata } =
   __internal;
