@@ -43,18 +43,36 @@ function resolveContainerTarget(req: Request): ContainerTarget {
 
   const target = resolveDockerDevice(service.device);
   if (!target) {
-    throw new HttpError(`No Docker API configured for device: ${service.device}`, 400);
+    throw new HttpError(
+      `No Docker API configured for device: ${service.device}`,
+      400,
+    );
   }
 
-  return { service, dockerProject: service.dockerProject, deviceId: target.id, device: target.device };
+  return {
+    service,
+    dockerProject: service.dockerProject,
+    deviceId: target.id,
+    device: target.device,
+  };
 }
 
 for (const action of CONTAINER_ACTIONS) {
   router.post(`/:id/${action}`, async (req: Request, res: Response) => {
     const target = resolveContainerTarget(req);
-    const message = await runContainerAction(target.device, target.dockerProject, action, target.service.name);
+    const message = await runContainerAction(
+      target.device,
+      target.dockerProject,
+      action,
+      target.service.name,
+    );
     ServiceRegistryService.scheduleRecheck();
-    res.json({ success: true, service: target.service.name, device: target.deviceId, message });
+    res.json({
+      success: true,
+      service: target.service.name,
+      device: target.deviceId,
+      message,
+    });
   });
 }
 
@@ -78,25 +96,43 @@ async function rollbackStatus(service: ProjectEntry): Promise<RollbackStatus> {
 
   let previousImage;
   try {
-    previousImage = await getPreviousImage(target.device, service.dockerProject);
+    previousImage = await getPreviousImage(
+      target.device,
+      service.dockerProject,
+    );
   } catch (error: unknown) {
-    logger.warn(`[Rollback] Status check failed for ${service.name}: ${getErrorMessage(error)}`);
+    logger.warn(
+      `[Rollback] Status check failed for ${service.name}: ${getErrorMessage(error)}`,
+    );
     previousImage = null;
   }
 
   if (!previousImage) {
     return { available: false, reason: "No previous image found" };
   }
-  return { available: true, service: service.name, device: target.id, previousImage };
+  return {
+    available: true,
+    service: service.name,
+    device: target.id,
+    previousImage,
+  };
 }
 
 // Every containerized project at once, keyed by project id — the Containers
 // and Projects pages ask for all of them on load, which as one request per
 // card was ~44 round trips (each a Docker image inspect).
 router.get("/rollback-status", async (_req: Request, res: Response) => {
-  const containerized = Object.entries(PROJECTS).filter(([, service]) => service.dockerProject);
-  const statuses = await Promise.all(containerized.map(([, service]) => rollbackStatus(service)));
-  res.json(Object.fromEntries(containerized.map(([id], index) => [id, statuses[index]])));
+  const containerized = Object.entries(PROJECTS).filter(
+    ([, service]) => service.dockerProject,
+  );
+  const statuses = await Promise.all(
+    containerized.map(([, service]) => rollbackStatus(service)),
+  );
+  res.json(
+    Object.fromEntries(
+      containerized.map(([id], index) => [id, statuses[index]]),
+    ),
+  );
 });
 
 router.get("/:id/rollback-status", async (req: Request, res: Response) => {
@@ -110,12 +146,20 @@ router.get("/:id/rollback-status", async (req: Request, res: Response) => {
 
 router.post("/:id/rollback", async (req: Request, res: Response) => {
   const target = resolveContainerTarget(req);
-  logger.info(`[Rollback] ${target.service.name} → swapping :latest and :previous`);
+  logger.info(
+    `[Rollback] ${target.service.name} → swapping :latest and :previous`,
+  );
 
   try {
-    await rollbackToPreviousImage(target.device, target.dockerProject, target.dockerProject);
+    await rollbackToPreviousImage(
+      target.device,
+      target.dockerProject,
+      target.dockerProject,
+    );
   } catch (error: unknown) {
-    logger.error(`[Rollback] ${target.service.name} failed: ${getErrorMessage(error)}`);
+    logger.error(
+      `[Rollback] ${target.service.name} failed: ${getErrorMessage(error)}`,
+    );
     throw error;
   }
 

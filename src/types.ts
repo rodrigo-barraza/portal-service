@@ -42,7 +42,11 @@ export interface ContainerStats {
   labels: Record<string, string>;
   device: string;
   cpu: { percent: number; cores: number };
-  cpuThrottling: { periods: number; throttledPeriods: number; throttledTimeNs: number };
+  cpuThrottling: {
+    periods: number;
+    throttledPeriods: number;
+    throttledTimeNs: number;
+  };
   memory: { used: number; limit: number; percent: number };
   memoryDetail: {
     rss: number;
@@ -71,17 +75,20 @@ export interface ContainerStats {
 
 export interface ContainerSnapshot {
   timestamp: string;
-  containers: Record<string, {
-    cpu: number;
-    memoryUsed: number;
-    memoryLimit: number;
-    memoryPercent: number;
-    blockRead: number;
-    blockWrite: number;
-    netRx: number;
-    netTx: number;
-    pids: number;
-  }>;
+  containers: Record<
+    string,
+    {
+      cpu: number;
+      memoryUsed: number;
+      memoryLimit: number;
+      memoryPercent: number;
+      blockRead: number;
+      blockWrite: number;
+      netRx: number;
+      netTx: number;
+      pids: number;
+    }
+  >;
 }
 
 // ── Registry & Config ──────────────────────────────────────────
@@ -320,7 +327,10 @@ export interface MetricsHistoryResult {
    * Keyed `<device>/<container>` — container names repeat across devices
    * (every host runs its own "portainer", "watchtower", …).
    */
-  containers: Record<string, { container: string; device: string; points: MetricsPoint[] }>;
+  containers: Record<
+    string,
+    { container: string; device: string; points: MetricsPoint[] }
+  >;
   range: string;
   since?: string;
   samples: number;

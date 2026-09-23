@@ -1,13 +1,25 @@
 import { MongoClient } from "mongodb";
-import { getErrorMessage, withTimeout } from "@rodrigo-barraza/utilities-library";
+import {
+  getErrorMessage,
+  withTimeout,
+} from "@rodrigo-barraza/utilities-library";
 import type { InfrastructureEntry, InfraStatus } from "../types.ts";
-import { INFRASTRUCTURE, HEALTH_CHECK_TIMEOUT_MS, MONGO_URI } from "../config.ts";
+import {
+  INFRASTRUCTURE,
+  HEALTH_CHECK_TIMEOUT_MS,
+  MONGO_URI,
+} from "../config.ts";
 import logger from "../utils/logger.ts";
 import { DeviceResolver } from "../utils/DeviceResolver.ts";
 import MinioService from "./MinioService.ts";
 
-type InfraProbe = (infra: InfrastructureEntry) => Promise<Record<string, unknown> | null>;
-type ProbeFields = Pick<InfraStatus, "healthy" | "responseTimeMs" | "metadata" | "error" | "checkedAt">;
+type InfraProbe = (
+  infra: InfrastructureEntry,
+) => Promise<Record<string, unknown> | null>;
+type ProbeFields = Pick<
+  InfraStatus,
+  "healthy" | "responseTimeMs" | "metadata" | "error" | "checkedAt"
+>;
 
 // Whole-probe deadline. The Mongo probe issues up to three commands and
 // the driver's timeouts cover connection setup, not a stalled server — so
@@ -23,7 +35,11 @@ let roundInflight: Promise<InfraStatus[]> | null = null;
 // command failure we discard the client so the next sweep starts clean.
 let healthCheckMongoClient: MongoClient | null = null;
 
-function toStatus(id: string, infra: InfrastructureEntry, probe: ProbeFields): InfraStatus {
+function toStatus(
+  id: string,
+  infra: InfrastructureEntry,
+  probe: ProbeFields,
+): InfraStatus {
   return {
     id,
     name: infra.name,
@@ -62,7 +78,12 @@ async function checkMongo(): Promise<Record<string, unknown>> {
     const admin = (await getHealthCheckMongoClient()).db("admin");
     await admin.command({ ping: 1 });
 
-    const metadata: Record<string, unknown> = { version: null, uptime: null, connections: null, databases: null };
+    const metadata: Record<string, unknown> = {
+      version: null,
+      uptime: null,
+      connections: null,
+      databases: null,
+    };
 
     try {
       const serverStatus = await admin.command({ serverStatus: 1 });
@@ -97,11 +118,15 @@ async function checkMinio(): Promise<Record<string, unknown>> {
   };
 }
 
-async function checkHttp(infra: InfrastructureEntry): Promise<Record<string, unknown>> {
+async function checkHttp(
+  infra: InfrastructureEntry,
+): Promise<Record<string, unknown>> {
   if (!infra.url) throw new Error("No URL configured");
 
   const url = `${infra.url.replace(/\/+$/, "")}${infra.healthPath || "/"}`;
-  const response = await fetch(url, { signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS) });
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS),
+  });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
   try {
@@ -144,7 +169,9 @@ export default class InfrastructureRegistryService {
   private static async _runRound(): Promise<InfraStatus[]> {
     const entries = Object.entries(INFRASTRUCTURE);
     const results = await Promise.all(
-      entries.map(([id, infra]) => InfrastructureRegistryService._checkInfra(id, infra)),
+      entries.map(([id, infra]) =>
+        InfrastructureRegistryService._checkInfra(id, infra),
+      ),
     );
 
     const liveIds = new Set(entries.map(([id]) => id));
@@ -157,7 +184,10 @@ export default class InfrastructureRegistryService {
     return results;
   }
 
-  public static async _checkInfra(id: string, infra: InfrastructureEntry): Promise<InfraStatus> {
+  public static async _checkInfra(
+    id: string,
+    infra: InfrastructureEntry,
+  ): Promise<InfraStatus> {
     const probe = PROBES[infra.type];
 
     // No probe for this type: say so. Reporting it healthy would hide a
@@ -175,7 +205,11 @@ export default class InfrastructureRegistryService {
 
     const start = Date.now();
     try {
-      const metadata = await withTimeout(probe(infra), PROBE_TIMEOUT_MS, "Timeout");
+      const metadata = await withTimeout(
+        probe(infra),
+        PROBE_TIMEOUT_MS,
+        "Timeout",
+      );
       return toStatus(id, infra, {
         healthy: true,
         responseTimeMs: Date.now() - start,
@@ -185,7 +219,8 @@ export default class InfrastructureRegistryService {
       });
     } catch (error: unknown) {
       const isTimeout =
-        error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
+        error instanceof Error &&
+        (error.name === "AbortError" || error.name === "TimeoutError");
       const message = isTimeout ? "Timeout" : getErrorMessage(error);
       logger.warn(`[InfraRegistry] ${infra.name} unreachable: ${message}`);
       return toStatus(id, infra, {

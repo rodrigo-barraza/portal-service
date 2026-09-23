@@ -171,7 +171,10 @@ function ensureState(
 const DISCORD_MESSAGE_LIMIT = 2000;
 
 /** Join alert lines into as few messages as fit Discord's content limit. */
-export function packAlertMessages(lines: string[], limit: number = DISCORD_MESSAGE_LIMIT): string[] {
+export function packAlertMessages(
+  lines: string[],
+  limit: number = DISCORD_MESSAGE_LIMIT,
+): string[] {
   const messages: string[] = [];
   let current = "";
   for (const line of lines) {
@@ -224,14 +227,18 @@ export default class WatchdogService {
       // "the process is alive", so staleness tracking resets.
       state.lastHeartbeatAtMs = nowMs;
       void WatchdogService._sendAlerts([
-        WatchdogService._transitionDown(state, nowMs, state.lastReason, { immediate: true }),
+        WatchdogService._transitionDown(state, nowMs, state.lastReason, {
+          immediate: true,
+        }),
       ]);
       return true;
     }
 
     state.lastHeartbeatAtMs = nowMs;
     state.lastReason = options.reason || null;
-    void WatchdogService._sendAlerts([WatchdogService._transitionUp(state, nowMs)]);
+    void WatchdogService._sendAlerts([
+      WatchdogService._transitionUp(state, nowMs),
+    ]);
     return true;
   }
 
@@ -275,7 +282,11 @@ export default class WatchdogService {
       alerts.push(
         target.healthy
           ? WatchdogService._transitionUp(state, nowMs)
-          : WatchdogService._transitionDown(state, nowMs, target.reason || "health check failing"),
+          : WatchdogService._transitionDown(
+              state,
+              nowMs,
+              target.reason || "health check failing",
+            ),
       );
     }
 
@@ -332,7 +343,10 @@ export default class WatchdogService {
   }
 
   /** Apply an up observation; returns the recovery line to send, if any. */
-  private static _transitionUp(state: WatchdogState, nowMs: number): string | null {
+  private static _transitionUp(
+    state: WatchdogState,
+    nowMs: number,
+  ): string | null {
     const wasAlerted = state.alertedDown;
     const downForMs =
       state.unhealthySinceMs !== null ? nowMs - state.unhealthySinceMs : 0;
@@ -343,12 +357,16 @@ export default class WatchdogService {
 
     // Recovery only pages when the outage itself did — a blip that never
     // alerted recovers silently.
-    return wasAlerted ? `🟢 **${state.name}** recovered after ${formatDuration(downForMs)}` : null;
+    return wasAlerted
+      ? `🟢 **${state.name}** recovered after ${formatDuration(downForMs)}`
+      : null;
   }
 
   /** Send a pass's alert lines as few webhook posts as fit; failures are logged, never thrown. */
   private static async _sendAlerts(lines: Array<string | null>): Promise<void> {
-    for (const message of packAlertMessages(lines.filter((line): line is string => line !== null))) {
+    for (const message of packAlertMessages(
+      lines.filter((line): line is string => line !== null),
+    )) {
       try {
         await WatchdogService.deps.sendAlert(message);
         logger.warn(`[Watchdog] ${message}`);

@@ -6,7 +6,11 @@
 
 import type { ClientRequest } from "node:http";
 import { Router, type Request, type Response } from "express";
-import { createSseEmitter, initSseResponse, startSseHeartbeat } from "@rodrigo-barraza/utilities-library/express";
+import {
+  createSseEmitter,
+  initSseResponse,
+  startSseHeartbeat,
+} from "@rodrigo-barraza/utilities-library/express";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { HttpError } from "@rodrigo-barraza/utilities-library/service";
 import { DEVICES } from "../config.ts";
@@ -66,21 +70,34 @@ router.get("/:containerName", async (req: Request, res: Response) => {
   try {
     containers = await DockerStatsService.getAll(queryParam(req, "device"));
   } catch (error: unknown) {
-    logger.error(`[Logs] Failed to query containers: ${getErrorMessage(error)}`);
+    logger.error(
+      `[Logs] Failed to query containers: ${getErrorMessage(error)}`,
+    );
     throw new HttpError("Failed to query Docker containers", 500);
   }
 
-  const matchedContainer = containers.find((container) => container.name === containerName);
+  const matchedContainer = containers.find(
+    (container) => container.name === containerName,
+  );
   if (!matchedContainer) {
     throw new HttpError(`Container not found: ${containerName}`, 404);
   }
 
   const deviceEntry = DEVICES[matchedContainer.device];
   if (!deviceEntry?.dockerApi) {
-    throw new HttpError(`No Docker API configured for device: ${matchedContainer.device}`, 400);
+    throw new HttpError(
+      `No Docker API configured for device: ${matchedContainer.device}`,
+      400,
+    );
   }
 
-  const tailCount = Math.min(Math.max(Number.parseInt(queryParam(req, "tail") ?? "", 10) || DEFAULT_TAIL, 1), MAX_TAIL);
+  const tailCount = Math.min(
+    Math.max(
+      Number.parseInt(queryParam(req, "tail") ?? "", 10) || DEFAULT_TAIL,
+      1,
+    ),
+    MAX_TAIL,
+  );
   const isFollowing = req.query.follow === "1";
 
   // ─── Filter Parameters ───────────────────────────────────────
@@ -89,7 +106,9 @@ router.get("/:containerName", async (req: Request, res: Response) => {
   const searchFilter = rawSearch?.toLowerCase() ?? null;
   const sinceFilter = queryParam(req, "since") ?? null;
   const minimumSeverity = minimumSeverityFor(levelFilter);
-  const sinceTimestamp = sinceFilter ? parseRelativeTimeToUnixSeconds(sinceFilter) : null;
+  const sinceTimestamp = sinceFilter
+    ? parseRelativeTimeToUnixSeconds(sinceFilter)
+    : null;
   const isFiltering = minimumSeverity !== null || searchFilter !== null;
 
   initSseResponse(res);
@@ -106,7 +125,9 @@ router.get("/:containerName", async (req: Request, res: Response) => {
     clientGone = true;
     stopHeartbeat();
     if (dockerStream) {
-      logger.info(`[Logs] Client disconnected from ${containerName} log stream`);
+      logger.info(
+        `[Logs] Client disconnected from ${containerName} log stream`,
+      );
       dockerStream.destroy();
     }
   });
@@ -155,10 +176,9 @@ router.get("/:containerName", async (req: Request, res: Response) => {
   // the parser must know which mode to use before connecting.
   let isTty = false;
   try {
-    const inspect = await DockerClient.dockerGetJson<{ Config?: { Tty?: boolean } }>(
-      deviceEntry,
-      `/containers/${encodeURIComponent(containerName)}/json`,
-    );
+    const inspect = await DockerClient.dockerGetJson<{
+      Config?: { Tty?: boolean };
+    }>(deviceEntry, `/containers/${encodeURIComponent(containerName)}/json`);
     isTty = inspect.Config?.Tty === true;
   } catch {
     // Inspect failure: assume non-TTY (the overwhelmingly common case)
@@ -180,7 +200,8 @@ router.get("/:containerName", async (req: Request, res: Response) => {
   const lineSplitter = createLineSplitter();
   const processLine = (line: string, streamSource: string) => {
     totalLineCount++;
-    if (isFiltering && !shouldIncludeLine(line, minimumSeverity, searchFilter)) return;
+    if (isFiltering && !shouldIncludeLine(line, minimumSeverity, searchFilter))
+      return;
     emittedLineCount++;
     emitDataFrame({ line, stream: streamSource });
   };
@@ -192,7 +213,8 @@ router.get("/:containerName", async (req: Request, res: Response) => {
       dockerQueryParameters,
       isTty,
       (payloadChunk: Buffer, streamType: number) => {
-        const streamSource = streamType === DOCKER_STREAM_STDERR ? "stderr" : "stdout";
+        const streamSource =
+          streamType === DOCKER_STREAM_STDERR ? "stderr" : "stdout";
         for (const line of lineSplitter.push(streamSource, payloadChunk)) {
           processLine(line, streamSource);
         }
@@ -206,7 +228,9 @@ router.get("/:containerName", async (req: Request, res: Response) => {
       (error: Error) => {
         // Our own destroy() on disconnect surfaces here too — not a failure
         if (clientGone) return;
-        logger.error(`[Logs] Docker stream error for ${containerName}: ${error.message}`);
+        logger.error(
+          `[Logs] Docker stream error for ${containerName}: ${error.message}`,
+        );
         finish({ error: error.message });
       },
     );

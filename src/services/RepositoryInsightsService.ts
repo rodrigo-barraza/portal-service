@@ -32,16 +32,24 @@ export function extractRepoSlug(repoUrl: string): string | null {
 }
 
 /** Linguist byte counts → sorted breakdown with one-decimal percentages. */
-export function toLanguageBreakdown(languageBytes: Record<string, number>): LanguageBreakdown {
-  const totalBytes = Object.values(languageBytes).reduce((sum, bytes) => sum + bytes, 0);
-  const sorted = Object.entries(languageBytes).sort(([, firstBytes], [, secondBytes]) => secondBytes - firstBytes);
+export function toLanguageBreakdown(
+  languageBytes: Record<string, number>,
+): LanguageBreakdown {
+  const totalBytes = Object.values(languageBytes).reduce(
+    (sum, bytes) => sum + bytes,
+    0,
+  );
+  const sorted = Object.entries(languageBytes).sort(
+    ([, firstBytes], [, secondBytes]) => secondBytes - firstBytes,
+  );
 
   return {
     primary: sorted[0]?.[0] ?? null,
     breakdown: sorted.map(([language, bytes]) => ({
       language,
       bytes,
-      percent: totalBytes > 0 ? Math.round((bytes / totalBytes) * 1000) / 10 : 0,
+      percent:
+        totalBytes > 0 ? Math.round((bytes / totalBytes) * 1000) / 10 : 0,
     })),
     totalBytes,
   };
@@ -58,7 +66,9 @@ function projectRepositories(): Array<[string, string]> {
 }
 
 /** Fan a per-repo lookup out over every project, keeping the non-null answers. */
-async function collectByProject<T>(lookup: (slug: string) => Promise<T | null>): Promise<Record<string, T>> {
+async function collectByProject<T>(
+  lookup: (slug: string) => Promise<T | null>,
+): Promise<Record<string, T>> {
   const byProject: Record<string, T> = {};
   await Promise.all(
     projectRepositories().map(async ([projectId, slug]) => {
@@ -71,23 +81,39 @@ async function collectByProject<T>(lookup: (slug: string) => Promise<T | null>):
 
 export default class RepositoryInsightsService {
   public static getRepoSize(slug: string): Promise<RepoSize | null> {
-    return repositoryCache.get(`size:${slug}`, REPO_SIZE_TTL_MS, () => GitHubClient.fetchRepoSize(slug));
+    return repositoryCache.get(`size:${slug}`, REPO_SIZE_TTL_MS, () =>
+      GitHubClient.fetchRepoSize(slug),
+    );
   }
 
   public static getLanguages(slug: string): Promise<LanguageBreakdown | null> {
-    return repositoryCache.get(`languages:${slug}`, LANGUAGES_TTL_MS, async () => {
-      const languageBytes = await GitHubClient.fetchRepoLanguages(slug);
-      return languageBytes ? toLanguageBreakdown(languageBytes) : null;
-    });
+    return repositoryCache.get(
+      `languages:${slug}`,
+      LANGUAGES_TTL_MS,
+      async () => {
+        const languageBytes = await GitHubClient.fetchRepoLanguages(slug);
+        return languageBytes ? toLanguageBreakdown(languageBytes) : null;
+      },
+    );
   }
 
-  public static async getAllRepoSizes(): Promise<{ sizes: Record<string, RepoSize>; fetchedAt: string }> {
-    const sizes = await collectByProject((slug) => RepositoryInsightsService.getRepoSize(slug));
+  public static async getAllRepoSizes(): Promise<{
+    sizes: Record<string, RepoSize>;
+    fetchedAt: string;
+  }> {
+    const sizes = await collectByProject((slug) =>
+      RepositoryInsightsService.getRepoSize(slug),
+    );
     return { sizes, fetchedAt: new Date().toISOString() };
   }
 
-  public static async getAllLanguages(): Promise<{ languages: Record<string, LanguageBreakdown>; fetchedAt: string }> {
-    const languages = await collectByProject((slug) => RepositoryInsightsService.getLanguages(slug));
+  public static async getAllLanguages(): Promise<{
+    languages: Record<string, LanguageBreakdown>;
+    fetchedAt: string;
+  }> {
+    const languages = await collectByProject((slug) =>
+      RepositoryInsightsService.getLanguages(slug),
+    );
     return { languages, fetchedAt: new Date().toISOString() };
   }
 }

@@ -4,22 +4,35 @@
 // cache fronts an expensive upstream (Docker /system/df, GitHub, GA,
 // Cloud Monitoring), so concurrent callers for one key share one fetch.
 
-import { createTtlCache, type TtlCacheOptions } from "@rodrigo-barraza/utilities-library/cache";
+import {
+  createTtlCache,
+  type TtlCacheOptions,
+} from "@rodrigo-barraza/utilities-library/cache";
 
 export interface DedupedTtlCache {
-  get<T>(key: string, ttlMilliseconds: number, fetcher: () => Promise<T>): Promise<T>;
+  get<T>(
+    key: string,
+    ttlMilliseconds: number,
+    fetcher: () => Promise<T>,
+  ): Promise<T>;
   /** Store a value fetched elsewhere (e.g. by a background poller) as fresh. */
   set(key: string, data: unknown): void;
   delete(key: string): void;
   clear(): void;
 }
 
-export function createDedupedTtlCache(options?: TtlCacheOptions): DedupedTtlCache {
+export function createDedupedTtlCache(
+  options?: TtlCacheOptions,
+): DedupedTtlCache {
   const cache = createTtlCache(options);
   const inflight = new Map<string, Promise<unknown>>();
 
   return {
-    get<T>(key: string, ttlMilliseconds: number, fetcher: () => Promise<T>): Promise<T> {
+    get<T>(
+      key: string,
+      ttlMilliseconds: number,
+      fetcher: () => Promise<T>,
+    ): Promise<T> {
       const pending = inflight.get(key);
       if (pending) return pending as Promise<T>;
 

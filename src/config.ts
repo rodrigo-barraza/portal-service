@@ -1,18 +1,28 @@
 // ─── Runtime Configuration ──────────────────────────────────
 
 import logger from "./utils/logger.ts";
-import type { ProjectEntry, InfrastructureEntry, DeviceEntry, AnalyticsProperty, VaultRegistry, VaultRegistryProject } from "./types.ts";
+import type {
+  ProjectEntry,
+  InfrastructureEntry,
+  DeviceEntry,
+  AnalyticsProperty,
+  VaultRegistry,
+  VaultRegistryProject,
+} from "./types.ts";
 
 export const PORT = process.env.PORTAL_SERVICE_PORT;
 
 export const MONGO_URI = process.env.MONGO_URI;
-export const MONGO_DB_NAME = process.env.PORTAL_SERVICE_MONGO_DB_NAME || process.env.MONGO_DB_NAME;
+export const MONGO_DB_NAME =
+  process.env.PORTAL_SERVICE_MONGO_DB_NAME || process.env.MONGO_DB_NAME;
 
 // Read-only cross-service databases for the External APIs dashboard:
 // prism's `requests` collection (LLM usage) and tools-service's
 // `external-api-usage` buckets live on the same Mongo server.
-export const PRISM_MONGO_DB_NAME = process.env.PRISM_SERVICE_MONGO_DB_NAME || "prism";
-export const TOOLS_MONGO_DB_NAME = process.env.TOOLS_SERVICE_MONGO_DB_NAME || "tools";
+export const PRISM_MONGO_DB_NAME =
+  process.env.PRISM_SERVICE_MONGO_DB_NAME || "prism";
+export const TOOLS_MONGO_DB_NAME =
+  process.env.TOOLS_SERVICE_MONGO_DB_NAME || "tools";
 
 export const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT;
 export const MINIO_ACCESS_KEY = process.env.MINIO_ACCESS_KEY;
@@ -40,10 +50,14 @@ function inferProjectType(id: string, service: VaultRegistryProject) {
 
 function inferDeployTier(projectType: string) {
   switch (projectType) {
-    case "Infrastructure": return 0;
-    case "Service":        return 1;
-    case "Client":         return 1;
-    default:               return 2; // Bot, Library, Kit, Tool
+    case "Infrastructure":
+      return 0;
+    case "Service":
+      return 1;
+    case "Client":
+      return 1;
+    default:
+      return 2; // Bot, Library, Kit, Tool
   }
 }
 
@@ -58,12 +72,15 @@ function deriveDependencies(service: VaultRegistryProject) {
     source: "registry",
   }));
 
-  const derived: Array<{ id: string; criticality: string; source: string }> = [];
-  if (service.db) derived.push({ id: "mongodb", criticality: "required", source: "derived" });
+  const derived: Array<{ id: string; criticality: string; source: string }> =
+    [];
+  if (service.db)
+    derived.push({ id: "mongodb", criticality: "required", source: "derived" });
   const hasMinioBucket = Array.isArray(service.minioBucket)
     ? service.minioBucket.length > 0
     : Boolean(service.minioBucket);
-  if (hasMinioBucket) derived.push({ id: "minio", criticality: "required", source: "derived" });
+  if (hasMinioBucket)
+    derived.push({ id: "minio", criticality: "required", source: "derived" });
 
   const declaredIds = new Set(dependencies.map((dep) => dep.id));
   for (const dep of derived) {
@@ -112,7 +129,9 @@ export function initializeRegistry(registry: VaultRegistry) {
       device: service.device || "synology",
       domain: service.domain || null,
       dockerProject: service.dockerProject || null,
-      deployTier: service.deployTier ?? inferDeployTier(inferProjectType(service.id, service)),
+      deployTier:
+        service.deployTier ??
+        inferDeployTier(inferProjectType(service.id, service)),
       essential: service.essential || false,
       watchdog: service.watchdog || null,
       analyticsPropertyId: service.analyticsPropertyId || null,
@@ -137,7 +156,11 @@ export function initializeRegistry(registry: VaultRegistry) {
 
   const infra: Record<string, InfrastructureEntry> = {};
 
-  const infraTypeLabels: Record<string, string> = { database: "Database", "object-store": "Store", inference: "Inference" };
+  const infraTypeLabels: Record<string, string> = {
+    database: "Database",
+    "object-store": "Store",
+    inference: "Inference",
+  };
 
   for (const item of registry.infrastructure || []) {
     infra[item.id] = {
@@ -184,14 +207,16 @@ export function initializeRegistry(registry: VaultRegistry) {
 export const HEALTH_CHECK_TIMEOUT_MS = 3000;
 
 // ── Google Analytics (GA4 Data API) ───────────────────────────
-export const GOOGLE_ANALYTICS_CREDENTIALS = process.env.GOOGLE_ANALYTICS_CREDENTIALS;
+export const GOOGLE_ANALYTICS_CREDENTIALS =
+  process.env.GOOGLE_ANALYTICS_CREDENTIALS;
 // Note: ANALYTICS_PROPERTIES is derived from registry entries (see initializeRegistry above)
 
 // ── Cloud Monitoring (API Usage Dashboard) ────────────────────
 // The GCP project ID to query for API usage metrics (serviceruntime.googleapis.com).
 // This may differ from the GA4 service account's project_id when API keys
 // (Places, YouTube, Geocoding, etc.) belong to a separate GCP project.
-export const GOOGLE_CLOUD_MONITORING_PROJECT_ID = process.env.GOOGLE_CLOUD_MONITORING_PROJECT_ID;
+export const GOOGLE_CLOUD_MONITORING_PROJECT_ID =
+  process.env.GOOGLE_CLOUD_MONITORING_PROJECT_ID;
 
 // ── Sessions Service (first-party analytics) ──────────────────
 export const SESSIONS_SERVICE_URL = process.env.SESSIONS_SERVICE_URL;
@@ -205,7 +230,8 @@ export const SESSIONS_STATS_API_SECRET = process.env.SESSIONS_STATS_API_SECRET;
 export const WATCHDOG_PUSH_TOKEN = process.env.WATCHDOG_PUSH_TOKEN || "";
 // Discord webhook that receives down/recovery alerts. Alerting is
 // log-only when unset; state tracking still runs.
-export const WATCHDOG_DISCORD_WEBHOOK_URL = process.env.WATCHDOG_DISCORD_WEBHOOK_URL || "";
+export const WATCHDOG_DISCORD_WEBHOOK_URL =
+  process.env.WATCHDOG_DISCORD_WEBHOOK_URL || "";
 // How often watchdog state is evaluated.
 export const WATCHDOG_EVALUATE_INTERVAL_MS = 30_000;
 // Push heartbeats arrive every ~60s; past this silence the pusher is down

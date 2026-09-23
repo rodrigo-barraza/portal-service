@@ -31,7 +31,11 @@ export class DeviceResolver {
   private static builtAtMs = 0;
 
   private static refreshIfStale(nowMs: number = Date.now()): void {
-    if (this.builtFromDevices === DEVICES && nowMs - this.builtAtMs < REFRESH_INTERVAL_MS) return;
+    if (
+      this.builtFromDevices === DEVICES &&
+      nowMs - this.builtAtMs < REFRESH_INTERVAL_MS
+    )
+      return;
 
     const addresses = localIpAddresses();
     this.localDeviceKey = this.detectLocalDevice(addresses);
@@ -51,22 +55,32 @@ export class DeviceResolver {
     return this.localDeviceKey;
   }
 
-  public static deriveHost(targetUrl: string | null | undefined, deviceKey: string | null | undefined): string {
+  public static deriveHost(
+    targetUrl: string | null | undefined,
+    deviceKey: string | null | undefined,
+  ): string {
     this.refreshIfStale();
-    const fallbackDeviceName = (deviceKey && DEVICES[deviceKey]?.name) || deviceKey || "Unknown";
+    const fallbackDeviceName =
+      (deviceKey && DEVICES[deviceKey]?.name) || deviceKey || "Unknown";
 
     if (!targetUrl) {
       return fallbackDeviceName;
     }
 
     try {
-      return this.hostnameToDeviceMap.get(new URL(targetUrl).hostname) || fallbackDeviceName;
+      return (
+        this.hostnameToDeviceMap.get(new URL(targetUrl).hostname) ||
+        fallbackDeviceName
+      );
     } catch {
       return fallbackDeviceName;
     }
   }
 
-  public static toLocalHealthUrl(targetUrl: string, deviceKey: string | null | undefined): string {
+  public static toLocalHealthUrl(
+    targetUrl: string,
+    deviceKey: string | null | undefined,
+  ): string {
     this.refreshIfStale();
     if (!this.localDeviceKey || deviceKey !== this.localDeviceKey) {
       return targetUrl;
@@ -90,7 +104,9 @@ export class DeviceResolver {
     return null;
   }
 
-  private static buildHostnameToDeviceMap(addresses: Set<string>): Map<string, string> {
+  private static buildHostnameToDeviceMap(
+    addresses: Set<string>,
+  ): Map<string, string> {
     const mapping = new Map<string, string>();
 
     for (const deviceEntry of Object.values(DEVICES)) {
@@ -99,7 +115,9 @@ export class DeviceResolver {
       }
     }
 
-    const localDevice = this.localDeviceKey ? DEVICES[this.localDeviceKey] : undefined;
+    const localDevice = this.localDeviceKey
+      ? DEVICES[this.localDeviceKey]
+      : undefined;
     if (localDevice) {
       mapping.set("localhost", localDevice.name);
       mapping.set("127.0.0.1", localDevice.name);

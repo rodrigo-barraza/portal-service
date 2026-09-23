@@ -29,8 +29,12 @@ router.get("/", async (_req: Request, res: Response) => {
     // Specs are best-effort decoration — the device list must never fail on them.
   }
 
-  const serviceStatusById = new Map(ServiceRegistryService.list().map((status) => [status.id, status]));
-  const infraStatusById = new Map(InfrastructureRegistryService.list().map((status) => [status.id, status]));
+  const serviceStatusById = new Map(
+    ServiceRegistryService.list().map((status) => [status.id, status]),
+  );
+  const infraStatusById = new Map(
+    InfrastructureRegistryService.list().map((status) => [status.id, status]),
+  );
 
   const devices = Object.entries(DEVICES).map(([deviceId, device]) => {
     const hostedServices = Object.entries(PROJECTS)
@@ -76,7 +80,9 @@ router.get("/", async (_req: Request, res: Response) => {
       });
 
     const hostedCount = hostedServices.length + hostedInfra.length;
-    const healthyCount = [...hostedServices, ...hostedInfra].filter((item) => item.healthy).length;
+    const healthyCount = [...hostedServices, ...hostedInfra].filter(
+      (item) => item.healthy,
+    ).length;
 
     // Descriptive fields only — the Docker Engine endpoint (an
     // unauthenticated tcp:// socket for remote hosts), docker binary path

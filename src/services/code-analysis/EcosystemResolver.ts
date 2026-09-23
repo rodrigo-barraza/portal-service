@@ -27,7 +27,7 @@ export class EcosystemResolver {
 
     if (owners.size === 0) {
       logger.warn(
-        "[EcosystemResolver] No GitHub repository URLs found in registry — analysis will be limited"
+        "[EcosystemResolver] No GitHub repository URLs found in registry — analysis will be limited",
       );
     }
 
@@ -37,7 +37,7 @@ export class EcosystemResolver {
   public static resolveEcosystemId(
     packageName: string,
     packageVersion: string,
-    ecosystemOwners: EcosystemOwners
+    ecosystemOwners: EcosystemOwners,
   ): string | null {
     for (const prefix of ecosystemOwners.scopePrefixes) {
       if (packageName.startsWith(prefix)) {
@@ -49,7 +49,9 @@ export class EcosystemResolver {
     // git+ssh://git@github.com:owner/repo — each optionally pinned "#ref".
     for (const owner of ecosystemOwners.owners) {
       const gitHubMatch = packageVersion.match(
-        new RegExp(`(?:^github:|github\\.com[/:])${escapeRegex(owner)}/([^/#]+?)(?:\\.git)?(?:#.*)?$`),
+        new RegExp(
+          `(?:^github:|github\\.com[/:])${escapeRegex(owner)}/([^/#]+?)(?:\\.git)?(?:#.*)?$`,
+        ),
       );
       if (gitHubMatch) {
         return gitHubMatch[1];

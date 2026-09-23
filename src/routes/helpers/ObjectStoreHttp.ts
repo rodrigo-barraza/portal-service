@@ -25,7 +25,10 @@ export function assertValidObjectName(name: string): void {
   if (Buffer.byteLength(name) > MAX_OBJECT_NAME_BYTES) {
     throw new HttpError("Object name too long", 400);
   }
-  if (name.includes("\0") || name.split("/").some((segment) => segment === "." || segment === "..")) {
+  if (
+    name.includes("\0") ||
+    name.split("/").some((segment) => segment === "." || segment === "..")
+  ) {
     throw new HttpError("Invalid object name", 400);
   }
 }
@@ -102,7 +105,10 @@ function encodeRfc5987(value: string): string {
  * Raw non-ASCII in setHeader throws; a raw quote or CRLF would break
  * out of the quoted-string.
  */
-export function contentDisposition(disposition: "inline" | "attachment", filename: string | undefined): string {
+export function contentDisposition(
+  disposition: "inline" | "attachment",
+  filename: string | undefined,
+): string {
   const name = filename || "download";
   const fallback = name.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
   return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encodeRfc5987(name)}`;
@@ -118,7 +124,10 @@ export type ByteRange =
  * range is supported; anything else (multi-range, other units, junk) is
  * ignored per RFC 9110 §14.2 and the full object is served.
  */
-export function parseRangeHeader(rangeHeader: string | undefined, size: number): ByteRange {
+export function parseRangeHeader(
+  rangeHeader: string | undefined,
+  size: number,
+): ByteRange {
   if (!rangeHeader) return { kind: "none" };
   const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
   if (!match || (match[1] === "" && match[2] === "")) return { kind: "none" };
@@ -133,7 +142,10 @@ export function parseRangeHeader(rangeHeader: string | undefined, size: number):
     end = size - 1;
   } else {
     start = Number.parseInt(match[1], 10);
-    end = match[2] === "" ? size - 1 : Math.min(Number.parseInt(match[2], 10), size - 1);
+    end =
+      match[2] === ""
+        ? size - 1
+        : Math.min(Number.parseInt(match[2], 10), size - 1);
   }
 
   if (start > end || start >= size) return { kind: "unsatisfiable" };
@@ -143,7 +155,10 @@ export function parseRangeHeader(rangeHeader: string | undefined, size: number):
 // minio-js error codes/names → client-facing failures. NotFound is
 // statObject's code for a missing key (a HEAD response carries no S3
 // error body, so there is no NoSuchKey to read).
-const MINIO_CLIENT_ERRORS: Record<string, { status: number; message: string | null }> = {
+const MINIO_CLIENT_ERRORS: Record<
+  string,
+  { status: number; message: string | null }
+> = {
   NoSuchBucket: { status: 404, message: "Bucket not found" },
   NoSuchKey: { status: 404, message: "Object not found" },
   NotFound: { status: 404, message: "Object not found" },
@@ -159,12 +174,22 @@ const MINIO_CLIENT_ERRORS: Record<string, { status: number; message: string | nu
  * original error untouched (→ generic 500).
  */
 export function toObjectStoreError(error: unknown): unknown {
-  const candidate = error as { code?: unknown; name?: unknown; message?: unknown } | null;
+  const candidate = error as {
+    code?: unknown;
+    name?: unknown;
+    message?: unknown;
+  } | null;
   const code = typeof candidate?.code === "string" ? candidate.code : "";
   const name = typeof candidate?.name === "string" ? candidate.name : "";
-  const message = typeof candidate?.message === "string" ? candidate.message : "";
+  const message =
+    typeof candidate?.message === "string" ? candidate.message : "";
   const known = MINIO_CLIENT_ERRORS[code] ?? MINIO_CLIENT_ERRORS[name];
-  if (known) return new HttpError(known.message ?? (message || "Invalid request"), known.status);
-  if (message.includes("Not Found")) return new HttpError("Object not found", 404);
+  if (known)
+    return new HttpError(
+      known.message ?? (message || "Invalid request"),
+      known.status,
+    );
+  if (message.includes("Not Found"))
+    return new HttpError("Object not found", 404);
   return error;
 }

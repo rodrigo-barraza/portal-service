@@ -17,7 +17,10 @@ router.get("/containers", async (req: Request, res: Response) => {
 
 router.get("/containers/history", (req: Request, res: Response) => {
   const history = DockerStatsService.getHistory(queryParam(req, "device"));
-  const samples = Object.values(history).reduce((sum, buffer) => sum + buffer.length, 0);
+  const samples = Object.values(history).reduce(
+    (sum, buffer) => sum + buffer.length,
+    0,
+  );
   res.json({ history, samples });
 });
 
@@ -44,9 +47,17 @@ router.get("/system", async (req: Request, res: Response) => {
 
 router.get("/storage", async (_req: Request, res: Response) => {
   const buckets = await MinioService.listBuckets();
-  const totalObjects = buckets.reduce((sum, bucket) => sum + bucket.objectCount, 0);
+  const totalObjects = buckets.reduce(
+    (sum, bucket) => sum + bucket.objectCount,
+    0,
+  );
   const totalSize = buckets.reduce((sum, bucket) => sum + bucket.totalSize, 0);
-  res.json({ buckets, totalObjects, totalSize, fetchedAt: new Date().toISOString() });
+  res.json({
+    buckets,
+    totalObjects,
+    totalSize,
+    fetchedAt: new Date().toISOString(),
+  });
 });
 
 export default router;

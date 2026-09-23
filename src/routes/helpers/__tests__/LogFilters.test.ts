@@ -15,7 +15,9 @@ describe("level detection and filtering", () => {
   it("detects the logger's level token through ANSI colour codes", () => {
     expect(extractLogLevel(stripAnsiCodes(warnLine))).toBe("WARN");
     expect(extractLogLevel(infoLine)).toBe("INFO");
-    expect(extractLogLevel("    at Object.<anonymous> (file.ts:1:1)")).toBeNull();
+    expect(
+      extractLogLevel("    at Object.<anonymous> (file.ts:1:1)"),
+    ).toBeNull();
   });
 
   it("cascades: warn keeps WARN and ERROR, drops INFO, keeps unlevelled lines", () => {
@@ -42,7 +44,9 @@ describe("parseRelativeTimeToUnixSeconds", () => {
 
   it("converts relative windows to a unix timestamp", () => {
     expect(parseRelativeTimeToUnixSeconds("5m", now)).toBe(1_700_000_000 - 300);
-    expect(parseRelativeTimeToUnixSeconds("2 h", now)).toBe(1_700_000_000 - 7200);
+    expect(parseRelativeTimeToUnixSeconds("2 h", now)).toBe(
+      1_700_000_000 - 7200,
+    );
   });
 
   it("rejects junk", () => {
@@ -54,10 +58,16 @@ describe("parseRelativeTimeToUnixSeconds", () => {
 describe("createLineSplitter", () => {
   it("holds a partial line until its newline arrives, per stream", () => {
     const splitter = createLineSplitter();
-    expect(splitter.push("stdout", Buffer.from("first\nsec"))).toEqual(["first"]);
+    expect(splitter.push("stdout", Buffer.from("first\nsec"))).toEqual([
+      "first",
+    ]);
     expect(splitter.push("stderr", Buffer.from("oops\n"))).toEqual(["oops"]);
-    expect(splitter.push("stdout", Buffer.from("ond\r\n\nthird"))).toEqual(["second"]);
-    expect(splitter.flush()).toEqual([{ streamSource: "stdout", line: "third" }]);
+    expect(splitter.push("stdout", Buffer.from("ond\r\n\nthird"))).toEqual([
+      "second",
+    ]);
+    expect(splitter.flush()).toEqual([
+      { streamSource: "stdout", line: "third" },
+    ]);
   });
 
   it("keeps a UTF-8 character split across chunks intact", () => {

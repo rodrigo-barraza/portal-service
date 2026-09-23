@@ -39,7 +39,13 @@ export class GitHubClient {
   private static stats: GitHubFetchStats = GitHubClient.emptyStats();
 
   private static emptyStats(): GitHubFetchStats {
-    return { requests: 0, failures: 0, unauthorized: 0, rateLimited: 0, notFound: 0 };
+    return {
+      requests: 0,
+      failures: 0,
+      unauthorized: 0,
+      rateLimited: 0,
+      notFound: 0,
+    };
   }
 
   public static resetStats(): void {
@@ -52,11 +58,13 @@ export class GitHubClient {
 
   public static async fetchJson<T>(
     requestPath: string,
-    timeoutMilliseconds: number = this.DEFAULT_TIMEOUT_MILLISECONDS
+    timeoutMilliseconds: number = this.DEFAULT_TIMEOUT_MILLISECONDS,
   ): Promise<T | null> {
     try {
       this.stats.requests++;
-      const response = await gitHubApiClient.requestRaw(requestPath, { timeoutMilliseconds });
+      const response = await gitHubApiClient.requestRaw(requestPath, {
+        timeoutMilliseconds,
+      });
 
       if (!response.ok) {
         this.stats.failures++;
@@ -68,7 +76,7 @@ export class GitHubClient {
           else this.stats.unauthorized++;
           if (!GITHUB_PAT) {
             logger.warn(
-              `[GitHubClient] Rate limit or forbidden on ${requestPath}. Set GITHUB_PAT for access.`
+              `[GitHubClient] Rate limit or forbidden on ${requestPath}. Set GITHUB_PAT for access.`,
             );
           }
         }
@@ -79,14 +87,19 @@ export class GitHubClient {
     } catch (error: unknown) {
       this.stats.failures++;
       const errorMessage = getErrorMessage(error);
-      logger.warn(`[GitHubClient] Request to ${requestPath} failed: ${errorMessage}`);
+      logger.warn(
+        `[GitHubClient] Request to ${requestPath} failed: ${errorMessage}`,
+      );
       return null;
     }
   }
 
-  public static async fetchFile(repoSlug: string, filePath: string): Promise<string | null> {
+  public static async fetchFile(
+    repoSlug: string,
+    filePath: string,
+  ): Promise<string | null> {
     const fileDetails = await this.fetchJson<GitHubContentDetails>(
-      `/repos/${repoSlug}/contents/${filePath}`
+      `/repos/${repoSlug}/contents/${filePath}`,
     );
 
     if (!fileDetails || !fileDetails.content) {
@@ -96,8 +109,12 @@ export class GitHubClient {
     return Buffer.from(fileDetails.content, "base64").toString("utf-8");
   }
 
-  public static async fetchRepoSize(repoSlug: string): Promise<{ sizeKB: number; sizeBytes: number } | null> {
-    const repositoryDetails = await this.fetchJson<GitHubRepoDetails>(`/repos/${repoSlug}`);
+  public static async fetchRepoSize(
+    repoSlug: string,
+  ): Promise<{ sizeKB: number; sizeBytes: number } | null> {
+    const repositoryDetails = await this.fetchJson<GitHubRepoDetails>(
+      `/repos/${repoSlug}`,
+    );
 
     if (!repositoryDetails || typeof repositoryDetails.size !== "number") {
       return null;
@@ -109,7 +126,11 @@ export class GitHubClient {
     };
   }
 
-  public static async fetchRepoLanguages(repoSlug: string): Promise<Record<string, number> | null> {
-    return this.fetchJson<Record<string, number>>(`/repos/${repoSlug}/languages`);
+  public static async fetchRepoLanguages(
+    repoSlug: string,
+  ): Promise<Record<string, number> | null> {
+    return this.fetchJson<Record<string, number>>(
+      `/repos/${repoSlug}/languages`,
+    );
   }
 }

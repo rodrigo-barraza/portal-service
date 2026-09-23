@@ -56,7 +56,9 @@ describe("MinioService._generatePrometheusToken", () => {
 
     const [headerPart, payloadPart, signaturePart] = token!.split(".");
     const header = JSON.parse(Buffer.from(headerPart, "base64url").toString());
-    const payload = JSON.parse(Buffer.from(payloadPart, "base64url").toString());
+    const payload = JSON.parse(
+      Buffer.from(payloadPart, "base64url").toString(),
+    );
 
     expect(header).toEqual({ alg: "HS512", typ: "JWT" });
     expect(payload.iss).toBe("prometheus");
@@ -80,7 +82,14 @@ describe("MinioService._scanUsageIncremental", () => {
       }));
 
     const seen: string[] = [];
-    for await (const result of MinioService._scanUsageIncremental(["a", "bb", "ccc", "dddd", "eeeee", "ffffff"])) {
+    for await (const result of MinioService._scanUsageIncremental([
+      "a",
+      "bb",
+      "ccc",
+      "dddd",
+      "eeeee",
+      "ffffff",
+    ])) {
       seen.push(result.name);
       expect(result.usage.objectCount).toBe(result.name.length);
     }
@@ -95,7 +104,9 @@ describe("MinioService.getBucketUsage", () => {
   it("caches a metrics snapshot and skips refetching while fresh", async () => {
     const metricsSpy = vi
       .spyOn(MinioService, "_fetchUsageFromMetrics")
-      .mockResolvedValue(new Map([["reels", { objectCount: 5, totalSize: 50 }]]));
+      .mockResolvedValue(
+        new Map([["reels", { objectCount: 5, totalSize: 50 }]]),
+      );
 
     const first = await MinioService.getBucketUsage();
     expect(first.source).toBe("metrics");

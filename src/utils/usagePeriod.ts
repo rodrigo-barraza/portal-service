@@ -7,7 +7,9 @@ const DEFAULT_USAGE_PERIOD = "30d";
 
 /** Any query value → one of USAGE_PERIODS (junk falls back to 30d, so cache keys stay bounded). */
 export function sanitizeUsagePeriod(period: unknown): string {
-  return typeof period === "string" && USAGE_PERIODS.includes(period) ? period : DEFAULT_USAGE_PERIOD;
+  return typeof period === "string" && USAGE_PERIODS.includes(period)
+    ? period
+    : DEFAULT_USAGE_PERIOD;
 }
 
 export function usagePeriodDays(period: string): number {
@@ -16,6 +18,9 @@ export function usagePeriodDays(period: string): number {
 }
 
 /** Start of the usage window as an ISO timestamp. */
-export function usagePeriodStart(period: string, nowMs: number = Date.now()): Date {
+export function usagePeriodStart(
+  period: string,
+  nowMs: number = Date.now(),
+): Date {
   return new Date(nowMs - usagePeriodDays(period) * MILLISECONDS_PER_DAY);
 }

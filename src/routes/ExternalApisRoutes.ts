@@ -8,7 +8,9 @@
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { HttpError } from "@rodrigo-barraza/utilities-library/service";
 import { Router, type Request, type Response } from "express";
-import GoogleCloudUsageService, { type ApiUsageSummary } from "../services/GoogleCloudUsageService.ts";
+import GoogleCloudUsageService, {
+  type ApiUsageSummary,
+} from "../services/GoogleCloudUsageService.ts";
 import ExternalProviderUsageService from "../services/ExternalProviderUsageService.ts";
 import logger from "../utils/logger.ts";
 import { queryParam } from "../utils/http.ts";
@@ -32,7 +34,10 @@ router.get("/", async (req: Request, res: Response) => {
     ExternalProviderUsageService.getSummary(period),
   ]);
 
-  if (googleResult.status === "rejected" && providerResult.status === "rejected") {
+  if (
+    googleResult.status === "rejected" &&
+    providerResult.status === "rejected"
+  ) {
     logger.error(
       `[ExternalApis] All sources failed — google: ${getErrorMessage(googleResult.reason)}; providers: ${getErrorMessage(providerResult.reason)}`,
     );
@@ -46,7 +51,9 @@ router.get("/", async (req: Request, res: Response) => {
     services.push(...googleResult.value.services);
   } else {
     unreachableSources.push("google-cloud-monitoring");
-    logger.warn(`[ExternalApis] Google source unavailable: ${getErrorMessage(googleResult.reason)}`);
+    logger.warn(
+      `[ExternalApis] Google source unavailable: ${getErrorMessage(googleResult.reason)}`,
+    );
   }
 
   if (providerResult.status === "fulfilled") {
@@ -54,16 +61,25 @@ router.get("/", async (req: Request, res: Response) => {
     unreachableSources.push(...providerResult.value.unreachableSources);
   } else {
     unreachableSources.push("provider-usage");
-    logger.warn(`[ExternalApis] Provider source unavailable: ${getErrorMessage(providerResult.reason)}`);
+    logger.warn(
+      `[ExternalApis] Provider source unavailable: ${getErrorMessage(providerResult.reason)}`,
+    );
   }
 
   services.sort((first, second) => second.totalRequests - first.totalRequests);
 
-  const google = googleResult.status === "fulfilled" ? googleResult.value : null;
+  const google =
+    googleResult.status === "fulfilled" ? googleResult.value : null;
   res.json({
     services,
-    totalRequests: services.reduce((sum, service) => sum + service.totalRequests, 0),
-    totalErrors: services.reduce((sum, service) => sum + service.errorRequests, 0),
+    totalRequests: services.reduce(
+      (sum, service) => sum + service.totalRequests,
+      0,
+    ),
+    totalErrors: services.reduce(
+      (sum, service) => sum + service.errorRequests,
+      0,
+    ),
     period,
     projectId: google?.projectId ?? "",
     projectIds: google?.projectIds ?? [],
@@ -94,8 +110,13 @@ router.get("/timeseries", async (req: Request, res: Response) => {
 
   // Discovery is dynamic, so any well-formed identifier is queryable —
   // the format check prevents monitoring-filter injection.
-  if (!ExternalProviderUsageService.isValidServiceIdentifier(serviceIdentifier)) {
-    throw new HttpError(`Invalid service identifier: ${serviceIdentifier}`, 400);
+  if (
+    !ExternalProviderUsageService.isValidServiceIdentifier(serviceIdentifier)
+  ) {
+    throw new HttpError(
+      `Invalid service identifier: ${serviceIdentifier}`,
+      400,
+    );
   }
 
   const isGoogleService =
@@ -106,10 +127,15 @@ router.get("/timeseries", async (req: Request, res: Response) => {
     res.json(
       isGoogleService
         ? await GoogleCloudUsageService.getTimeSeries(serviceIdentifier, period)
-        : await ExternalProviderUsageService.getTimeSeries(serviceIdentifier, period),
+        : await ExternalProviderUsageService.getTimeSeries(
+            serviceIdentifier,
+            period,
+          ),
     );
   } catch (error: unknown) {
-    logger.error(`[ExternalApis] Time series failed for ${serviceIdentifier}: ${getErrorMessage(error)}`);
+    logger.error(
+      `[ExternalApis] Time series failed for ${serviceIdentifier}: ${getErrorMessage(error)}`,
+    );
     throw new HttpError("Failed to fetch external API usage time series", 500);
   }
 });

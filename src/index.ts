@@ -3,8 +3,14 @@
 import http from "node:http";
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { getErrorMessage, MILLISECONDS_PER_MINUTE } from "@rodrigo-barraza/utilities-library";
-import { installShutdownHandlers, registerCleanup } from "@rodrigo-barraza/utilities-library/service";
+import {
+  getErrorMessage,
+  MILLISECONDS_PER_MINUTE,
+} from "@rodrigo-barraza/utilities-library";
+import {
+  installShutdownHandlers,
+  registerCleanup,
+} from "@rodrigo-barraza/utilities-library/service";
 
 import { errorHandler, notFoundHandler } from "./utils/errors.ts";
 import logger from "./utils/logger.ts";
@@ -55,11 +61,16 @@ installShutdownHandlers({ logger });
 // rejection. Log loudly and survive instead — per-request error paths
 // already handle their own failures. (Same rationale as prism-service.)
 process.on("unhandledRejection", (reason: unknown) => {
-  const detail = reason instanceof Error ? `${reason.message}\n${reason.stack}` : JSON.stringify(reason);
+  const detail =
+    reason instanceof Error
+      ? `${reason.message}\n${reason.stack}`
+      : JSON.stringify(reason);
   logger.error(`[process] Unhandled promise rejection (survived): ${detail}`);
 });
 process.on("uncaughtException", (error: Error, origin: string) => {
-  logger.error(`[process] Uncaught exception (${origin}, survived): ${error.message}\n${error.stack}`);
+  logger.error(
+    `[process] Uncaught exception (${origin}, survived): ${error.message}\n${error.stack}`,
+  );
 });
 
 // ─── Express App ───────────────────────────────────────────────────
@@ -70,7 +81,10 @@ const app = express();
 const ALLOWED_ORIGINS = [
   process.env.AUTH_URL, // e.g. https://portal.rod.dev (from Vault)
   process.env.PORTAL_CLIENT_URL, // e.g. http://localhost:4000 (from Vault registry)
-  process.env.PORTAL_SERVICE_PUBLIC_URL?.replace(/^https?:\/\/api\./, "https://"), // derive client origin from API domain
+  process.env.PORTAL_SERVICE_PUBLIC_URL?.replace(
+    /^https?:\/\/api\./,
+    "https://",
+  ), // derive client origin from API domain
 ].filter(Boolean);
 
 const LOCALHOST_ORIGIN_PATTERN = /^http:\/\/localhost(:\d+)?$/;
@@ -79,7 +93,10 @@ const PRIVATE_NETWORK_ORIGIN_PATTERN =
 
 app.use(
   cors({
-    origin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    origin(
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) {
       // No origin: server-to-server, curl, health checks. Otherwise any
       // localhost port (local development), private-network IPs (LAN
       // access via IP address), or a whitelisted origin. Disallowed
@@ -104,7 +121,20 @@ app.use(requestLoggerMiddleware);
 // ─── Endpoint Registry ────────────────────────────────────────────
 
 const ENDPOINTS = {
-  rest: ["/health", "/services", "/devices", "/containers", "/stats", "/logs", "/integrations", "/object-store", "/google-analytics", "/session-analytics", "/external-apis", "/watchdog"],
+  rest: [
+    "/health",
+    "/services",
+    "/devices",
+    "/containers",
+    "/stats",
+    "/logs",
+    "/integrations",
+    "/object-store",
+    "/google-analytics",
+    "/session-analytics",
+    "/external-apis",
+    "/watchdog",
+  ],
 };
 
 // ─── Root Health Check ─────────────────────────────────────────────
@@ -145,11 +175,12 @@ app.use(errorHandler);
 
 /** Re-run both health rounds, logging (never throwing) on failure. */
 function checkRegistryHealth(): Promise<unknown> {
-  return Promise.all([ServiceRegistryService.checkAll(), InfrastructureRegistryService.checkAll()]).catch(
-    (error: unknown) => {
-      logger.warn(`[Registry] Health round failed: ${getErrorMessage(error)}`);
-    },
-  );
+  return Promise.all([
+    ServiceRegistryService.checkAll(),
+    InfrastructureRegistryService.checkAll(),
+  ]).catch((error: unknown) => {
+    logger.warn(`[Registry] Health round failed: ${getErrorMessage(error)}`);
+  });
 }
 
 /** Deferred recovery: vault had no registry at boot — keep retrying until it does. */
@@ -158,20 +189,28 @@ function scheduleDeferredRegistryRecovery(): void {
   const MAX_DEFERRED_ATTEMPTS = 30; // give up after 5 minutes
   let deferredAttempt = 0;
 
-  logger.warn("[Registry] No registry projects from boot — scheduling deferred recovery");
+  logger.warn(
+    "[Registry] No registry projects from boot — scheduling deferred recovery",
+  );
 
   const deferredTimer = setInterval(async () => {
     deferredAttempt++;
     try {
       const result = await reloadRegistry();
       if (result) {
-        logger.success(`[Registry] Deferred recovery succeeded on attempt ${deferredAttempt}`);
+        logger.success(
+          `[Registry] Deferred recovery succeeded on attempt ${deferredAttempt}`,
+        );
         clearInterval(deferredTimer);
         return;
       }
-      logger.warn(`[Registry] Deferred attempt ${deferredAttempt}/${MAX_DEFERRED_ATTEMPTS} — still empty`);
+      logger.warn(
+        `[Registry] Deferred attempt ${deferredAttempt}/${MAX_DEFERRED_ATTEMPTS} — still empty`,
+      );
     } catch (error: unknown) {
-      logger.warn(`[Registry] Deferred attempt ${deferredAttempt} failed: ${getErrorMessage(error)}`);
+      logger.warn(
+        `[Registry] Deferred attempt ${deferredAttempt} failed: ${getErrorMessage(error)}`,
+      );
     }
 
     if (deferredAttempt >= MAX_DEFERRED_ATTEMPTS) {
@@ -190,12 +229,20 @@ function scheduleDeferredRegistryRecovery(): void {
   // Read-only connections to sibling databases for the External APIs
   // dashboard (prism LLM request log + tools-service usage buckets).
   // Non-fatal: the dashboard degrades to Google-only data without them.
-  for (const externalDbName of new Set([PRISM_MONGO_DB_NAME, TOOLS_MONGO_DB_NAME])) {
+  for (const externalDbName of new Set([
+    PRISM_MONGO_DB_NAME,
+    TOOLS_MONGO_DB_NAME,
+  ])) {
     if (externalDbName === MONGO_DB_NAME) continue;
     try {
-      await MongoWrapper.createClient(String(externalDbName), String(MONGO_URI));
+      await MongoWrapper.createClient(
+        String(externalDbName),
+        String(MONGO_URI),
+      );
     } catch (error: unknown) {
-      logger.warn(`External usage database "${externalDbName}" unavailable: ${getErrorMessage(error)}`);
+      logger.warn(
+        `External usage database "${externalDbName}" unavailable: ${getErrorMessage(error)}`,
+      );
     }
   }
 
@@ -207,19 +254,33 @@ function scheduleDeferredRegistryRecovery(): void {
   }
 
   // Initial health check of all services (fire-and-forget)
-  Promise.all([ServiceRegistryService.checkAll(), InfrastructureRegistryService.checkAll()])
+  Promise.all([
+    ServiceRegistryService.checkAll(),
+    InfrastructureRegistryService.checkAll(),
+  ])
     .then(([serviceResults, infraResults]) => {
-      const serviceHealthyCount = serviceResults.filter((result) => result.healthy).length;
-      const infraHealthyCount = infraResults.filter((result) => result.healthy).length;
-      logger.info(`[ServiceRegistry] ${serviceHealthyCount}/${serviceResults.length} services healthy`);
-      logger.info(`[InfraRegistry] ${infraHealthyCount}/${infraResults.length} infrastructure healthy`);
+      const serviceHealthyCount = serviceResults.filter(
+        (result) => result.healthy,
+      ).length;
+      const infraHealthyCount = infraResults.filter(
+        (result) => result.healthy,
+      ).length;
+      logger.info(
+        `[ServiceRegistry] ${serviceHealthyCount}/${serviceResults.length} services healthy`,
+      );
+      logger.info(
+        `[InfraRegistry] ${infraHealthyCount}/${infraResults.length} infrastructure healthy`,
+      );
     })
     .catch((error: unknown) => {
       logger.warn(`[Registry] Initial check failed: ${getErrorMessage(error)}`);
     });
 
   // Periodic health checks every 60 seconds
-  const healthCheckTimer = setInterval(() => void checkRegistryHealth(), MILLISECONDS_PER_MINUTE);
+  const healthCheckTimer = setInterval(
+    () => void checkRegistryHealth(),
+    MILLISECONDS_PER_MINUTE,
+  );
   registerCleanup(() => clearInterval(healthCheckTimer));
   registerCleanup(() => InfrastructureRegistryService.closeHealthCheckClient());
 
@@ -245,10 +306,14 @@ function scheduleDeferredRegistryRecovery(): void {
     try {
       const result = await reloadRegistry();
       if (result?.changed) {
-        logger.info(`[Registry] Hot-reloaded — ${result.previousCount} → ${result.newCount} projects`);
+        logger.info(
+          `[Registry] Hot-reloaded — ${result.previousCount} → ${result.newCount} projects`,
+        );
       }
     } catch (error: unknown) {
-      logger.warn(`[Registry] Periodic refresh failed: ${getErrorMessage(error)}`);
+      logger.warn(
+        `[Registry] Periodic refresh failed: ${getErrorMessage(error)}`,
+      );
     }
   }, REGISTRY_REFRESH_INTERVAL_MS);
   registerCleanup(() => clearInterval(registryRefreshTimer));
@@ -265,7 +330,9 @@ function scheduleDeferredRegistryRecovery(): void {
   server.requestTimeout = 0;
   server.listen(PORT, () => {
     logger.success(`API is running on port ${PORT}`);
-    ENDPOINTS.rest.forEach((endpoint: string) => logger.info(`  REST  →  http://localhost:${PORT}${endpoint}`));
+    ENDPOINTS.rest.forEach((endpoint: string) =>
+      logger.info(`  REST  →  http://localhost:${PORT}${endpoint}`),
+    );
   });
   registerCleanup(
     () =>

@@ -26,9 +26,15 @@ const DEFAULT_DOCKER_TCP_PORT = 2375;
 const STDOUT_STREAM = 1;
 
 export class DockerClient {
-  public static parseTransport(dockerApiUrl: string, requestPath: string): DockerTransport {
+  public static parseTransport(
+    dockerApiUrl: string,
+    requestPath: string,
+  ): DockerTransport {
     if (dockerApiUrl.startsWith("unix://")) {
-      return { socketPath: dockerApiUrl.slice("unix://".length), path: requestPath };
+      return {
+        socketPath: dockerApiUrl.slice("unix://".length),
+        path: requestPath,
+      };
     }
 
     if (dockerApiUrl.startsWith("tcp://")) {
@@ -54,7 +60,8 @@ export class DockerClient {
     options: { timeout?: number; body?: unknown } = {},
   ): Promise<DockerResponse> {
     const timeoutMilliseconds = options.timeout ?? DEFAULT_REQUEST_TIMEOUT_MS;
-    const requestBody = options.body === undefined ? null : JSON.stringify(options.body);
+    const requestBody =
+      options.body === undefined ? null : JSON.stringify(options.body);
 
     return new Promise<DockerResponse>((resolve, reject) => {
       if (!deviceEntry.dockerApi) {
@@ -69,7 +76,10 @@ export class DockerClient {
           headers: {
             Accept: "application/json",
             ...(requestBody !== null
-              ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(requestBody) }
+              ? {
+                  "Content-Type": "application/json",
+                  "Content-Length": Buffer.byteLength(requestBody),
+                }
               : {}),
           },
         },
@@ -90,7 +100,9 @@ export class DockerClient {
       );
 
       clientRequest.setTimeout(timeoutMilliseconds, () => {
-        clientRequest.destroy(new Error(`Docker API timeout after ${timeoutMilliseconds}ms`));
+        clientRequest.destroy(
+          new Error(`Docker API timeout after ${timeoutMilliseconds}ms`),
+        );
       });
       clientRequest.on("error", reject);
       if (requestBody !== null) clientRequest.write(requestBody);
@@ -104,9 +116,14 @@ export class DockerClient {
     requestPath: string,
     timeoutMilliseconds: number = DEFAULT_GET_TIMEOUT_MS,
   ): Promise<string> {
-    const response = await DockerClient.dockerRequest(deviceEntry, "GET", requestPath, {
-      timeout: timeoutMilliseconds,
-    });
+    const response = await DockerClient.dockerRequest(
+      deviceEntry,
+      "GET",
+      requestPath,
+      {
+        timeout: timeoutMilliseconds,
+      },
+    );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw new Error(
         `Docker API GET returned status ${response.statusCode}: ${response.body.substring(0, 200)}`,
@@ -121,7 +138,13 @@ export class DockerClient {
     requestPath: string,
     timeoutMilliseconds?: number,
   ): Promise<T> {
-    return JSON.parse(await DockerClient.dockerGet(deviceEntry, requestPath, timeoutMilliseconds)) as T;
+    return JSON.parse(
+      await DockerClient.dockerGet(
+        deviceEntry,
+        requestPath,
+        timeoutMilliseconds,
+      ),
+    ) as T;
   }
 
   /**
@@ -158,7 +181,9 @@ export class DockerClient {
           clientResponse.on("end", () => {
             let message = `Docker API error: ${clientResponse.statusCode}`;
             try {
-              message = JSON.parse(Buffer.concat(errorChunks).toString("utf8")).message || message;
+              message =
+                JSON.parse(Buffer.concat(errorChunks).toString("utf8"))
+                  .message || message;
             } catch {
               // Non-JSON error body — keep the status-code message
             }
@@ -171,7 +196,9 @@ export class DockerClient {
         // TTY containers stream raw bytes with no mux framing — parsing the
         // 8-byte headers there reads garbage frame sizes and buffers forever.
         if (isTty) {
-          clientResponse.on("data", (chunk: Buffer) => onData(chunk, STDOUT_STREAM));
+          clientResponse.on("data", (chunk: Buffer) =>
+            onData(chunk, STDOUT_STREAM),
+          );
           clientResponse.on("end", onEnd);
           return;
         }
@@ -179,7 +206,10 @@ export class DockerClient {
         let dataBuffer: Buffer = Buffer.alloc(0);
 
         clientResponse.on("data", (chunk: Buffer) => {
-          dataBuffer = dataBuffer.length === 0 ? chunk : Buffer.concat([dataBuffer, chunk]);
+          dataBuffer =
+            dataBuffer.length === 0
+              ? chunk
+              : Buffer.concat([dataBuffer, chunk]);
 
           while (dataBuffer.length >= 8) {
             const streamType = dataBuffer.readUInt8(0);

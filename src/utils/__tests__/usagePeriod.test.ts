@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeUsagePeriod, usagePeriodDays, usagePeriodStart } from "../usagePeriod.ts";
+import {
+  sanitizeUsagePeriod,
+  usagePeriodDays,
+  usagePeriodStart,
+} from "../usagePeriod.ts";
 
 describe("usage periods", () => {
   it("accepts the dashboard's periods and folds everything else to 30d", () => {
@@ -12,6 +16,8 @@ describe("usage periods", () => {
   it("converts to days and a window start", () => {
     expect(usagePeriodDays("90d")).toBe(90);
     expect(usagePeriodDays("junk")).toBe(30);
-    expect(usagePeriodStart("7d", Date.UTC(2026, 8, 22)).toISOString()).toBe("2026-09-15T00:00:00.000Z");
+    expect(usagePeriodStart("7d", Date.UTC(2026, 8, 22)).toISOString()).toBe(
+      "2026-09-15T00:00:00.000Z",
+    );
   });
 });

@@ -39,12 +39,16 @@ export default class ContainerMetricsService {
   public static async ensureCollection(): Promise<void> {
     const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
     if (!db) {
-      logger.warn("[ContainerMetrics] MongoDB not connected — skipping collection setup");
+      logger.warn(
+        "[ContainerMetrics] MongoDB not connected — skipping collection setup",
+      );
       return;
     }
 
     try {
-      const collections = await db.listCollections({ name: COLLECTIONS.CONTAINER_METRICS }).toArray();
+      const collections = await db
+        .listCollections({ name: COLLECTIONS.CONTAINER_METRICS })
+        .toArray();
 
       if (collections.length === 0) {
         await db.createCollection(COLLECTIONS.CONTAINER_METRICS, {
@@ -55,7 +59,9 @@ export default class ContainerMetricsService {
           },
           expireAfterSeconds: TTL_SECONDS,
         });
-        logger.success(`[ContainerMetrics] Created time-series collection "${COLLECTIONS.CONTAINER_METRICS}" (TTL: ${TTL_DAYS}d)`);
+        logger.success(
+          `[ContainerMetrics] Created time-series collection "${COLLECTIONS.CONTAINER_METRICS}" (TTL: ${TTL_DAYS}d)`,
+        );
       }
 
       const metricsCollection = db.collection(COLLECTIONS.CONTAINER_METRICS);
@@ -67,7 +73,12 @@ export default class ContainerMetricsService {
       ContainerMetricsService._initialized = true;
       logger.success("[ContainerMetrics] Indexes ensured");
     } catch (error: unknown) {
-      if (error && typeof error === "object" && "codeName" in error && error.codeName === "NamespaceExists") {
+      if (
+        error &&
+        typeof error === "object" &&
+        "codeName" in error &&
+        error.codeName === "NamespaceExists"
+      ) {
         ContainerMetricsService._initialized = true;
         logger.info("[ContainerMetrics] Collection already exists");
       } else {
@@ -77,7 +88,10 @@ export default class ContainerMetricsService {
     }
   }
 
-  public static async persistSnapshot(deviceId: string, containers: ContainerStats[]): Promise<void> {
+  public static async persistSnapshot(
+    deviceId: string,
+    containers: ContainerStats[],
+  ): Promise<void> {
     if (!ContainerMetricsService._initialized) return;
 
     const db = MongoWrapper.getDb(String(MONGO_DB_NAME));
@@ -133,7 +147,10 @@ export default class ContainerMetricsService {
 
     // Nothing older than the collection's TTL exists — and an absurd range
     // ("99999999d") would otherwise produce an Invalid Date.
-    const rangeMs = Math.min(DateHelpers.parseRangeToMilliseconds(range), TTL_SECONDS * 1000);
+    const rangeMs = Math.min(
+      DateHelpers.parseRangeToMilliseconds(range),
+      TTL_SECONDS * 1000,
+    );
     const since = new Date(Date.now() - rangeMs);
 
     const match: Record<string, unknown> = { timestamp: { $gte: since } };
@@ -141,7 +158,9 @@ export default class ContainerMetricsService {
     if (device) match["metadata.device"] = device;
 
     const bucketCount = Math.min(
-      Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : MAX_POINTS_PER_CONTAINER,
+      Number.isFinite(limit)
+        ? Math.max(1, Math.floor(limit))
+        : MAX_POINTS_PER_CONTAINER,
       MAX_POINTS_PER_CONTAINER,
     );
 
@@ -202,12 +221,16 @@ export default class ContainerMetricsService {
         totalSamples += doc.points.length;
       }
 
-      return { containers, range, since: since.toISOString(), samples: totalSamples };
+      return {
+        containers,
+        range,
+        since: since.toISOString(),
+        samples: totalSamples,
+      };
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       logger.error(`[ContainerMetrics] Query failed: ${errorMessage}`);
       return { containers: {}, range, samples: 0 };
     }
   }
-
 }

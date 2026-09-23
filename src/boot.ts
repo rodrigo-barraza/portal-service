@@ -24,7 +24,8 @@ for (const [key, value] of Object.entries(secrets)) {
 const REGISTRY_RETRIES = 5;
 const REGISTRY_RETRY_DELAY_MS = 2_000;
 
-const { applyRegistry, hasProjects } = await import("./services/RegistryRefreshService.ts");
+const { applyRegistry, hasProjects } =
+  await import("./services/RegistryRefreshService.ts");
 
 let registry: VaultRegistry | null = null;
 
@@ -33,8 +34,12 @@ for (let attempt = 1; attempt <= REGISTRY_RETRIES; attempt++) {
   if (hasProjects(registry)) break;
 
   if (attempt < REGISTRY_RETRIES) {
-    bootLogger.warn(`Registry empty (attempt ${attempt}/${REGISTRY_RETRIES}) — retrying in ${REGISTRY_RETRY_DELAY_MS}ms…`);
-    await new Promise((resolve) => setTimeout(resolve, REGISTRY_RETRY_DELAY_MS));
+    bootLogger.warn(
+      `Registry empty (attempt ${attempt}/${REGISTRY_RETRIES}) — retrying in ${REGISTRY_RETRY_DELAY_MS}ms…`,
+    );
+    await new Promise((resolve) =>
+      setTimeout(resolve, REGISTRY_RETRY_DELAY_MS),
+    );
   }
 }
 

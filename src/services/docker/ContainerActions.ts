@@ -11,7 +11,11 @@ import logger from "../../utils/logger.ts";
 
 export type ContainerAction = "restart" | "stop" | "start";
 
-export const CONTAINER_ACTIONS: readonly ContainerAction[] = ["restart", "stop", "start"];
+export const CONTAINER_ACTIONS: readonly ContainerAction[] = [
+  "restart",
+  "stop",
+  "start",
+];
 
 // Docker container names: alphanumeric start, then [a-zA-Z0-9_.-].
 // Anything else could rewrite the Engine API request path or query
@@ -28,9 +32,24 @@ interface ActionSpec {
 }
 
 const ACTION_SPECS: Record<ContainerAction, ActionSpec> = {
-  restart: { path: "/restart?t=10", label: "Restart", done: "Container restarted", alreadyDone: null },
-  stop: { path: "/stop?t=10", label: "Stop", done: "Container stopped", alreadyDone: "Container already stopped" },
-  start: { path: "/start", label: "Start", done: "Container started", alreadyDone: "Container already running" },
+  restart: {
+    path: "/restart?t=10",
+    label: "Restart",
+    done: "Container restarted",
+    alreadyDone: null,
+  },
+  stop: {
+    path: "/stop?t=10",
+    label: "Stop",
+    done: "Container stopped",
+    alreadyDone: "Container already stopped",
+  },
+  start: {
+    path: "/start",
+    label: "Start",
+    done: "Container started",
+    alreadyDone: "Container already running",
+  },
 };
 
 /** The Engine API's own `{ message }` from an error body, if any. */
@@ -45,8 +64,12 @@ export function tryParseDockerError(body: string): string | null {
 }
 
 /** A registry device that has a Docker API endpoint, or null. */
-export function resolveDockerDevice(deviceId: string): { id: string; device: DeviceEntry } | null {
-  const device = Object.hasOwn(DEVICES, deviceId) ? DEVICES[deviceId] : undefined;
+export function resolveDockerDevice(
+  deviceId: string,
+): { id: string; device: DeviceEntry } | null {
+  const device = Object.hasOwn(DEVICES, deviceId)
+    ? DEVICES[deviceId]
+    : undefined;
   if (!device || !device.dockerApi) return null;
   return { id: deviceId, device };
 }
@@ -67,12 +90,21 @@ export async function runContainerAction(
 
   const result = await DockerClient.dockerRequest(device, "POST", requestPath);
 
-  if (result.statusCode === 204 || (result.statusCode === 304 && spec.alreadyDone)) {
-    logger.success(`[${spec.label}] ${logLabel} ${action === "stop" ? "stopped" : `${action}ed`}`);
-    return result.statusCode === 304 && spec.alreadyDone ? spec.alreadyDone : spec.done;
+  if (
+    result.statusCode === 204 ||
+    (result.statusCode === 304 && spec.alreadyDone)
+  ) {
+    logger.success(
+      `[${spec.label}] ${logLabel} ${action === "stop" ? "stopped" : `${action}ed`}`,
+    );
+    return result.statusCode === 304 && spec.alreadyDone
+      ? spec.alreadyDone
+      : spec.done;
   }
 
-  const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
+  const message =
+    tryParseDockerError(result.body) ||
+    `Docker API error: ${result.statusCode}`;
   logger.error(`[${spec.label}] Failed for ${logLabel}: ${message}`);
   throw new HttpError(message, 502);
 }

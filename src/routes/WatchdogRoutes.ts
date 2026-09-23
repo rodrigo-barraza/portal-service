@@ -25,7 +25,10 @@ router.use(express.text({ type: "*/*", limit: "4kb" }));
  * leaks how many leading characters of a guess were right. Hashing first
  * gives both sides equal length.
  */
-export function isValidPushToken(candidate: string, expected: string = WATCHDOG_PUSH_TOKEN): boolean {
+export function isValidPushToken(
+  candidate: string,
+  expected: string = WATCHDOG_PUSH_TOKEN,
+): boolean {
   if (!expected) return false;
   const digest = (value: string) => createHash("sha256").update(value).digest();
   return timingSafeEqual(digest(candidate), digest(expected));
@@ -34,9 +37,7 @@ export function isValidPushToken(candidate: string, expected: string = WATCHDOG_
 function handleHeartbeat(failed: boolean) {
   return (req: Request, res: Response) => {
     if (!WATCHDOG_PUSH_TOKEN) {
-      res
-        .status(503)
-        .json({ error: "watchdog push token not configured" });
+      res.status(503).json({ error: "watchdog push token not configured" });
       return;
     }
     if (!isValidPushToken(routeParam(req, "token"))) {

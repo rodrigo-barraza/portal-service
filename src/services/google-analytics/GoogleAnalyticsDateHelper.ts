@@ -3,21 +3,31 @@ const DEFAULT_PRESET_DAYS = 30;
 
 /** "7d" → 7; unknown presets read as the 30-day default. */
 function presetDays(periodString: string): number {
-  return PRESET_PERIODS.has(periodString) ? Number.parseInt(periodString, 10) : DEFAULT_PRESET_DAYS;
+  return PRESET_PERIODS.has(periodString)
+    ? Number.parseInt(periodString, 10)
+    : DEFAULT_PRESET_DAYS;
 }
 const CUSTOM_RANGE_PATTERN = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/;
 
 /** A real calendar day — "2026-02-31" parses in JS (as March 3rd) but isn't one. */
 function isCalendarDate(value: string): boolean {
   const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
 }
 
 /** 7d / 30d / 90d, or YYYY-MM-DD_YYYY-MM-DD of real dates with start ≤ end. */
 export function isValidAnalyticsPeriod(period: string): boolean {
   if (PRESET_PERIODS.has(period)) return true;
   const match = CUSTOM_RANGE_PATTERN.exec(period);
-  return Boolean(match && isCalendarDate(match[1]) && isCalendarDate(match[2]) && match[1] <= match[2]);
+  return Boolean(
+    match &&
+    isCalendarDate(match[1]) &&
+    isCalendarDate(match[2]) &&
+    match[1] <= match[2],
+  );
 }
 
 export class GoogleAnalyticsDateHelper {
@@ -58,9 +68,11 @@ export class GoogleAnalyticsDateHelper {
         const endDate = new Date(endDateString);
         const millisecondsDifference = endDate.getTime() - startDate.getTime();
 
-        const previousEndDate = new Date(startDate.getTime() - 24 * 60 * 60 * 1000);
+        const previousEndDate = new Date(
+          startDate.getTime() - 24 * 60 * 60 * 1000,
+        );
         const previousStartDate = new Date(
-          previousEndDate.getTime() - millisecondsDifference
+          previousEndDate.getTime() - millisecondsDifference,
         );
 
         const formatDate = (date: Date) => date.toISOString().split("T")[0];

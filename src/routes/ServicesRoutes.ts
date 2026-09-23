@@ -22,20 +22,33 @@ function withWatchdogState<Item extends object>(item: Item, stateId: string) {
   return {
     ...item,
     watchdogStatus: state.status,
-    lastHeartbeatAt: state.lastHeartbeatAtMs !== null ? new Date(state.lastHeartbeatAtMs).toISOString() : null,
-    downSince: state.unhealthySinceMs !== null ? new Date(state.unhealthySinceMs).toISOString() : null,
+    lastHeartbeatAt:
+      state.lastHeartbeatAtMs !== null
+        ? new Date(state.lastHeartbeatAtMs).toISOString()
+        : null,
+    downSince:
+      state.unhealthySinceMs !== null
+        ? new Date(state.unhealthySinceMs).toISOString()
+        : null,
   };
 }
 
 async function servicesResponse(refresh: boolean) {
   const [services, infrastructure] = refresh
-    ? await Promise.all([ServiceRegistryService.checkAll(), InfrastructureRegistryService.checkAll()])
+    ? await Promise.all([
+        ServiceRegistryService.checkAll(),
+        InfrastructureRegistryService.checkAll(),
+      ])
     : [ServiceRegistryService.list(), InfrastructureRegistryService.list()];
 
   const enriched = ServiceDependencyEnricher.enrich(services, infrastructure);
   return {
-    services: enriched.services.map((service) => withWatchdogState(service, service.id)),
-    infrastructure: enriched.infrastructure.map((infra) => withWatchdogState(infra, `infra:${infra.id}`)),
+    services: enriched.services.map((service) =>
+      withWatchdogState(service, service.id),
+    ),
+    infrastructure: enriched.infrastructure.map((infra) =>
+      withWatchdogState(infra, `infra:${infra.id}`),
+    ),
   };
 }
 
@@ -54,7 +67,9 @@ router.post("/reload", async (_req: Request, res: Response) => {
   }
 
   const { previousCount, newCount } = result;
-  logger.success(`[Registry] Manual reload — ${previousCount} → ${newCount} projects`);
+  logger.success(
+    `[Registry] Manual reload — ${previousCount} → ${newCount} projects`,
+  );
 
   res.json({
     success: true,

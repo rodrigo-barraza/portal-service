@@ -14,7 +14,10 @@ const ERROR_CODE_LABELS: Record<string, string> = {
   EPIPE: "Broken pipe",
 };
 
-type ProbeFields = Pick<ServiceStatus, "healthy" | "responseTimeMs" | "metadata" | "error" | "checkedAt">;
+type ProbeFields = Pick<
+  ServiceStatus,
+  "healthy" | "responseTimeMs" | "metadata" | "error" | "checkedAt"
+>;
 
 const statusCache = new Map<string, ServiceStatus>();
 
@@ -29,7 +32,11 @@ let recheckTimer: ReturnType<typeof setTimeout> | null = null;
 const POST_ACTION_RECHECK_DELAY_MS = 3_000;
 
 /** A project's registry fields, plus the outcome of its latest probe. */
-function toStatus(id: string, service: ProjectEntry, probe: ProbeFields): ServiceStatus {
+function toStatus(
+  id: string,
+  service: ProjectEntry,
+  probe: ProbeFields,
+): ServiceStatus {
   return {
     id,
     name: service.name,
@@ -97,7 +104,9 @@ export default class ServiceRegistryService {
    * Re-probe shortly after a lifecycle action so the UI sees the new
    * state before the next 60s tick. A burst of actions queues one recheck.
    */
-  public static scheduleRecheck(delayMs: number = POST_ACTION_RECHECK_DELAY_MS): void {
+  public static scheduleRecheck(
+    delayMs: number = POST_ACTION_RECHECK_DELAY_MS,
+  ): void {
     if (recheckTimer) return;
     recheckTimer = setTimeout(() => {
       recheckTimer = null;
@@ -109,7 +118,9 @@ export default class ServiceRegistryService {
   private static async _runRound(): Promise<ServiceStatus[]> {
     const projects = Object.entries(PROJECTS);
     const results = await Promise.all(
-      projects.map(([id, service]) => ServiceRegistryService._checkService(id, service)),
+      projects.map(([id, service]) =>
+        ServiceRegistryService._checkService(id, service),
+      ),
     );
 
     // Projects dropped from the registry leave no cached state behind.
@@ -127,7 +138,10 @@ export default class ServiceRegistryService {
     return results;
   }
 
-  public static async _checkService(id: string, service: ProjectEntry): Promise<ServiceStatus> {
+  public static async _checkService(
+    id: string,
+    service: ProjectEntry,
+  ): Promise<ServiceStatus> {
     if (!service.url) {
       return toStatus(id, service, {
         healthy: false,
@@ -146,12 +160,17 @@ export default class ServiceRegistryService {
         await sleep(ServiceRegistryService.HEALTH_CHECK_RETRY_DELAY_MS);
       }
 
-      lastResult = await ServiceRegistryService._attemptHealthCheck(id, service);
+      lastResult = await ServiceRegistryService._attemptHealthCheck(
+        id,
+        service,
+      );
 
       if (lastResult.healthy) {
         consecutiveFailedRounds.delete(id);
         if (attempt > 1) {
-          logger.info(`[ServiceRegistry] ${service.name} recovered on retry ${attempt - 1}`);
+          logger.info(
+            `[ServiceRegistry] ${service.name} recovered on retry ${attempt - 1}`,
+          );
         }
         return lastResult;
       }
@@ -164,7 +183,10 @@ export default class ServiceRegistryService {
     consecutiveFailedRounds.set(id, failedRounds);
 
     const previous = statusCache.get(id);
-    if (previous?.healthy && failedRounds < ServiceRegistryService.UNHEALTHY_AFTER_ROUNDS) {
+    if (
+      previous?.healthy &&
+      failedRounds < ServiceRegistryService.UNHEALTHY_AFTER_ROUNDS
+    ) {
       logger.warn(
         `[ServiceRegistry] ${service.name} failed round ${failedRounds}/${ServiceRegistryService.UNHEALTHY_AFTER_ROUNDS} (${lastResult?.error}) — holding healthy until confirmed`,
       );
@@ -178,9 +200,15 @@ export default class ServiceRegistryService {
     return lastResult!;
   }
 
-  public static async _attemptHealthCheck(id: string, service: ProjectEntry): Promise<ServiceStatus> {
+  public static async _attemptHealthCheck(
+    id: string,
+    service: ProjectEntry,
+  ): Promise<ServiceStatus> {
     const start = Date.now();
-    const healthUrl = DeviceResolver.toLocalHealthUrl(`${service.url}${service.healthPath || "/"}`, service.device);
+    const healthUrl = DeviceResolver.toLocalHealthUrl(
+      `${service.url}${service.healthPath || "/"}`,
+      service.device,
+    );
 
     try {
       // One deadline for headers AND body — a server that sends headers
@@ -208,7 +236,9 @@ export default class ServiceRegistryService {
       });
     } catch (error: unknown) {
       const errorDetail = ServiceRegistryService._extractErrorDetail(error);
-      logger.warn(`[ServiceRegistry] ${service.name} unreachable: ${errorDetail}`);
+      logger.warn(
+        `[ServiceRegistry] ${service.name} unreachable: ${errorDetail}`,
+      );
       return toStatus(id, service, {
         healthy: false,
         responseTimeMs: Date.now() - start,
@@ -221,7 +251,8 @@ export default class ServiceRegistryService {
 
   public static _extractErrorDetail(error: unknown): string {
     if (!(error instanceof Error)) return String(error);
-    if (error.name === "AbortError" || error.name === "TimeoutError") return "Timeout";
+    if (error.name === "AbortError" || error.name === "TimeoutError")
+      return "Timeout";
 
     // fetch wraps the socket error: TypeError("fetch failed", { cause })
     let current: unknown = error;
@@ -230,7 +261,10 @@ export default class ServiceRegistryService {
       if (cause && typeof cause === "object") {
         const causeObject = cause as { code?: string; message?: string };
         if (causeObject.code) {
-          return ERROR_CODE_LABELS[causeObject.code] || `${causeObject.code}: ${causeObject.message || error.message}`;
+          return (
+            ERROR_CODE_LABELS[causeObject.code] ||
+            `${causeObject.code}: ${causeObject.message || error.message}`
+          );
         }
       }
       current = cause;

@@ -163,7 +163,9 @@ export default class ScreenshotService {
     const startedAt = Date.now();
 
     try {
-      const context = await (await getBrowser()).newContext({
+      const context = await (
+        await getBrowser()
+      ).newContext({
         viewport: VIEWPORT,
         deviceScaleFactor: 1,
         reducedMotion: "reduce",

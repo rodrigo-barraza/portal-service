@@ -1,15 +1,31 @@
 import { describe, it, expect } from "vitest";
-import { GoogleAnalyticsDateHelper, isValidAnalyticsPeriod } from "../GoogleAnalyticsDateHelper.ts";
+import {
+  GoogleAnalyticsDateHelper,
+  isValidAnalyticsPeriod,
+} from "../GoogleAnalyticsDateHelper.ts";
 
 describe("isValidAnalyticsPeriod", () => {
   it("accepts the presets and real custom ranges", () => {
-    for (const period of ["7d", "30d", "90d", "2026-06-01_2026-06-15", "2024-02-29_2024-02-29"]) {
+    for (const period of [
+      "7d",
+      "30d",
+      "90d",
+      "2026-06-01_2026-06-15",
+      "2024-02-29_2024-02-29",
+    ]) {
       expect(isValidAnalyticsPeriod(period)).toBe(true);
     }
   });
 
   it("rejects impossible dates, reversed ranges, and other presets", () => {
-    for (const period of ["14d", "2026-02-31_2026-03-05", "2026-13-01_2026-13-02", "2026-06-15_2026-06-01", "2026-06-01", ""]) {
+    for (const period of [
+      "14d",
+      "2026-02-31_2026-03-05",
+      "2026-13-01_2026-13-02",
+      "2026-06-15_2026-06-01",
+      "2026-06-01",
+      "",
+    ]) {
       expect(isValidAnalyticsPeriod(period)).toBe(false);
     }
   });
@@ -33,7 +49,9 @@ describe("GoogleAnalyticsDateHelper", () => {
     });
 
     it("should support custom date range with underscore separator", () => {
-      expect(GoogleAnalyticsDateHelper.periodToDateRange("2026-06-01_2026-06-15")).toEqual({
+      expect(
+        GoogleAnalyticsDateHelper.periodToDateRange("2026-06-01_2026-06-15"),
+      ).toEqual({
         startDate: "2026-06-01",
         endDate: "2026-06-15",
       });
@@ -63,7 +81,9 @@ describe("GoogleAnalyticsDateHelper", () => {
     });
 
     it("should calculate previous period for custom date ranges correctly", () => {
-      expect(GoogleAnalyticsDateHelper.previousPeriodRange("2026-06-10_2026-06-15")).toEqual({
+      expect(
+        GoogleAnalyticsDateHelper.previousPeriodRange("2026-06-10_2026-06-15"),
+      ).toEqual({
         startDate: "2026-06-04",
         endDate: "2026-06-09",
       });

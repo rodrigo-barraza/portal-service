@@ -18,7 +18,8 @@ const router = Router();
 
 // Hostnames only — no ports, paths, or userinfo sneaking into the URL
 // ScreenshotService navigates to.
-const VALID_DOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+const VALID_DOMAIN_PATTERN =
+  /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
 
 // Cached site thumbnail for a registered client domain — the static
 // preview shown on the /containers card view instead of a live iframe.
@@ -55,10 +56,18 @@ for (const action of CONTAINER_ACTIONS) {
 
     const target = resolveDockerDevice(deviceId);
     if (!target) {
-      throw new HttpError(`No Docker API configured for device: ${deviceId}`, 400);
+      throw new HttpError(
+        `No Docker API configured for device: ${deviceId}`,
+        400,
+      );
     }
 
-    const message = await runContainerAction(target.device, name, action, `${target.id}/${name}`);
+    const message = await runContainerAction(
+      target.device,
+      name,
+      action,
+      `${target.id}/${name}`,
+    );
     ServiceRegistryService.scheduleRecheck();
     res.json({ success: true, container: name, device: target.id, message });
   });

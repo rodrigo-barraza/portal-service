@@ -30,7 +30,12 @@ const LOG_LEVEL_PATTERN = /\]\s+(ERROR|WARN |INFO |OK {3}|DEBUG)\s/;
 // oxlint-disable-next-line no-control-regex
 const ANSI_ESCAPE_PATTERN = /\x1b\[[0-9;]*m/g;
 
-const RELATIVE_TIME_UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
+const RELATIVE_TIME_UNIT_SECONDS: Record<string, number> = {
+  s: 1,
+  m: 60,
+  h: 3600,
+  d: 86400,
+};
 
 export function stripAnsiCodes(text: string): string {
   return text.replace(ANSI_ESCAPE_PATTERN, "");
@@ -43,15 +48,23 @@ export function extractLogLevel(strippedLine: string): LogLevel | null {
 
 /** "warn" → 2; anything that isn't a known level → null (no level filter). */
 export function minimumSeverityFor(levelFilter: string | null): number | null {
-  if (!levelFilter || !Object.hasOwn(LEVEL_FILTER_MINIMUM_SEVERITY, levelFilter)) return null;
+  if (
+    !levelFilter ||
+    !Object.hasOwn(LEVEL_FILTER_MINIMUM_SEVERITY, levelFilter)
+  )
+    return null;
   return LEVEL_FILTER_MINIMUM_SEVERITY[levelFilter];
 }
 
 /** "5m" / "1 h" / "2d" → the Docker `since` unix timestamp; junk → null. */
-export function parseRelativeTimeToUnixSeconds(relativeTime: string, nowMs: number = Date.now()): number | null {
+export function parseRelativeTimeToUnixSeconds(
+  relativeTime: string,
+  nowMs: number = Date.now(),
+): number | null {
   const match = relativeTime.match(/^(\d+)\s*(s|m|h|d)$/);
   if (!match) return null;
-  const offsetSeconds = Number.parseInt(match[1], 10) * RELATIVE_TIME_UNIT_SECONDS[match[2]];
+  const offsetSeconds =
+    Number.parseInt(match[1], 10) * RELATIVE_TIME_UNIT_SECONDS[match[2]];
   return Math.floor(nowMs / 1000) - offsetSeconds;
 }
 
@@ -69,7 +82,8 @@ export function shouldIncludeLine(
 
   if (minimumSeverity !== null) {
     const detectedLevel = extractLogLevel(strippedLine);
-    if (detectedLevel && LOG_LEVEL_SEVERITY[detectedLevel] < minimumSeverity) return false;
+    if (detectedLevel && LOG_LEVEL_SEVERITY[detectedLevel] < minimumSeverity)
+      return false;
   }
 
   return searchTerm === null || strippedLine.toLowerCase().includes(searchTerm);
@@ -94,12 +108,15 @@ export function createLineSplitter() {
     return decoder;
   };
 
-  const trimCarriageReturn = (line: string) => (line.endsWith("\r") ? line.slice(0, -1) : line);
+  const trimCarriageReturn = (line: string) =>
+    line.endsWith("\r") ? line.slice(0, -1) : line;
 
   return {
     /** Complete lines (CRLF-normalized, empty lines dropped) from one chunk. */
     push(streamSource: string, chunk: Buffer): string[] {
-      const text = (remainders.get(streamSource) ?? "") + decoderFor(streamSource).write(chunk);
+      const text =
+        (remainders.get(streamSource) ?? "") +
+        decoderFor(streamSource).write(chunk);
       const lines = text.split("\n");
       remainders.set(streamSource, lines.pop() ?? "");
       return lines.map(trimCarriageReturn).filter((line) => line.length > 0);
@@ -109,7 +126,9 @@ export function createLineSplitter() {
     flush(): Array<{ streamSource: string; line: string }> {
       const flushed: Array<{ streamSource: string; line: string }> = [];
       for (const [streamSource, decoder] of decoders) {
-        const line = trimCarriageReturn((remainders.get(streamSource) ?? "") + decoder.end());
+        const line = trimCarriageReturn(
+          (remainders.get(streamSource) ?? "") + decoder.end(),
+        );
         if (line.length > 0) flushed.push({ streamSource, line });
       }
       remainders.clear();

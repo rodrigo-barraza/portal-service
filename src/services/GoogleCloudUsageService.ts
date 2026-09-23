@@ -1,7 +1,10 @@
 import { MetricServiceClient, protos } from "@google-cloud/monitoring";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import logger from "../utils/logger.ts";
-import { GOOGLE_ANALYTICS_CREDENTIALS, GOOGLE_CLOUD_MONITORING_PROJECT_ID } from "../config.ts";
+import {
+  GOOGLE_ANALYTICS_CREDENTIALS,
+  GOOGLE_CLOUD_MONITORING_PROJECT_ID,
+} from "../config.ts";
 import { createDedupedTtlCache } from "../utils/cache.ts";
 import { parseServiceAccountCredentials } from "../utils/googleCredentials.ts";
 import { usagePeriodStart } from "../utils/usagePeriod.ts";
@@ -37,7 +40,8 @@ const KNOWN_API_METADATA: Record<string, GoogleCloudApiMetadata> = {
     displayName: "Places API (New)",
     category: "Maps & Location",
     consumer: "tools-service",
-    documentationUrl: "https://developers.google.com/maps/documentation/places/web-service",
+    documentationUrl:
+      "https://developers.google.com/maps/documentation/places/web-service",
   },
   // Cloud Monitoring labels the Maps Platform backends without a product
   // prefix ("geocoding-backend.googleapis.com" etc.) — these are the real
@@ -46,25 +50,29 @@ const KNOWN_API_METADATA: Record<string, GoogleCloudApiMetadata> = {
     displayName: "Geocoding API",
     category: "Maps & Location",
     consumer: "tools-service",
-    documentationUrl: "https://developers.google.com/maps/documentation/geocoding",
+    documentationUrl:
+      "https://developers.google.com/maps/documentation/geocoding",
   },
   "static-maps-backend.googleapis.com": {
     displayName: "Static Maps API",
     category: "Maps & Location",
     consumer: "tools-service",
-    documentationUrl: "https://developers.google.com/maps/documentation/maps-static",
+    documentationUrl:
+      "https://developers.google.com/maps/documentation/maps-static",
   },
   "maps-backend.googleapis.com": {
     displayName: "Maps JavaScript API",
     category: "Maps & Location",
     consumer: "tools-service",
-    documentationUrl: "https://developers.google.com/maps/documentation/javascript",
+    documentationUrl:
+      "https://developers.google.com/maps/documentation/javascript",
   },
   "airquality.googleapis.com": {
     displayName: "Air Quality API",
     category: "Environmental",
     consumer: "tools-service",
-    documentationUrl: "https://developers.google.com/maps/documentation/air-quality",
+    documentationUrl:
+      "https://developers.google.com/maps/documentation/air-quality",
   },
   "pollen.googleapis.com": {
     displayName: "Pollen API",
@@ -94,7 +102,8 @@ const KNOWN_API_METADATA: Record<string, GoogleCloudApiMetadata> = {
     displayName: "GA4 Data API",
     category: "Analytics",
     consumer: "portal-service",
-    documentationUrl: "https://developers.google.com/analytics/devguides/reporting/data/v1",
+    documentationUrl:
+      "https://developers.google.com/analytics/devguides/reporting/data/v1",
   },
 };
 
@@ -196,7 +205,9 @@ const CACHE_TTL_MILLISECONDS = 5 * 60 * 1000; // 5 minutes
 function periodToInterval(period: string) {
   const nowMs = Date.now();
   return {
-    startTime: { seconds: Math.floor(usagePeriodStart(period, nowMs).getTime() / 1000) },
+    startTime: {
+      seconds: Math.floor(usagePeriodStart(period, nowMs).getTime() / 1000),
+    },
     endTime: { seconds: Math.floor(nowMs / 1000) },
   };
 }
@@ -209,15 +220,23 @@ export default class GoogleCloudUsageService {
   private static monitoringClient: MetricServiceClient | null = null;
   private static cachedProjectIds: string[] | null = null;
 
-  private static getClient(): { client: MetricServiceClient; projectIds: string[] } {
-    if (GoogleCloudUsageService.monitoringClient && GoogleCloudUsageService.cachedProjectIds) {
+  private static getClient(): {
+    client: MetricServiceClient;
+    projectIds: string[];
+  } {
+    if (
+      GoogleCloudUsageService.monitoringClient &&
+      GoogleCloudUsageService.cachedProjectIds
+    ) {
       return {
         client: GoogleCloudUsageService.monitoringClient,
         projectIds: GoogleCloudUsageService.cachedProjectIds,
       };
     }
 
-    const credentials = parseServiceAccountCredentials(GOOGLE_ANALYTICS_CREDENTIALS);
+    const credentials = parseServiceAccountCredentials(
+      GOOGLE_ANALYTICS_CREDENTIALS,
+    );
 
     GoogleCloudUsageService.monitoringClient = new MetricServiceClient({
       credentials: {
@@ -234,11 +253,17 @@ export default class GoogleCloudUsageService {
       .split(",")
       .map((projectId) => projectId.trim())
       .filter(Boolean);
-    const projectIds = [...new Set(
-      configuredProjectIds.length > 0 ? configuredProjectIds : [credentials.project_id],
-    )];
+    const projectIds = [
+      ...new Set(
+        configuredProjectIds.length > 0
+          ? configuredProjectIds
+          : [credentials.project_id],
+      ),
+    ];
     GoogleCloudUsageService.cachedProjectIds = projectIds;
-    logger.success(`[CloudUsage] Monitoring client initialized — querying projects: ${projectIds.join(", ")}`);
+    logger.success(
+      `[CloudUsage] Monitoring client initialized — querying projects: ${projectIds.join(", ")}`,
+    );
 
     return {
       client: GoogleCloudUsageService.monitoringClient,
@@ -263,7 +288,10 @@ export default class GoogleCloudUsageService {
    * per-project failures (e.g. the service account lacking monitoring.viewer
    * on a project) so one bad grant doesn't blank the whole dashboard.
    */
-  private static async listTimeSeriesAcrossProjects(filter: string, period: string): Promise<{
+  private static async listTimeSeriesAcrossProjects(
+    filter: string,
+    period: string,
+  ): Promise<{
     timeSeries: MonitoringTimeSeries;
     reachableProjectIds: string[];
     unreachableProjectIds: string[];
@@ -304,12 +332,16 @@ export default class GoogleCloudUsageService {
   }
 
   static async getSummary(period = "30d"): Promise<CloudUsageSummaryResponse> {
-    return usageCache.get(`cloud-usage:summary:${period}`, CACHE_TTL_MILLISECONDS, () =>
-      GoogleCloudUsageService.computeSummary(period),
+    return usageCache.get(
+      `cloud-usage:summary:${period}`,
+      CACHE_TTL_MILLISECONDS,
+      () => GoogleCloudUsageService.computeSummary(period),
     );
   }
 
-  private static async computeSummary(period: string): Promise<CloudUsageSummaryResponse> {
+  private static async computeSummary(
+    period: string,
+  ): Promise<CloudUsageSummaryResponse> {
     // No service filter — discover everything with traffic, then classify.
     const { timeSeries, reachableProjectIds, unreachableProjectIds } =
       await GoogleCloudUsageService.listTimeSeriesAcrossProjects(
@@ -333,7 +365,8 @@ export default class GoogleCloudUsageService {
       const serviceLabel = singleTimeSeries.resource?.labels?.service;
       if (!serviceLabel) continue;
 
-      const responseCodeClass = singleTimeSeries.metric?.labels?.response_code_class;
+      const responseCodeClass =
+        singleTimeSeries.metric?.labels?.response_code_class;
       const isError =
         responseCodeClass === "4xx" || responseCodeClass === "5xx";
 
@@ -342,7 +375,10 @@ export default class GoogleCloudUsageService {
         for (const point of singleTimeSeries.points || []) {
           excludedCount += Number(point.value?.int64Value || 0);
         }
-        excludedTotals.set(serviceLabel, (excludedTotals.get(serviceLabel) || 0) + excludedCount);
+        excludedTotals.set(
+          serviceLabel,
+          (excludedTotals.get(serviceLabel) || 0) + excludedCount,
+        );
         continue;
       }
 
@@ -385,7 +421,9 @@ export default class GoogleCloudUsageService {
       const excludedSummary = [...excludedTotals.entries()]
         .map(([service, count]) => `${service}=${count}`)
         .join(", ");
-      logger.info(`[CloudUsage] Excluded console/infra traffic: ${excludedSummary}`);
+      logger.info(
+        `[CloudUsage] Excluded console/infra traffic: ${excludedSummary}`,
+      );
     }
 
     // Build response — only include services with actual usage
@@ -422,7 +460,9 @@ export default class GoogleCloudUsageService {
     }
 
     // Sort by total requests descending
-    services.sort((first, second) => second.totalRequests - first.totalRequests);
+    services.sort(
+      (first, second) => second.totalRequests - first.totalRequests,
+    );
 
     const result: CloudUsageSummaryResponse = {
       services,
@@ -449,7 +489,8 @@ export default class GoogleCloudUsageService {
     return usageCache.get(
       `cloud-usage:timeseries:${serviceIdentifier}:${period}`,
       CACHE_TTL_MILLISECONDS,
-      () => GoogleCloudUsageService.computeTimeSeries(serviceIdentifier, period),
+      () =>
+        GoogleCloudUsageService.computeTimeSeries(serviceIdentifier, period),
     );
   }
 
@@ -457,10 +498,11 @@ export default class GoogleCloudUsageService {
     serviceIdentifier: string,
     period: string,
   ): Promise<CloudUsageTimeSeriesResponse> {
-    const { timeSeries } = await GoogleCloudUsageService.listTimeSeriesAcrossProjects(
-      `metric.type = "serviceruntime.googleapis.com/api/request_count" AND resource.labels.service = "${serviceIdentifier}"`,
-      period,
-    );
+    const { timeSeries } =
+      await GoogleCloudUsageService.listTimeSeriesAcrossProjects(
+        `metric.type = "serviceruntime.googleapis.com/api/request_count" AND resource.labels.service = "${serviceIdentifier}"`,
+        period,
+      );
 
     // Aggregate into daily buckets by response code class
     const dailyBuckets = new Map<
@@ -469,7 +511,8 @@ export default class GoogleCloudUsageService {
     >();
 
     for (const singleTimeSeries of timeSeries) {
-      const responseCodeClass = singleTimeSeries.metric?.labels?.response_code_class;
+      const responseCodeClass =
+        singleTimeSeries.metric?.labels?.response_code_class;
       const isError =
         responseCodeClass === "4xx" || responseCodeClass === "5xx";
 

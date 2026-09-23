@@ -4,7 +4,11 @@
 // that portal-service consumers expect.
 // ─────────────────────────────────────────────────────────────
 
-import { connectDatabase, getDatabase, disconnectDatabase } from "@rodrigo-barraza/utilities-library/service/mongo";
+import {
+  connectDatabase,
+  getDatabase,
+  disconnectDatabase,
+} from "@rodrigo-barraza/utilities-library/service/mongo";
 import type { Db } from "mongodb";
 import logger from "../utils/logger.ts";
 

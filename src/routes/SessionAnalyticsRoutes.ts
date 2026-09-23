@@ -22,7 +22,9 @@ const router = Router();
 const sessionsClient = SESSIONS_SERVICE_URL
   ? createApiClient(`${SESSIONS_SERVICE_URL}/stats`, {
       headers: {
-        ...(SESSIONS_STATS_API_SECRET ? { [AUTH_HEADERS.apiSecret]: SESSIONS_STATS_API_SECRET } : {}),
+        ...(SESSIONS_STATS_API_SECRET
+          ? { [AUTH_HEADERS.apiSecret]: SESSIONS_STATS_API_SECRET }
+          : {}),
       },
       timeoutMilliseconds: 15_000,
     })
@@ -35,8 +37,10 @@ const sessionsClient = SESSIONS_SERVICE_URL
  */
 export function upstreamErrorMessage(body: unknown, status: number): string {
   const candidate = body as { error?: unknown; message?: unknown } | null;
-  if (typeof candidate?.error === "string" && candidate.error) return candidate.error;
-  if (typeof candidate?.message === "string" && candidate.message) return candidate.message;
+  if (typeof candidate?.error === "string" && candidate.error)
+    return candidate.error;
+  if (typeof candidate?.message === "string" && candidate.message)
+    return candidate.message;
   return `Sessions service error (${status})`;
 }
 
@@ -45,7 +49,11 @@ export function upstreamErrorMessage(body: unknown, status: number): string {
  * errors keep the upstream status but are re-enveloped as
  * `{ error: "<message>" }` like every other portal error.
  */
-async function proxy(res: Response, sessionsPath: string, query: Record<string, string> = {}) {
+async function proxy(
+  res: Response,
+  sessionsPath: string,
+  query: Record<string, string> = {},
+) {
   if (!sessionsClient) {
     throw new HttpError("Sessions service URL not configured", 503);
   }
@@ -54,11 +62,16 @@ async function proxy(res: Response, sessionsPath: string, query: Record<string, 
   let response: globalThis.Response;
   try {
     // requestRaw: no throw on non-2xx, so upstream statuses pass through.
-    response = await sessionsClient.requestRaw(`${sessionsPath}${queryString ? `?${queryString}` : ""}`, {
-      method: "GET",
-    });
+    response = await sessionsClient.requestRaw(
+      `${sessionsPath}${queryString ? `?${queryString}` : ""}`,
+      {
+        method: "GET",
+      },
+    );
   } catch (error: unknown) {
-    logger.error(`[SessionAnalytics] ${sessionsPath} unreachable: ${getErrorMessage(error)}`);
+    logger.error(
+      `[SessionAnalytics] ${sessionsPath} unreachable: ${getErrorMessage(error)}`,
+    );
     throw new HttpError("Sessions service unreachable", 502);
   }
 
@@ -67,11 +80,16 @@ async function proxy(res: Response, sessionsPath: string, query: Record<string, 
     data = await response.json();
   } catch {
     // Upstream returned non-JSON (e.g. a proxy's HTML error page)
-    throw new HttpError(`Sessions service returned a non-JSON response (${response.status})`, 502);
+    throw new HttpError(
+      `Sessions service returned a non-JSON response (${response.status})`,
+      502,
+    );
   }
 
   if (!response.ok) {
-    res.status(response.status).json({ error: upstreamErrorMessage(data, response.status) });
+    res
+      .status(response.status)
+      .json({ error: upstreamErrorMessage(data, response.status) });
     return;
   }
   res.status(response.status).json(data);
@@ -98,7 +116,9 @@ const PASSTHROUGH_PATHS = [
 ];
 
 for (const path of PASSTHROUGH_PATHS) {
-  router.get(path, (req: Request, res: Response) => proxy(res, path, singleValuedQuery(req)));
+  router.get(path, (req: Request, res: Response) =>
+    proxy(res, path, singleValuedQuery(req)),
+  );
 }
 
 // ─── GET /session-analytics/session/:sessionId ────────────────
@@ -112,13 +132,20 @@ router.get("/session/:sessionId", (req: Request, res: Response) =>
 // segment means it never collides with /session/:sessionId above.
 
 router.get("/session/:sessionId/replay", (req: Request, res: Response) =>
-  proxy(res, `/session/${encodeURIComponent(routeParam(req, "sessionId"))}/replay`),
+  proxy(
+    res,
+    `/session/${encodeURIComponent(routeParam(req, "sessionId"))}/replay`,
+  ),
 );
 
 // ─── GET /session-analytics/ip/:ip ────────────────────────────
 
 router.get("/ip/:ip", (req: Request, res: Response) =>
-  proxy(res, `/ip/${encodeURIComponent(routeParam(req, "ip"))}`, singleValuedQuery(req)),
+  proxy(
+    res,
+    `/ip/${encodeURIComponent(routeParam(req, "ip"))}`,
+    singleValuedQuery(req),
+  ),
 );
 
 export default router;

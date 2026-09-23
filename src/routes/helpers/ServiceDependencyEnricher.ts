@@ -7,7 +7,10 @@ export interface DependencyNode {
   dependsOn?: Array<string | DependencyRef>;
 }
 
-export type EnrichedNode<Node extends DependencyNode> = Omit<Node, "dependsOn"> & {
+export type EnrichedNode<Node extends DependencyNode> = Omit<
+  Node,
+  "dependsOn"
+> & {
   dependsOn: EnrichedDependency[];
   dependedOnBy: EnrichedDependency[];
 };
@@ -19,7 +22,9 @@ function dependencyId(dependency: string | DependencyRef): string {
 }
 
 function dependencyCriticality(dependency: string | DependencyRef): string {
-  return typeof dependency === "string" ? DEFAULT_CRITICALITY : dependency.criticality || DEFAULT_CRITICALITY;
+  return typeof dependency === "string"
+    ? DEFAULT_CRITICALITY
+    : dependency.criticality || DEFAULT_CRITICALITY;
 }
 
 export class ServiceDependencyEnricher {
@@ -29,10 +34,16 @@ export class ServiceDependencyEnricher {
    * inputs are the registry services' shared status cache and must not
    * be mutated per request.
    */
-  public static enrich<Service extends DependencyNode, Infrastructure extends DependencyNode>(
+  public static enrich<
+    Service extends DependencyNode,
+    Infrastructure extends DependencyNode,
+  >(
     services: Service[],
     infrastructure: Infrastructure[],
-  ): { services: EnrichedNode<Service>[]; infrastructure: EnrichedNode<Infrastructure>[] } {
+  ): {
+    services: EnrichedNode<Service>[];
+    infrastructure: EnrichedNode<Infrastructure>[];
+  } {
     const allNodes: DependencyNode[] = [...services, ...infrastructure];
     const nameById = new Map(allNodes.map((node) => [node.id, node.name]));
 
@@ -41,12 +52,18 @@ export class ServiceDependencyEnricher {
       for (const dependency of node.dependsOn || []) {
         const targetId = dependencyId(dependency);
         const inverse = dependedOnBy.get(targetId) ?? [];
-        inverse.push({ id: node.id, name: node.name, criticality: dependencyCriticality(dependency) });
+        inverse.push({
+          id: node.id,
+          name: node.name,
+          criticality: dependencyCriticality(dependency),
+        });
         dependedOnBy.set(targetId, inverse);
       }
     }
 
-    const enrichNode = <Node extends DependencyNode>(node: Node): EnrichedNode<Node> => ({
+    const enrichNode = <Node extends DependencyNode>(
+      node: Node,
+    ): EnrichedNode<Node> => ({
       ...node,
       dependsOn: (node.dependsOn || []).map((dependency) => {
         const targetId = dependencyId(dependency);
@@ -54,7 +71,9 @@ export class ServiceDependencyEnricher {
           id: targetId,
           name: nameById.get(targetId) || targetId,
           criticality: dependencyCriticality(dependency),
-          ...(typeof dependency === "object" && dependency.source ? { source: dependency.source } : {}),
+          ...(typeof dependency === "object" && dependency.source
+            ? { source: dependency.source }
+            : {}),
         };
       }),
       dependedOnBy: dependedOnBy.get(node.id) ?? [],

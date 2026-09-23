@@ -1,14 +1,27 @@
 import { describe, it, expect } from "vitest";
 import type { Request } from "express";
-import { queryParam, routeParam, singleValuedQuery, wildcardParam } from "../http.ts";
+import {
+  queryParam,
+  routeParam,
+  singleValuedQuery,
+  wildcardParam,
+} from "../http.ts";
 
-function request(parts: { query?: Record<string, unknown>; params?: Record<string, unknown> }) {
-  return { query: parts.query ?? {}, params: parts.params ?? {} } as unknown as Request;
+function request(parts: {
+  query?: Record<string, unknown>;
+  params?: Record<string, unknown>;
+}) {
+  return {
+    query: parts.query ?? {},
+    params: parts.params ?? {},
+  } as unknown as Request;
 }
 
 describe("wildcardParam", () => {
   it("rejoins Express 5's segment array with '/' (String() would give 'a,b')", () => {
-    const req = request({ params: { objectPath: ["folder", "sub", "file.png"] } });
+    const req = request({
+      params: { objectPath: ["folder", "sub", "file.png"] },
+    });
     expect(wildcardParam(req, "objectPath")).toBe("folder/sub/file.png");
   });
 
@@ -18,7 +31,12 @@ describe("wildcardParam", () => {
   });
 
   it("reads a plain string or nothing", () => {
-    expect(wildcardParam(request({ params: { objectPath: "file.txt" } }), "objectPath")).toBe("file.txt");
+    expect(
+      wildcardParam(
+        request({ params: { objectPath: "file.txt" } }),
+        "objectPath",
+      ),
+    ).toBe("file.txt");
     expect(wildcardParam(request({}), "objectPath")).toBe("");
   });
 });
@@ -33,7 +51,9 @@ describe("queryParam / singleValuedQuery / routeParam", () => {
   });
 
   it("reads route params as strings", () => {
-    expect(routeParam(request({ params: { id: "prism" } }), "id")).toBe("prism");
+    expect(routeParam(request({ params: { id: "prism" } }), "id")).toBe(
+      "prism",
+    );
     expect(routeParam(request({}), "id")).toBe("");
   });
 });

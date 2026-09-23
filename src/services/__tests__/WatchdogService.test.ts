@@ -18,10 +18,12 @@ interface PullTarget {
   reason: string | null;
 }
 
-function setup(options: {
-  pushTargets?: Array<{ id: string; name: string }>;
-  pullTargets?: PullTarget[];
-} = {}) {
+function setup(
+  options: {
+    pushTargets?: Array<{ id: string; name: string }>;
+    pullTargets?: PullTarget[];
+  } = {},
+) {
   const alerts: string[] = [];
   const pullTargets: PullTarget[] = options.pullTargets ?? [];
   WatchdogService.deps = {
@@ -46,8 +48,12 @@ describe("push heartbeats", () => {
 
   it("rejects heartbeats from unregistered projects", () => {
     setup(PUSH);
-    expect(WatchdogService.recordHeartbeat("unknown-service", { nowMs: T0 })).toBe(false);
-    expect(WatchdogService.recordHeartbeat("lupos-bot", { nowMs: T0 })).toBe(true);
+    expect(
+      WatchdogService.recordHeartbeat("unknown-service", { nowMs: T0 }),
+    ).toBe(false);
+    expect(WatchdogService.recordHeartbeat("lupos-bot", { nowMs: T0 })).toBe(
+      true,
+    );
   });
 
   it("never alerts for a push target that has not heartbeated yet", async () => {
@@ -112,7 +118,13 @@ describe("pull targets", () => {
   it("stays pending for never-checked targets", async () => {
     const { alerts } = setup({
       pullTargets: [
-        { id: "notes-service", name: "Notes", kind: "service", healthy: null, reason: null },
+        {
+          id: "notes-service",
+          name: "Notes",
+          kind: "service",
+          healthy: null,
+          reason: null,
+        },
       ],
     });
     await WatchdogService.evaluate(T0);
@@ -123,7 +135,13 @@ describe("pull targets", () => {
   it("does not page on a blip shorter than the confirmation window", async () => {
     const { alerts, pullTargets } = setup({
       pullTargets: [
-        { id: "notes-service", name: "Notes", kind: "service", healthy: true, reason: null },
+        {
+          id: "notes-service",
+          name: "Notes",
+          kind: "service",
+          healthy: true,
+          reason: null,
+        },
       ],
     });
     await WatchdogService.evaluate(T0);
@@ -141,7 +159,13 @@ describe("pull targets", () => {
   it("pages after sustained unhealthiness and sends one recovery", async () => {
     const { alerts, pullTargets } = setup({
       pullTargets: [
-        { id: "notes-service", name: "Notes", kind: "service", healthy: false, reason: "HTTP 502" },
+        {
+          id: "notes-service",
+          name: "Notes",
+          kind: "service",
+          healthy: false,
+          reason: "HTTP 502",
+        },
       ],
     });
     await WatchdogService.evaluate(T0); // first observation — starts the clock
@@ -159,7 +183,13 @@ describe("pull targets", () => {
   it("suppresses a repeat down alert inside the cooldown window", async () => {
     const { alerts, pullTargets } = setup({
       pullTargets: [
-        { id: "notes-service", name: "Notes", kind: "service", healthy: false, reason: "HTTP 502" },
+        {
+          id: "notes-service",
+          name: "Notes",
+          kind: "service",
+          healthy: false,
+          reason: "HTTP 502",
+        },
       ],
     });
     await WatchdogService.evaluate(T0);
@@ -183,7 +213,13 @@ describe("pull targets", () => {
   it("tracks infrastructure targets under the infra: prefix", async () => {
     const { alerts } = setup({
       pullTargets: [
-        { id: "infra:mongodb", name: "MongoDB", kind: "infrastructure", healthy: false, reason: "connect ECONNREFUSED" },
+        {
+          id: "infra:mongodb",
+          name: "MongoDB",
+          kind: "infrastructure",
+          healthy: false,
+          reason: "connect ECONNREFUSED",
+        },
       ],
     });
     await WatchdogService.evaluate(T0);
@@ -196,13 +232,16 @@ describe("pull targets", () => {
 
 describe("host-wide outages", () => {
   it("sends one message for every target that went down in the same pass", async () => {
-    const pullTargets: PullTarget[] = Array.from({ length: 30 }, (_, index) => ({
-      id: `service-${index}`,
-      name: `Service ${index}`,
-      kind: "service" as const,
-      healthy: false,
-      reason: "Timeout",
-    }));
+    const pullTargets: PullTarget[] = Array.from(
+      { length: 30 },
+      (_, index) => ({
+        id: `service-${index}`,
+        name: `Service ${index}`,
+        kind: "service" as const,
+        healthy: false,
+        reason: "Timeout",
+      }),
+    );
     const { alerts } = setup({ pullTargets });
 
     await WatchdogService.evaluate(T0);
@@ -224,7 +263,13 @@ describe("host-wide outages", () => {
 describe("registry changes", () => {
   it("forgets targets that left the registry", async () => {
     const pullTargets: PullTarget[] = [
-      { id: "old-service", name: "Old", kind: "service", healthy: false, reason: "HTTP 502" },
+      {
+        id: "old-service",
+        name: "Old",
+        kind: "service",
+        healthy: false,
+        reason: "HTTP 502",
+      },
     ];
     setup({ pullTargets });
     await WatchdogService.evaluate(T0);
@@ -240,7 +285,10 @@ describe("registry changes", () => {
 describe("packAlertMessages", () => {
   it("fills messages up to the limit and splits beyond it", () => {
     expect(packAlertMessages(["a", "b", "c"], 10)).toEqual(["a\nb\nc"]);
-    expect(packAlertMessages(["aaaa", "bbbb", "cccc"], 9)).toEqual(["aaaa\nbbbb", "cccc"]);
+    expect(packAlertMessages(["aaaa", "bbbb", "cccc"], 9)).toEqual([
+      "aaaa\nbbbb",
+      "cccc",
+    ]);
   });
 
   it("clips a single overlong line", () => {

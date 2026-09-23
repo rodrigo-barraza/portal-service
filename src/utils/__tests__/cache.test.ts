@@ -5,7 +5,9 @@ describe("createDedupedTtlCache", () => {
   it("shares one fetch between concurrent callers for a key", async () => {
     const cache = createDedupedTtlCache();
     let resolveFetch!: (value: string) => void;
-    const pending = new Promise<string>((resolve) => { resolveFetch = resolve; });
+    const pending = new Promise<string>((resolve) => {
+      resolveFetch = resolve;
+    });
     const fetcher = vi.fn(() => pending);
 
     const first = cache.get("k", 1_000, fetcher);
@@ -32,7 +34,10 @@ describe("createDedupedTtlCache", () => {
 
   it("lets a failed fetch be retried by the next caller", async () => {
     const cache = createDedupedTtlCache();
-    const fetcher = vi.fn().mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce("up");
+    const fetcher = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("down"))
+      .mockResolvedValueOnce("up");
 
     await expect(cache.get("k", 60_000, fetcher)).rejects.toThrow("down");
     expect(await cache.get("k", 60_000, fetcher)).toBe("up");

@@ -60,4 +60,3 @@ describe("Config", () => {
     expect("MONGO_DB_NAME" in config).toBe(true);
   });
 });
-

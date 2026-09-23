@@ -8,7 +8,10 @@
 import { HttpError } from "@rodrigo-barraza/utilities-library/service";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { DeviceEntry } from "../../types.ts";
-import { DockerClient, type DockerResponse } from "../../wrappers/DockerClient.ts";
+import {
+  DockerClient,
+  type DockerResponse,
+} from "../../wrappers/DockerClient.ts";
 import logger from "../../utils/logger.ts";
 import { tryParseDockerError } from "./ContainerActions.ts";
 
@@ -36,12 +39,22 @@ export interface PreviousImageInfo {
 }
 
 /** 502 carrying Docker's own message unless the response has one of `okStatuses`. */
-function expectStatus(response: DockerResponse, okStatuses: number[], failure: string): void {
+function expectStatus(
+  response: DockerResponse,
+  okStatuses: number[],
+  failure: string,
+): void {
   if (okStatuses.includes(response.statusCode)) return;
-  throw new HttpError(tryParseDockerError(response.body) || `${failure} (${response.statusCode})`, 502);
+  throw new HttpError(
+    tryParseDockerError(response.body) || `${failure} (${response.statusCode})`,
+    502,
+  );
 }
 
-async function inspectImage(device: DeviceEntry, reference: string): Promise<ImageInspect | null> {
+async function inspectImage(
+  device: DeviceEntry,
+  reference: string,
+): Promise<ImageInspect | null> {
   const response = await DockerClient.dockerRequest(
     device,
     "GET",
@@ -53,7 +66,12 @@ async function inspectImage(device: DeviceEntry, reference: string): Promise<Ima
   return JSON.parse(response.body) as ImageInspect;
 }
 
-async function tagImage(device: DeviceEntry, imageId: string, repository: string, tag: string): Promise<void> {
+async function tagImage(
+  device: DeviceEntry,
+  imageId: string,
+  repository: string,
+  tag: string,
+): Promise<void> {
   const response = await DockerClient.dockerRequest(
     device,
     "POST",
@@ -71,7 +89,9 @@ async function attempt(
   try {
     const response = await request();
     if (!okStatuses.includes(response.statusCode)) {
-      logger.error(`[Rollback] ${description} failed (${response.statusCode}): ${response.body.substring(0, 200)}`);
+      logger.error(
+        `[Rollback] ${description} failed (${response.statusCode}): ${response.body.substring(0, 200)}`,
+      );
     }
   } catch (error: unknown) {
     logger.error(`[Rollback] ${description} failed: ${getErrorMessage(error)}`);
@@ -79,7 +99,10 @@ async function attempt(
 }
 
 /** The `:previous` image a rollback would switch to, or null when there is none. */
-export async function getPreviousImage(device: DeviceEntry, imageName: string): Promise<PreviousImageInfo | null> {
+export async function getPreviousImage(
+  device: DeviceEntry,
+  imageName: string,
+): Promise<PreviousImageInfo | null> {
   const tag = `${imageName}:previous`;
   const image = await inspectImage(device, tag);
   if (!image) return null;
@@ -112,7 +135,10 @@ async function recreateContainerWithImage(
       `/containers/${encodeURIComponent(containerName)}/json`,
     );
   } catch (error: unknown) {
-    throw new HttpError(`Failed to inspect container: ${getErrorMessage(error)}`, 502);
+    throw new HttpError(
+      `Failed to inspect container: ${getErrorMessage(error)}`,
+      502,
+    );
   }
 
   const oldContainerId = inspect.Id;
@@ -121,7 +147,9 @@ async function recreateContainerWithImage(
   // Networks: keep only creation-time fields — runtime fields (assigned
   // IP, endpoint ID, MAC) belong to the old container.
   const endpointsConfig: Record<string, unknown> = {};
-  for (const [networkName, endpoint] of Object.entries(inspect.NetworkSettings?.Networks || {})) {
+  for (const [networkName, endpoint] of Object.entries(
+    inspect.NetworkSettings?.Networks || {},
+  )) {
     endpointsConfig[networkName] = {
       Aliases: endpoint.Aliases || undefined,
       Links: endpoint.Links || undefined,
@@ -138,20 +166,30 @@ async function recreateContainerWithImage(
 
   const restartOriginal = () =>
     attempt("Restart original container", () =>
-      DockerClient.dockerRequest(device, "POST", `/containers/${oldContainerId}/start`),
+      DockerClient.dockerRequest(
+        device,
+        "POST",
+        `/containers/${oldContainerId}/start`,
+      ),
     );
 
   // Stop the old container (304 = already stopped) and move it aside. A
   // stop that errors may still have landed — bring the service back.
   try {
     expectStatus(
-      await DockerClient.dockerRequest(device, "POST", `/containers/${oldContainerId}/stop?t=10`),
+      await DockerClient.dockerRequest(
+        device,
+        "POST",
+        `/containers/${oldContainerId}/stop?t=10`,
+      ),
       [204, 304],
       "Failed to stop container",
     );
   } catch (error: unknown) {
     await restartOriginal();
-    throw error instanceof HttpError ? error : new HttpError(getErrorMessage(error), 502);
+    throw error instanceof HttpError
+      ? error
+      : new HttpError(getErrorMessage(error), 502);
   }
 
   const renameResult = await DockerClient.dockerRequest(
@@ -161,7 +199,10 @@ async function recreateContainerWithImage(
   ).catch((error: unknown) => {
     // The rename may or may not have landed — restart under whatever
     // name it holds, then surface the failure.
-    return { statusCode: 0, body: JSON.stringify({ message: getErrorMessage(error) }) };
+    return {
+      statusCode: 0,
+      body: JSON.stringify({ message: getErrorMessage(error) }),
+    };
   });
   if (renameResult.statusCode !== 204) {
     await restartOriginal();
@@ -182,22 +223,36 @@ async function recreateContainerWithImage(
     );
     createOutcomeUnknown = false;
     expectStatus(createResult, [201], "Failed to create replacement container");
-    newContainerId = String((JSON.parse(createResult.body) as { Id?: unknown }).Id || "") || null;
-    if (!newContainerId) throw new HttpError("Docker created the replacement without an ID", 502);
+    newContainerId =
+      String((JSON.parse(createResult.body) as { Id?: unknown }).Id || "") ||
+      null;
+    if (!newContainerId)
+      throw new HttpError("Docker created the replacement without an ID", 502);
 
     expectStatus(
-      await DockerClient.dockerRequest(device, "POST", `/containers/${newContainerId}/start`),
+      await DockerClient.dockerRequest(
+        device,
+        "POST",
+        `/containers/${newContainerId}/start`,
+      ),
       [204, 304],
       "Failed to start replacement container",
     );
   } catch (error: unknown) {
     // The original answers to the holding name now, so after a create
     // that timed out, a container called containerName is ours.
-    const replacementRef = newContainerId ?? (createOutcomeUnknown ? encodeURIComponent(containerName) : null);
+    const replacementRef =
+      newContainerId ??
+      (createOutcomeUnknown ? encodeURIComponent(containerName) : null);
     if (replacementRef) {
       await attempt(
         "Remove failed replacement",
-        () => DockerClient.dockerRequest(device, "DELETE", `/containers/${replacementRef}?force=true`),
+        () =>
+          DockerClient.dockerRequest(
+            device,
+            "DELETE",
+            `/containers/${replacementRef}?force=true`,
+          ),
         [204, 404],
       );
     }
@@ -209,12 +264,18 @@ async function recreateContainerWithImage(
       ),
     );
     await restartOriginal();
-    throw error instanceof HttpError ? error : new HttpError(getErrorMessage(error), 502);
+    throw error instanceof HttpError
+      ? error
+      : new HttpError(getErrorMessage(error), 502);
   }
 
   // Success — the old container is disposable now
   await attempt("Remove replaced container", () =>
-    DockerClient.dockerRequest(device, "DELETE", `/containers/${oldContainerId}?force=true`),
+    DockerClient.dockerRequest(
+      device,
+      "DELETE",
+      `/containers/${oldContainerId}?force=true`,
+    ),
   );
 }
 
@@ -237,23 +298,41 @@ export async function rollbackToPreviousImage(
 
   await tagImage(device, previousImage.Id, imageName, "latest");
   if (latestImage) {
-    await tagImage(device, latestImage.Id, imageName, "previous").catch((error: unknown) => {
-      logger.warn(`[Rollback] Could not keep the current image as :previous for roll-forward: ${getErrorMessage(error)}`);
-    });
+    await tagImage(device, latestImage.Id, imageName, "previous").catch(
+      (error: unknown) => {
+        logger.warn(
+          `[Rollback] Could not keep the current image as :previous for roll-forward: ${getErrorMessage(error)}`,
+        );
+      },
+    );
   }
 
-  logger.info(`[Rollback] Recreating ${containerName} from ${imageName}:latest`);
+  logger.info(
+    `[Rollback] Recreating ${containerName} from ${imageName}:latest`,
+  );
   try {
-    await recreateContainerWithImage(device, containerName, `${imageName}:latest`);
+    await recreateContainerWithImage(
+      device,
+      containerName,
+      `${imageName}:latest`,
+    );
   } catch (error: unknown) {
     if (latestImage) {
-      await tagImage(device, latestImage.Id, imageName, "latest").catch((restoreError: unknown) => {
-        logger.error(`[Rollback] Failed to restore :latest: ${getErrorMessage(restoreError)}`);
-      });
+      await tagImage(device, latestImage.Id, imageName, "latest").catch(
+        (restoreError: unknown) => {
+          logger.error(
+            `[Rollback] Failed to restore :latest: ${getErrorMessage(restoreError)}`,
+          );
+        },
+      );
     }
-    await tagImage(device, previousImage.Id, imageName, "previous").catch((restoreError: unknown) => {
-      logger.error(`[Rollback] Failed to restore :previous: ${getErrorMessage(restoreError)}`);
-    });
+    await tagImage(device, previousImage.Id, imageName, "previous").catch(
+      (restoreError: unknown) => {
+        logger.error(
+          `[Rollback] Failed to restore :previous: ${getErrorMessage(restoreError)}`,
+        );
+      },
+    );
     throw error;
   }
 }

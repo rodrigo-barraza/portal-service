@@ -23,15 +23,21 @@ describe("errorHandler middleware", () => {
   });
 
   it("hides an unexpected error's text behind a generic 500", () => {
-    const { status, json } = invoke(new Error("connect ECONNREFUSED 10.0.0.5:27017"));
+    const { status, json } = invoke(
+      new Error("connect ECONNREFUSED 10.0.0.5:27017"),
+    );
     expect(status).toHaveBeenCalledWith(500);
     expect(json).toHaveBeenCalledWith({ error: "Internal server error" });
   });
 
   it("exposes a deliberate HttpError's message and status", () => {
-    const { status, json } = invoke(new HttpError("Vault returned empty registry", 502));
+    const { status, json } = invoke(
+      new HttpError("Vault returned empty registry", 502),
+    );
     expect(status).toHaveBeenCalledWith(502);
-    expect(json).toHaveBeenCalledWith({ error: "Vault returned empty registry" });
+    expect(json).toHaveBeenCalledWith({
+      error: "Vault returned empty registry",
+    });
   });
 
   it("exposes client errors carried as a plain `status`", () => {
@@ -69,7 +75,10 @@ describe("notFoundHandler", () => {
     const { notFoundHandler } = await import("../errors.ts");
     const status = vi.fn().mockReturnThis();
     const json = vi.fn();
-    notFoundHandler({ method: "GET", path: "/nope" } as Request, { status, json } as unknown as Response);
+    notFoundHandler(
+      { method: "GET", path: "/nope" } as Request,
+      { status, json } as unknown as Response,
+    );
     expect(status).toHaveBeenCalledWith(404);
     expect(json).toHaveBeenCalledWith({ error: "Not found: GET /nope" });
   });

@@ -24,7 +24,12 @@ export function resolveErrorStatus(error: unknown): number {
   return typeof raw === "number" && raw >= 400 && raw <= 599 ? raw : 500;
 }
 
-export function errorHandler(error: unknown, _req: Request, res: Response, next: NextFunction) {
+export function errorHandler(
+  error: unknown,
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+) {
   const status = resolveErrorStatus(error);
   const message = getErrorMessage(error);
 

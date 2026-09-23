@@ -14,10 +14,16 @@ import InfrastructureRegistryService from "./InfrastructureRegistryService.ts";
 let appliedFingerprint: string | null = null;
 
 function registryFingerprint(registry: VaultRegistry): string {
-  return JSON.stringify([registry.projects, registry.infrastructure ?? [], registry.devices ?? []]);
+  return JSON.stringify([
+    registry.projects,
+    registry.infrastructure ?? [],
+    registry.devices ?? [],
+  ]);
 }
 
-export function hasProjects(registry: VaultRegistry | null | undefined): registry is VaultRegistry {
+export function hasProjects(
+  registry: VaultRegistry | null | undefined,
+): registry is VaultRegistry {
   return Array.isArray(registry?.projects) && registry.projects.length > 0;
 }
 
@@ -38,7 +44,9 @@ export interface RegistryReloadResult {
  * with `force`). Returns null — keeping the current registry — when vault
  * answers with no projects (e.g. still booting).
  */
-export async function reloadRegistry({ force = false }: { force?: boolean } = {}): Promise<RegistryReloadResult | null> {
+export async function reloadRegistry({
+  force = false,
+}: { force?: boolean } = {}): Promise<RegistryReloadResult | null> {
   const registry = await fetchVaultRegistry();
   if (!hasProjects(registry)) return null;
 

@@ -100,32 +100,163 @@ interface HostProviderMetadata extends ProviderMetadata {
 }
 
 const KNOWN_HOST_PROVIDERS: Record<string, HostProviderMetadata> = {
-  "api.ebay.com": { key: "api.ebay.com", displayName: "eBay API", category: "Commerce", documentationUrl: "https://developer.ebay.com/docs" },
-  "openapi.etsy.com": { key: "openapi.etsy.com", displayName: "Etsy API", category: "Commerce", documentationUrl: "https://developers.etsy.com" },
-  "api.spotify.com": { key: "api.spotify.com", displayName: "Spotify Web API", category: "Music", documentationUrl: "https://developer.spotify.com/documentation/web-api" },
-  "accounts.spotify.com": { key: "api.spotify.com", displayName: "Spotify Web API", category: "Music", documentationUrl: "https://developer.spotify.com/documentation/web-api" },
-  "musicbrainz.org": { key: "musicbrainz.org", displayName: "MusicBrainz API", category: "Music", documentationUrl: "https://musicbrainz.org/doc/MusicBrainz_API" },
-  "oauth.reddit.com": { key: "reddit.com", displayName: "Reddit API", category: "Social", documentationUrl: "https://www.reddit.com/dev/api" },
-  "www.reddit.com": { key: "reddit.com", displayName: "Reddit API", category: "Social", documentationUrl: "https://www.reddit.com/dev/api" },
-  "api.themoviedb.org": { key: "api.themoviedb.org", displayName: "TMDb API", category: "Media", documentationUrl: "https://developer.themoviedb.org" },
-  "api.tvmaze.com": { key: "api.tvmaze.com", displayName: "TVMaze API", category: "Media", documentationUrl: "https://www.tvmaze.com/api" },
-  "api.jikan.moe": { key: "api.jikan.moe", displayName: "Jikan (MyAnimeList) API", category: "Media", documentationUrl: "https://docs.api.jikan.moe" },
-  "api.search.brave.com": { key: "api.search.brave.com", displayName: "Brave Search API", category: "Search", documentationUrl: "https://api-dashboard.search.brave.com/app/documentation" },
-  "finnhub.io": { key: "finnhub.io", displayName: "Finnhub API", category: "Finance", documentationUrl: "https://finnhub.io/docs/api" },
-  "api.stlouisfed.org": { key: "api.stlouisfed.org", displayName: "FRED API", category: "Finance", documentationUrl: "https://fred.stlouisfed.org/docs/api/fred" },
-  "api.eia.gov": { key: "api.eia.gov", displayName: "EIA API", category: "Finance", documentationUrl: "https://www.eia.gov/opendata" },
-  "www.eia.gov": { key: "api.eia.gov", displayName: "EIA API", category: "Finance", documentationUrl: "https://www.eia.gov/opendata" },
-  "api.nasa.gov": { key: "api.nasa.gov", displayName: "NASA API", category: "Space", documentationUrl: "https://api.nasa.gov" },
-  "app.ticketmaster.com": { key: "app.ticketmaster.com", displayName: "Ticketmaster Discovery API", category: "Events", documentationUrl: "https://developer.ticketmaster.com" },
-  "api.seatgeek.com": { key: "api.seatgeek.com", displayName: "SeatGeek API", category: "Events", documentationUrl: "https://platform.seatgeek.com" },
-  "en.wikipedia.org": { key: "en.wikipedia.org", displayName: "Wikipedia API", category: "Knowledge", documentationUrl: "https://en.wikipedia.org/api/rest_v1" },
-  "openlibrary.org": { key: "openlibrary.org", displayName: "Open Library API", category: "Knowledge", documentationUrl: "https://openlibrary.org/developers/api" },
-  "restcountries.com": { key: "restcountries.com", displayName: "REST Countries API", category: "Knowledge", documentationUrl: "https://restcountries.com" },
-  "api.open-meteo.com": { key: "api.open-meteo.com", displayName: "Open-Meteo API", category: "Weather", documentationUrl: "https://open-meteo.com/en/docs" },
-  "hacker-news.firebaseio.com": { key: "hacker-news.firebaseio.com", displayName: "Hacker News API", category: "Social", documentationUrl: "https://github.com/HackerNews/API" },
-  "api.producthunt.com": { key: "api.producthunt.com", displayName: "Product Hunt API", category: "Social", documentationUrl: "https://api.producthunt.com/v2/docs" },
-  "api.github.com": { key: "api.github.com", displayName: "GitHub API", category: "Utility", documentationUrl: "https://docs.github.com/rest" },
-  "ipinfo.io": { key: "ipinfo.io", displayName: "IPinfo API", category: "Utility", documentationUrl: "https://ipinfo.io/developers" },
+  "api.ebay.com": {
+    key: "api.ebay.com",
+    displayName: "eBay API",
+    category: "Commerce",
+    documentationUrl: "https://developer.ebay.com/docs",
+  },
+  "openapi.etsy.com": {
+    key: "openapi.etsy.com",
+    displayName: "Etsy API",
+    category: "Commerce",
+    documentationUrl: "https://developers.etsy.com",
+  },
+  "api.spotify.com": {
+    key: "api.spotify.com",
+    displayName: "Spotify Web API",
+    category: "Music",
+    documentationUrl: "https://developer.spotify.com/documentation/web-api",
+  },
+  "accounts.spotify.com": {
+    key: "api.spotify.com",
+    displayName: "Spotify Web API",
+    category: "Music",
+    documentationUrl: "https://developer.spotify.com/documentation/web-api",
+  },
+  "musicbrainz.org": {
+    key: "musicbrainz.org",
+    displayName: "MusicBrainz API",
+    category: "Music",
+    documentationUrl: "https://musicbrainz.org/doc/MusicBrainz_API",
+  },
+  "oauth.reddit.com": {
+    key: "reddit.com",
+    displayName: "Reddit API",
+    category: "Social",
+    documentationUrl: "https://www.reddit.com/dev/api",
+  },
+  "www.reddit.com": {
+    key: "reddit.com",
+    displayName: "Reddit API",
+    category: "Social",
+    documentationUrl: "https://www.reddit.com/dev/api",
+  },
+  "api.themoviedb.org": {
+    key: "api.themoviedb.org",
+    displayName: "TMDb API",
+    category: "Media",
+    documentationUrl: "https://developer.themoviedb.org",
+  },
+  "api.tvmaze.com": {
+    key: "api.tvmaze.com",
+    displayName: "TVMaze API",
+    category: "Media",
+    documentationUrl: "https://www.tvmaze.com/api",
+  },
+  "api.jikan.moe": {
+    key: "api.jikan.moe",
+    displayName: "Jikan (MyAnimeList) API",
+    category: "Media",
+    documentationUrl: "https://docs.api.jikan.moe",
+  },
+  "api.search.brave.com": {
+    key: "api.search.brave.com",
+    displayName: "Brave Search API",
+    category: "Search",
+    documentationUrl:
+      "https://api-dashboard.search.brave.com/app/documentation",
+  },
+  "finnhub.io": {
+    key: "finnhub.io",
+    displayName: "Finnhub API",
+    category: "Finance",
+    documentationUrl: "https://finnhub.io/docs/api",
+  },
+  "api.stlouisfed.org": {
+    key: "api.stlouisfed.org",
+    displayName: "FRED API",
+    category: "Finance",
+    documentationUrl: "https://fred.stlouisfed.org/docs/api/fred",
+  },
+  "api.eia.gov": {
+    key: "api.eia.gov",
+    displayName: "EIA API",
+    category: "Finance",
+    documentationUrl: "https://www.eia.gov/opendata",
+  },
+  "www.eia.gov": {
+    key: "api.eia.gov",
+    displayName: "EIA API",
+    category: "Finance",
+    documentationUrl: "https://www.eia.gov/opendata",
+  },
+  "api.nasa.gov": {
+    key: "api.nasa.gov",
+    displayName: "NASA API",
+    category: "Space",
+    documentationUrl: "https://api.nasa.gov",
+  },
+  "app.ticketmaster.com": {
+    key: "app.ticketmaster.com",
+    displayName: "Ticketmaster Discovery API",
+    category: "Events",
+    documentationUrl: "https://developer.ticketmaster.com",
+  },
+  "api.seatgeek.com": {
+    key: "api.seatgeek.com",
+    displayName: "SeatGeek API",
+    category: "Events",
+    documentationUrl: "https://platform.seatgeek.com",
+  },
+  "en.wikipedia.org": {
+    key: "en.wikipedia.org",
+    displayName: "Wikipedia API",
+    category: "Knowledge",
+    documentationUrl: "https://en.wikipedia.org/api/rest_v1",
+  },
+  "openlibrary.org": {
+    key: "openlibrary.org",
+    displayName: "Open Library API",
+    category: "Knowledge",
+    documentationUrl: "https://openlibrary.org/developers/api",
+  },
+  "restcountries.com": {
+    key: "restcountries.com",
+    displayName: "REST Countries API",
+    category: "Knowledge",
+    documentationUrl: "https://restcountries.com",
+  },
+  "api.open-meteo.com": {
+    key: "api.open-meteo.com",
+    displayName: "Open-Meteo API",
+    category: "Weather",
+    documentationUrl: "https://open-meteo.com/en/docs",
+  },
+  "hacker-news.firebaseio.com": {
+    key: "hacker-news.firebaseio.com",
+    displayName: "Hacker News API",
+    category: "Social",
+    documentationUrl: "https://github.com/HackerNews/API",
+  },
+  "api.producthunt.com": {
+    key: "api.producthunt.com",
+    displayName: "Product Hunt API",
+    category: "Social",
+    documentationUrl: "https://api.producthunt.com/v2/docs",
+  },
+  "api.github.com": {
+    key: "api.github.com",
+    displayName: "GitHub API",
+    category: "Utility",
+    documentationUrl: "https://docs.github.com/rest",
+  },
+  "ipinfo.io": {
+    key: "ipinfo.io",
+    displayName: "IPinfo API",
+    category: "Utility",
+    documentationUrl: "https://ipinfo.io/developers",
+  },
 };
 
 /** "api.some-provider.com" → "Api Some Provider Com" minus noise words. */
@@ -133,7 +264,15 @@ function prettifyHostname(hostname: string): string {
   return hostname
     .replace(/^(www|api|apis|app)\./, "")
     .split(/[.-]/)
-    .filter((word) => word && word !== "com" && word !== "org" && word !== "net" && word !== "io" && word !== "gov")
+    .filter(
+      (word) =>
+        word &&
+        word !== "com" &&
+        word !== "org" &&
+        word !== "net" &&
+        word !== "io" &&
+        word !== "gov",
+    )
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
@@ -185,7 +324,11 @@ function accumulateDay(
   requests: number,
   errors: number,
 ): void {
-  const bucket = buckets.get(date) || { requests: 0, successRequests: 0, errorRequests: 0 };
+  const bucket = buckets.get(date) || {
+    requests: 0,
+    successRequests: 0,
+    errorRequests: 0,
+  };
   bucket.requests += requests;
   bucket.errorRequests += errors;
   bucket.successRequests += requests - errors;
@@ -210,12 +353,16 @@ export default class ExternalProviderUsageService {
   }
 
   static async getSummary(period = "30d"): Promise<ProviderUsageSummaryResult> {
-    return usageCache.get(`provider-usage:summary:${period}`, CACHE_TTL_MILLISECONDS, () =>
-      ExternalProviderUsageService.computeSummary(period),
+    return usageCache.get(
+      `provider-usage:summary:${period}`,
+      CACHE_TTL_MILLISECONDS,
+      () => ExternalProviderUsageService.computeSummary(period),
     );
   }
 
-  private static async computeSummary(period: string): Promise<ProviderUsageSummaryResult> {
+  private static async computeSummary(
+    period: string,
+  ): Promise<ProviderUsageSummaryResult> {
     const [llmResult, toolsResult] = await Promise.allSettled([
       ExternalProviderUsageService.aggregateLlmProviders(period),
       ExternalProviderUsageService.aggregateToolsProviders(period),
@@ -228,22 +375,34 @@ export default class ExternalProviderUsageService {
       services.push(...llmResult.value);
     } else {
       unreachableSources.push(`prism (${PRISM_MONGO_DB_NAME})`);
-      logger.warn(`[ProviderUsage] LLM source unavailable: ${getErrorMessage(llmResult.reason)}`);
+      logger.warn(
+        `[ProviderUsage] LLM source unavailable: ${getErrorMessage(llmResult.reason)}`,
+      );
     }
 
     if (toolsResult.status === "fulfilled") {
       services.push(...toolsResult.value);
     } else {
       unreachableSources.push(`tools (${TOOLS_MONGO_DB_NAME})`);
-      logger.warn(`[ProviderUsage] tools source unavailable: ${getErrorMessage(toolsResult.reason)}`);
+      logger.warn(
+        `[ProviderUsage] tools source unavailable: ${getErrorMessage(toolsResult.reason)}`,
+      );
     }
 
-    services.sort((first, second) => second.totalRequests - first.totalRequests);
+    services.sort(
+      (first, second) => second.totalRequests - first.totalRequests,
+    );
 
     return {
       services,
-      totalRequests: services.reduce((sum, service) => sum + service.totalRequests, 0),
-      totalErrors: services.reduce((sum, service) => sum + service.errorRequests, 0),
+      totalRequests: services.reduce(
+        (sum, service) => sum + service.totalRequests,
+        0,
+      ),
+      totalErrors: services.reduce(
+        (sum, service) => sum + service.errorRequests,
+        0,
+      ),
       unreachableSources,
     };
   }
@@ -252,7 +411,8 @@ export default class ExternalProviderUsageService {
 
   private static getPrismRequestsCollection() {
     const database = MongoWrapper.getDb(String(PRISM_MONGO_DB_NAME));
-    if (!database) throw new Error(`prism database "${PRISM_MONGO_DB_NAME}" not connected`);
+    if (!database)
+      throw new Error(`prism database "${PRISM_MONGO_DB_NAME}" not connected`);
     return database.collection(PRISM_REQUESTS_COLLECTION);
   }
 
@@ -262,45 +422,69 @@ export default class ExternalProviderUsageService {
    * keeps any legacy Date-typed values from breaking the pipeline.
    */
   private static async queryLlmDailyRollups(period: string) {
-    const collection = ExternalProviderUsageService.getPrismRequestsCollection();
+    const collection =
+      ExternalProviderUsageService.getPrismRequestsCollection();
     return collection
       .aggregate<{
         _id: { provider: string; day: string };
         requests: number;
         errors: number;
         estimatedCost: number;
-      }>([
-        { $match: { createdAt: { $gte: periodStartIso(period) }, provider: { $ne: null } } },
-        {
-          $group: {
-            _id: {
-              provider: "$provider",
-              day: { $substrCP: [{ $toString: "$createdAt" }, 0, 10] },
+      }>(
+        [
+          {
+            $match: {
+              createdAt: { $gte: periodStartIso(period) },
+              provider: { $ne: null },
             },
-            requests: { $sum: 1 },
-            // success:null marks mid-turn crash stubs — count only explicit
-            // failures as errors so stubs don't inflate provider error rates.
-            errors: { $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] } },
-            estimatedCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
           },
-        },
-      ], { maxTimeMS: QUERY_MAX_TIME_MS })
+          {
+            $group: {
+              _id: {
+                provider: "$provider",
+                day: { $substrCP: [{ $toString: "$createdAt" }, 0, 10] },
+              },
+              requests: { $sum: 1 },
+              // success:null marks mid-turn crash stubs — count only explicit
+              // failures as errors so stubs don't inflate provider error rates.
+              errors: { $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] } },
+              estimatedCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
+            },
+          },
+        ],
+        { maxTimeMS: QUERY_MAX_TIME_MS },
+      )
       .toArray();
   }
 
-  private static async aggregateLlmProviders(period: string): Promise<ApiUsageSummary[]> {
-    const rollups = await ExternalProviderUsageService.queryLlmDailyRollups(period);
+  private static async aggregateLlmProviders(
+    period: string,
+  ): Promise<ApiUsageSummary[]> {
+    const rollups =
+      await ExternalProviderUsageService.queryLlmDailyRollups(period);
 
     const perProvider = new Map<
       string,
-      { requests: number; errors: number; estimatedCost: number; days: Map<string, DailyAccumulator> }
+      {
+        requests: number;
+        errors: number;
+        estimatedCost: number;
+        days: Map<string, DailyAccumulator>;
+      }
     >();
 
     for (const rollup of rollups) {
-      const provider = resolveProviderBaseType(String(rollup._id.provider || ""));
+      const provider = resolveProviderBaseType(
+        String(rollup._id.provider || ""),
+      );
       // Google traffic is already on the dashboard via Cloud Monitoring
       // (generativelanguage.googleapis.com); local providers aren't external.
-      if (!provider || provider === PROVIDERS.GOOGLE || isLocalProvider(provider)) continue;
+      if (
+        !provider ||
+        provider === PROVIDERS.GOOGLE ||
+        isLocalProvider(provider)
+      )
+        continue;
 
       let entry = perProvider.get(provider);
       if (!entry) {
@@ -327,7 +511,8 @@ export default class ExternalProviderUsageService {
         successRequests: entry.requests - entry.errors,
         errorRequests: entry.errors,
         errorRate: entry.requests > 0 ? entry.errors / entry.requests : 0,
-        estimatedCost: entry.estimatedCost > 0 ? entry.estimatedCost : undefined,
+        estimatedCost:
+          entry.estimatedCost > 0 ? entry.estimatedCost : undefined,
         dailySeries: toSortedDailySeries(entry.days),
       };
     });
@@ -337,19 +522,25 @@ export default class ExternalProviderUsageService {
 
   private static getToolsUsageCollection() {
     const database = MongoWrapper.getDb(String(TOOLS_MONGO_DB_NAME));
-    if (!database) throw new Error(`tools database "${TOOLS_MONGO_DB_NAME}" not connected`);
+    if (!database)
+      throw new Error(`tools database "${TOOLS_MONGO_DB_NAME}" not connected`);
     return database.collection(EXTERNAL_API_USAGE_COLLECTION);
   }
 
-  private static async aggregateToolsProviders(period: string): Promise<ApiUsageSummary[]> {
+  private static async aggregateToolsProviders(
+    period: string,
+  ): Promise<ApiUsageSummary[]> {
     const collection = ExternalProviderUsageService.getToolsUsageCollection();
     const sinceDate = periodStartIso(period).slice(0, 10);
 
     const buckets = await collection
-      .find<{ service: string; host: string; date: string; requests: number; errors: number }>(
-        { date: { $gte: sinceDate } },
-        { maxTimeMS: QUERY_MAX_TIME_MS },
-      )
+      .find<{
+        service: string;
+        host: string;
+        date: string;
+        requests: number;
+        errors: number;
+      }>({ date: { $gte: sinceDate } }, { maxTimeMS: QUERY_MAX_TIME_MS })
       .toArray();
 
     const perProvider = new Map<
@@ -368,7 +559,13 @@ export default class ExternalProviderUsageService {
 
       let entry = perProvider.get(metadata.key);
       if (!entry) {
-        entry = { metadata, consumers: new Set(), requests: 0, errors: 0, days: new Map() };
+        entry = {
+          metadata,
+          consumers: new Set(),
+          requests: 0,
+          errors: 0,
+          days: new Map(),
+        };
         perProvider.set(metadata.key, entry);
       }
 
@@ -401,7 +598,11 @@ export default class ExternalProviderUsageService {
     return usageCache.get(
       `provider-usage:timeseries:${serviceIdentifier}:${period}`,
       CACHE_TTL_MILLISECONDS,
-      () => ExternalProviderUsageService.computeTimeSeries(serviceIdentifier, period),
+      () =>
+        ExternalProviderUsageService.computeTimeSeries(
+          serviceIdentifier,
+          period,
+        ),
     );
   }
 
@@ -410,8 +611,14 @@ export default class ExternalProviderUsageService {
     period: string,
   ): Promise<CloudUsageTimeSeriesResponse> {
     const days = ExternalProviderUsageService.isLlmIdentifier(serviceIdentifier)
-      ? await ExternalProviderUsageService.computeLlmTimeSeries(serviceIdentifier, period)
-      : await ExternalProviderUsageService.computeToolsTimeSeries(serviceIdentifier, period);
+      ? await ExternalProviderUsageService.computeLlmTimeSeries(
+          serviceIdentifier,
+          period,
+        )
+      : await ExternalProviderUsageService.computeToolsTimeSeries(
+          serviceIdentifier,
+          period,
+        );
 
     const series: TimeSeriesDataPoint[] = [...days.entries()]
       .map(([date, values]) => ({ date, ...values }))
@@ -419,8 +626,12 @@ export default class ExternalProviderUsageService {
 
     // Same name the summary card shows — unknown LLM providers used to fall
     // back to the raw "llm:<id>" here but "<Label> API" on the card.
-    const displayName = ExternalProviderUsageService.isLlmIdentifier(serviceIdentifier)
-      ? resolveLlmProvider(serviceIdentifier.slice(LLM_IDENTIFIER_PREFIX.length)).displayName
+    const displayName = ExternalProviderUsageService.isLlmIdentifier(
+      serviceIdentifier,
+    )
+      ? resolveLlmProvider(
+          serviceIdentifier.slice(LLM_IDENTIFIER_PREFIX.length),
+        ).displayName
       : resolveHostProvider(serviceIdentifier).displayName;
 
     return {
@@ -432,27 +643,40 @@ export default class ExternalProviderUsageService {
     };
   }
 
-  private static async computeLlmTimeSeries(serviceIdentifier: string, period: string) {
+  private static async computeLlmTimeSeries(
+    serviceIdentifier: string,
+    period: string,
+  ) {
     const provider = serviceIdentifier.slice(LLM_IDENTIFIER_PREFIX.length);
-    const rollups = await ExternalProviderUsageService.queryLlmDailyRollups(period);
+    const rollups =
+      await ExternalProviderUsageService.queryLlmDailyRollups(period);
 
     const days = new Map<string, DailyAccumulator>();
     for (const rollup of rollups) {
-      if (resolveProviderBaseType(String(rollup._id.provider || "")) !== provider) continue;
+      if (
+        resolveProviderBaseType(String(rollup._id.provider || "")) !== provider
+      )
+        continue;
       accumulateDay(days, rollup._id.day, rollup.requests, rollup.errors);
     }
     return days;
   }
 
-  private static async computeToolsTimeSeries(serviceIdentifier: string, period: string) {
+  private static async computeToolsTimeSeries(
+    serviceIdentifier: string,
+    period: string,
+  ) {
     const collection = ExternalProviderUsageService.getToolsUsageCollection();
     const sinceDate = periodStartIso(period).slice(0, 10);
 
     const buckets = await collection
-      .find<{ host: string; date: string; requests: number; errors: number }>({
-        host: { $in: hostsForProviderKey(serviceIdentifier) },
-        date: { $gte: sinceDate },
-      }, { maxTimeMS: QUERY_MAX_TIME_MS })
+      .find<{ host: string; date: string; requests: number; errors: number }>(
+        {
+          host: { $in: hostsForProviderKey(serviceIdentifier) },
+          date: { $gte: sinceDate },
+        },
+        { maxTimeMS: QUERY_MAX_TIME_MS },
+      )
       .toArray();
 
     const days = new Map<string, DailyAccumulator>();
