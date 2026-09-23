@@ -289,6 +289,14 @@ function resolveHostProvider(hostname: string): HostProviderMetadata {
 }
 
 /** Hosts that roll up into the given provider key (for time-series). */
+// Every *.googleapis.com API is on the dashboard through Cloud Monitoring,
+// which counts the calls of every consumer (tools-service included) — the
+// /timeseries route routes those identifiers to GCP for the same reason.
+// A tools-service bucket for one of those hosts is the same traffic again.
+function isReportedByCloudMonitoring(host: string): boolean {
+  return host.endsWith(".googleapis.com");
+}
+
 function hostsForProviderKey(providerKey: string): string[] {
   const hosts = Object.entries(KNOWN_HOST_PROVIDERS)
     .filter(([, metadata]) => metadata.key === providerKey)
@@ -555,6 +563,7 @@ export default class ExternalProviderUsageService {
     >();
 
     for (const bucket of buckets) {
+      if (isReportedByCloudMonitoring(bucket.host)) continue;
       const metadata = resolveHostProvider(bucket.host);
 
       let entry = perProvider.get(metadata.key);
