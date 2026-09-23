@@ -15,15 +15,17 @@
 // dashboard already renders, so cards merge seamlessly with the GCP ones.
 // ─────────────────────────────────────────────────────────────────────
 
-import { createTtlCache } from "@rodrigo-barraza/utilities-library/cache";
 import {
   PROVIDERS,
   PROVIDER_LABELS,
   isLocalProvider,
   resolveProviderBaseType,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import logger from "../utils/logger.ts";
+import { createDedupedTtlCache } from "../utils/cache.ts";
+import { usagePeriodStart } from "../utils/usagePeriod.ts";
 import { PRISM_MONGO_DB_NAME, TOOLS_MONGO_DB_NAME } from "../config.ts";
 import type {
   ApiUsageSummary,
@@ -46,6 +48,10 @@ interface ProviderMetadata {
   category: string;
   documentationUrl: string;
 }
+
+// A slow aggregation over prism's request log must not hold the
+// dashboard (or the shared cache fetch) open indefinitely.
+const QUERY_MAX_TIME_MS = 20_000;
 
 const LLM_PROVIDER_METADATA: Record<string, ProviderMetadata> = {
   [PROVIDERS.OPENAI]: {
@@ -74,6 +80,17 @@ const LLM_PROVIDER_METADATA: Record<string, ProviderMetadata> = {
     documentationUrl: "https://docs.inworld.ai",
   },
 };
+
+/** Curated card metadata for an LLM provider, or a label-derived fallback. */
+function resolveLlmProvider(provider: string): ProviderMetadata {
+  return (
+    LLM_PROVIDER_METADATA[provider] ?? {
+      displayName: `${PROVIDER_LABELS[provider] || provider} API`,
+      category: "AI / LLM",
+      documentationUrl: "",
+    }
+  );
+}
 
 // Known tools-service hosts → friendly provider cards. Multiple hosts can
 // collapse into one provider key (e.g. api + accounts endpoints). Anything
@@ -149,16 +166,11 @@ export interface ProviderUsageSummaryResult {
   unreachableSources: string[];
 }
 
-const usageCache = createTtlCache();
+const usageCache = createDedupedTtlCache();
 const CACHE_TTL_MILLISECONDS = 5 * 60 * 1000;
 
-function periodToDays(period: string): number {
-  const match = period.match(/^(\d+)d$/);
-  return match ? parseInt(match[1], 10) : 30;
-}
-
 function periodStartIso(period: string): string {
-  return new Date(Date.now() - periodToDays(period) * 24 * 60 * 60 * 1000).toISOString();
+  return usagePeriodStart(period).toISOString();
 }
 
 interface DailyAccumulator {
@@ -216,14 +228,14 @@ export default class ExternalProviderUsageService {
       services.push(...llmResult.value);
     } else {
       unreachableSources.push(`prism (${PRISM_MONGO_DB_NAME})`);
-      logger.warn(`[ProviderUsage] LLM source unavailable: ${String(llmResult.reason)}`);
+      logger.warn(`[ProviderUsage] LLM source unavailable: ${getErrorMessage(llmResult.reason)}`);
     }
 
     if (toolsResult.status === "fulfilled") {
       services.push(...toolsResult.value);
     } else {
       unreachableSources.push(`tools (${TOOLS_MONGO_DB_NAME})`);
-      logger.warn(`[ProviderUsage] tools source unavailable: ${String(toolsResult.reason)}`);
+      logger.warn(`[ProviderUsage] tools source unavailable: ${getErrorMessage(toolsResult.reason)}`);
     }
 
     services.sort((first, second) => second.totalRequests - first.totalRequests);
@@ -272,7 +284,7 @@ export default class ExternalProviderUsageService {
             estimatedCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
           },
         },
-      ])
+      ], { maxTimeMS: QUERY_MAX_TIME_MS })
       .toArray();
   }
 
@@ -303,11 +315,7 @@ export default class ExternalProviderUsageService {
     }
 
     return [...perProvider.entries()].map(([provider, entry]) => {
-      const metadata = LLM_PROVIDER_METADATA[provider] ?? {
-        displayName: `${PROVIDER_LABELS[provider] || provider} API`,
-        category: "AI / LLM",
-        documentationUrl: "",
-      };
+      const metadata = resolveLlmProvider(provider);
 
       return {
         serviceIdentifier: `${LLM_IDENTIFIER_PREFIX}${provider}`,
@@ -340,6 +348,7 @@ export default class ExternalProviderUsageService {
     const buckets = await collection
       .find<{ service: string; host: string; date: string; requests: number; errors: number }>(
         { date: { $gte: sinceDate } },
+        { maxTimeMS: QUERY_MAX_TIME_MS },
       )
       .toArray();
 
@@ -408,9 +417,10 @@ export default class ExternalProviderUsageService {
       .map(([date, values]) => ({ date, ...values }))
       .sort((first, second) => first.date.localeCompare(second.date));
 
+    // Same name the summary card shows — unknown LLM providers used to fall
+    // back to the raw "llm:<id>" here but "<Label> API" on the card.
     const displayName = ExternalProviderUsageService.isLlmIdentifier(serviceIdentifier)
-      ? (LLM_PROVIDER_METADATA[serviceIdentifier.slice(LLM_IDENTIFIER_PREFIX.length)]?.displayName ??
-        serviceIdentifier)
+      ? resolveLlmProvider(serviceIdentifier.slice(LLM_IDENTIFIER_PREFIX.length)).displayName
       : resolveHostProvider(serviceIdentifier).displayName;
 
     return {
@@ -442,7 +452,7 @@ export default class ExternalProviderUsageService {
       .find<{ host: string; date: string; requests: number; errors: number }>({
         host: { $in: hostsForProviderKey(serviceIdentifier) },
         date: { $gte: sinceDate },
-      })
+      }, { maxTimeMS: QUERY_MAX_TIME_MS })
       .toArray();
 
     const days = new Map<string, DailyAccumulator>();
@@ -457,6 +467,7 @@ export default class ExternalProviderUsageService {
 export const __internal = {
   KNOWN_HOST_PROVIDERS,
   LLM_PROVIDER_METADATA,
+  resolveLlmProvider,
   prettifyHostname,
   resolveHostProvider,
   hostsForProviderKey,

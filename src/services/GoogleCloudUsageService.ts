@@ -1,7 +1,10 @@
 import { MetricServiceClient, protos } from "@google-cloud/monitoring";
-import { createTtlCache } from "@rodrigo-barraza/utilities-library/cache";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import logger from "../utils/logger.ts";
 import { GOOGLE_ANALYTICS_CREDENTIALS, GOOGLE_CLOUD_MONITORING_PROJECT_ID } from "../config.ts";
+import { createDedupedTtlCache } from "../utils/cache.ts";
+import { parseServiceAccountCredentials } from "../utils/googleCredentials.ts";
+import { usagePeriodStart } from "../utils/usagePeriod.ts";
 
 // ── Google Cloud API Discovery ────────────────────────────────────
 // Every service with request traffic in the monitored projects appears
@@ -187,25 +190,14 @@ export interface CloudUsageTimeSeriesResponse {
 
 // ── Cache ──────────────────────────────────────────────────────────
 
-const usageCache = createTtlCache();
+const usageCache = createDedupedTtlCache();
 const CACHE_TTL_MILLISECONDS = 5 * 60 * 1000; // 5 minutes
 
-// ── Period Parsing ─────────────────────────────────────────────────
-
-function periodToDays(period: string): number {
-  const match = period.match(/^(\d+)d$/);
-  if (match) return parseInt(match[1], 10);
-  return 30;
-}
-
 function periodToInterval(period: string) {
-  const days = periodToDays(period);
-  const endTime = new Date();
-  const startTime = new Date(endTime.getTime() - days * 24 * 60 * 60 * 1000);
-
+  const nowMs = Date.now();
   return {
-    startTime: { seconds: Math.floor(startTime.getTime() / 1000) },
-    endTime: { seconds: Math.floor(endTime.getTime() / 1000) },
+    startTime: { seconds: Math.floor(usagePeriodStart(period, nowMs).getTime() / 1000) },
+    endTime: { seconds: Math.floor(nowMs / 1000) },
   };
 }
 
@@ -225,12 +217,7 @@ export default class GoogleCloudUsageService {
       };
     }
 
-    if (!GOOGLE_ANALYTICS_CREDENTIALS) {
-      throw new Error("GOOGLE_ANALYTICS_CREDENTIALS is not configured — cannot query Cloud Monitoring");
-    }
-
-    const decoded = Buffer.from(GOOGLE_ANALYTICS_CREDENTIALS, "base64").toString("utf-8");
-    const credentials = JSON.parse(decoded);
+    const credentials = parseServiceAccountCredentials(GOOGLE_ANALYTICS_CREDENTIALS);
 
     GoogleCloudUsageService.monitoringClient = new MetricServiceClient({
       credentials: {
@@ -248,7 +235,7 @@ export default class GoogleCloudUsageService {
       .map((projectId) => projectId.trim())
       .filter(Boolean);
     const projectIds = [...new Set(
-      configuredProjectIds.length > 0 ? configuredProjectIds : [credentials.project_id as string],
+      configuredProjectIds.length > 0 ? configuredProjectIds : [credentials.project_id],
     )];
     GoogleCloudUsageService.cachedProjectIds = projectIds;
     logger.success(`[CloudUsage] Monitoring client initialized — querying projects: ${projectIds.join(", ")}`);
@@ -257,6 +244,14 @@ export default class GoogleCloudUsageService {
       client: GoogleCloudUsageService.monitoringClient,
       projectIds,
     };
+  }
+
+  /** Release the gRPC channel (shutdown). */
+  static async close(): Promise<void> {
+    const client = GoogleCloudUsageService.monitoringClient;
+    GoogleCloudUsageService.monitoringClient = null;
+    GoogleCloudUsageService.cachedProjectIds = null;
+    await client?.close();
   }
 
   static isValidServiceIdentifier(serviceIdentifier: string): boolean {
@@ -298,7 +293,7 @@ export default class GoogleCloudUsageService {
         reachableProjectIds.push(projectId);
       } else {
         unreachableProjectIds.push(projectId);
-        const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
+        const reason = getErrorMessage(result.reason);
         logger.warn(
           `[CloudUsage] Project ${projectId} unreachable (grant roles/monitoring.viewer to the service account?): ${reason}`,
         );

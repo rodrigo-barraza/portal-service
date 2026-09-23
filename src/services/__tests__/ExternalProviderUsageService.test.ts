@@ -65,3 +65,18 @@ describe("identifier validation", () => {
     expect(ExternalProviderUsageService.isLlmIdentifier("api.ebay.com")).toBe(false);
   });
 });
+
+describe("resolveLlmProvider", () => {
+  const { resolveLlmProvider } = __internal;
+
+  it("uses curated metadata for known providers", () => {
+    expect(resolveLlmProvider("openai").displayName).toBe("OpenAI API");
+  });
+
+  it("derives one fallback name for unknown providers — the card and its time series agree", () => {
+    const fallback = resolveLlmProvider("some-new-provider");
+    expect(fallback.displayName).toBe("some-new-provider API");
+    expect(fallback.displayName).not.toContain("llm:");
+    expect(fallback.category).toBe("AI / LLM");
+  });
+});
