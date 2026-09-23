@@ -1,9 +1,10 @@
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import { createSimpleCache } from "@rodrigo-barraza/utilities-library/cache";
 import { GITHUB_PAT, PROJECTS } from "../config.ts";
 import logger from "../utils/logger.ts";
+import { createDedupedTtlCache } from "../utils/cache.ts";
 import { GitHubClient, type GitHubFetchStats } from "../wrappers/GitHubClient.ts";
 import { EcosystemResolver, type EcosystemOwners } from "./code-analysis/EcosystemResolver.ts";
+import RepositoryInsightsService, { extractRepoSlug, type RepoSize } from "./RepositoryInsightsService.ts";
 
 const CACHE_TTL_MILLISECONDS = 15 * 60 * 1000;
 const CONFIG_PATHS = ["config.ts", "src/config.ts", "config.js", "src/config.js"];
@@ -31,28 +32,25 @@ interface GitHubHealth {
 
 interface AnalysisResult {
   dependencies: Record<string, ProjectAnalysis>;
-  repoSizes: Record<string, { sizeKB: number; sizeBytes: number }>;
+  repoSizes: Record<string, RepoSize>;
   owners: Record<string, string>;
   analyzedAt: string;
   github: GitHubHealth;
 }
 
-const analysisCache = createSimpleCache<AnalysisResult | null>();
+const ANALYSIS_CACHE_KEY = "analysis";
+
+// Deduped: concurrent callers share one run. Two overlapping runs would
+// also reset each other's GitHub request stats mid-flight.
+const analysisCache = createDedupedTtlCache();
 
 export default class CodeAnalysisService {
-  public static async analyze(forceRefresh = false): Promise<AnalysisResult> {
-    const currentTimestamp = Date.now();
-    const cachedAnalysis = analysisCache.getData();
-    const lastFetchTimestamp = analysisCache.getLastFetch();
-    if (
-      !forceRefresh &&
-      cachedAnalysis &&
-      lastFetchTimestamp &&
-      currentTimestamp - Date.parse(lastFetchTimestamp) < CACHE_TTL_MILLISECONDS
-    ) {
-      return cachedAnalysis;
-    }
+  public static analyze(forceRefresh = false): Promise<AnalysisResult> {
+    if (forceRefresh) analysisCache.delete(ANALYSIS_CACHE_KEY);
+    return analysisCache.get(ANALYSIS_CACHE_KEY, CACHE_TTL_MILLISECONDS, () => CodeAnalysisService._runAnalysis());
+  }
 
+  private static async _runAnalysis(): Promise<AnalysisResult> {
     logger.info("[CodeAnalysis] Starting ecosystem analysis...");
     const startTimestamp = Date.now();
     GitHubClient.resetStats();
@@ -64,21 +62,20 @@ export default class CodeAnalysisService {
 
     const projectIds = new Set(Object.keys(PROJECTS));
     const dependencies: Record<string, ProjectAnalysis> = {};
-    const repoSizes: Record<string, { sizeKB: number; sizeBytes: number }> = {};
+    const repoSizes: Record<string, RepoSize> = {};
 
     const projectsWithRepos = Object.entries(PROJECTS).filter(([, service]) => service.repo);
 
     await Promise.allSettled(
       projectsWithRepos.map(async ([projectId, service]) => {
-        if (!service.repo) return;
-        const repoSlug = CodeAnalysisService.extractSlug(service.repo);
+        const repoSlug = service.repo ? extractRepoSlug(service.repo) : null;
         if (!repoSlug) return;
 
         try {
           const [imports, apiCalls, sizeDetails] = await Promise.all([
             CodeAnalysisService._detectImports(repoSlug, projectId, projectIds, ecosystemOwners),
             CodeAnalysisService._detectApiCalls(repoSlug, projectId, projectIds),
-            GitHubClient.fetchRepoSize(repoSlug),
+            RepositoryInsightsService.getRepoSize(repoSlug),
           ]);
 
           dependencies[projectId] = { imports, apiCalls };
@@ -123,8 +120,6 @@ export default class CodeAnalysisService {
       },
     };
 
-    analysisCache.update(analysisResult);
-
     const totalImports = Object.values(dependencies).reduce((sum, projectDependency) => sum + projectDependency.imports.length, 0);
     const totalApiCalls = Object.values(dependencies).reduce(
       (sum, projectDependency) => sum + projectDependency.apiCalls.length,
@@ -135,11 +130,6 @@ export default class CodeAnalysisService {
     );
 
     return analysisResult;
-  }
-
-  public static extractSlug(repoUrl: string): string | null {
-    const matchedSlug = repoUrl.match(/github\.com\/(.+?)(?:\.git)?$/);
-    return matchedSlug ? matchedSlug[1] : null;
   }
 
   private static async _detectImports(

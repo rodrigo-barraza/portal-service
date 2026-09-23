@@ -1,3 +1,4 @@
+import { escapeRegex } from "@rodrigo-barraza/utilities-library";
 import { PROJECTS } from "../../config.ts";
 import logger from "../../utils/logger.ts";
 
@@ -44,17 +45,14 @@ export class EcosystemResolver {
       }
     }
 
+    // github:owner/repo, https://github.com/owner/repo.git,
+    // git+ssh://git@github.com:owner/repo — each optionally pinned "#ref".
     for (const owner of ecosystemOwners.owners) {
-      const gitHubShortMatch = packageVersion.match(new RegExp(`^github:${owner}/(.+?)$`));
-      if (gitHubShortMatch) {
-        return gitHubShortMatch[1];
-      }
-
-      const gitHubHttpsMatch = packageVersion.match(
-        new RegExp(`github\\.com/${owner}/(.+?)(?:\\.git)?$`)
+      const gitHubMatch = packageVersion.match(
+        new RegExp(`(?:^github:|github\\.com[/:])${escapeRegex(owner)}/([^/#]+?)(?:\\.git)?(?:#.*)?$`),
       );
-      if (gitHubHttpsMatch) {
-        return gitHubHttpsMatch[1];
+      if (gitHubMatch) {
+        return gitHubMatch[1];
       }
     }
 
