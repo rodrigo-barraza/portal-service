@@ -18,8 +18,12 @@
 //
 // Alerts fire on state TRANSITIONS only, with a confirmation window for
 // pull targets (no paging on a single blip) and a per-target cooldown
-// (no flap spam). The watchdog itself has the usual blind spot: it can't
-// report its own host going down — that needs a watcher outside the NAS.
+// (no flap spam). Transitions found in one evaluation pass go out as one
+// Discord message: a host-wide outage flips dozens of targets at once,
+// and one webhook post each ran into Discord's rate limit (5 per 2s) —
+// the rejected alerts were lost while their recoveries still fired.
+// The watchdog itself has the usual blind spot: it can't report its own
+// host going down — that needs a watcher outside the NAS.
 // ============================================================
 
 import ServiceRegistryService from "./ServiceRegistryService.ts";
@@ -163,6 +167,26 @@ function ensureState(
   return state;
 }
 
+// Discord rejects message content over 2000 characters.
+const DISCORD_MESSAGE_LIMIT = 2000;
+
+/** Join alert lines into as few messages as fit Discord's content limit. */
+export function packAlertMessages(lines: string[], limit: number = DISCORD_MESSAGE_LIMIT): string[] {
+  const messages: string[] = [];
+  let current = "";
+  for (const line of lines) {
+    const clipped = line.length > limit ? `${line.slice(0, limit - 1)}…` : line;
+    if (current && current.length + 1 + clipped.length > limit) {
+      messages.push(current);
+      current = clipped;
+    } else {
+      current = current ? `${current}\n${clipped}` : clipped;
+    }
+  }
+  if (current) messages.push(current);
+  return messages;
+}
+
 function formatDuration(milliseconds: number): string {
   const seconds = Math.round(milliseconds / 1000);
   if (seconds < 120) return `${seconds}s`;
@@ -199,15 +223,15 @@ export default class WatchdogService {
       // no confirmation window. The heartbeat itself still counts as
       // "the process is alive", so staleness tracking resets.
       state.lastHeartbeatAtMs = nowMs;
-      void WatchdogService._transitionDown(state, nowMs, state.lastReason, {
-        immediate: true,
-      });
+      void WatchdogService._sendAlerts([
+        WatchdogService._transitionDown(state, nowMs, state.lastReason, { immediate: true }),
+      ]);
       return true;
     }
 
     state.lastHeartbeatAtMs = nowMs;
     state.lastReason = options.reason || null;
-    void WatchdogService._transitionUp(state, nowMs);
+    void WatchdogService._sendAlerts([WatchdogService._transitionUp(state, nowMs)]);
     return true;
   }
 
@@ -217,8 +241,11 @@ export default class WatchdogService {
    */
   public static async evaluate(nowMs: number = Date.now()): Promise<void> {
     const { deps } = WatchdogService;
+    const alerts: Array<string | null> = [];
+    const liveIds = new Set<string>();
 
     for (const target of deps.getPushTargetIds()) {
+      liveIds.add(target.id);
       const state = ensureState(target.id, target.name, "service", "push");
       // Never heartbeated: stays pending — a service that hasn't been
       // cut over yet shouldn't page anyone.
@@ -226,32 +253,39 @@ export default class WatchdogService {
 
       const silenceMs = nowMs - state.lastHeartbeatAtMs;
       if (silenceMs > deps.pushGraceMs) {
-        await WatchdogService._transitionDown(
-          state,
-          nowMs,
-          `no heartbeat for ${formatDuration(silenceMs)}`,
-          // Silence already implies the grace window elapsed — no extra
-          // confirmation wait on top.
-          { immediate: true },
+        alerts.push(
+          WatchdogService._transitionDown(
+            state,
+            nowMs,
+            `no heartbeat for ${formatDuration(silenceMs)}`,
+            // Silence already implies the grace window elapsed — no extra
+            // confirmation wait on top.
+            { immediate: true },
+          ),
         );
       }
       // Fresh heartbeats transition up in recordHeartbeat.
     }
 
     for (const target of deps.getPullTargets()) {
+      liveIds.add(target.id);
       const state = ensureState(target.id, target.name, target.kind, "pull");
       if (target.healthy === null) continue; // not yet checked — pending
 
-      if (target.healthy) {
-        await WatchdogService._transitionUp(state, nowMs);
-      } else {
-        await WatchdogService._transitionDown(
-          state,
-          nowMs,
-          target.reason || "health check failing",
-        );
-      }
+      alerts.push(
+        target.healthy
+          ? WatchdogService._transitionUp(state, nowMs)
+          : WatchdogService._transitionDown(state, nowMs, target.reason || "health check failing"),
+      );
     }
+
+    // A project removed from the registry (or switched to watchdog "off")
+    // stops being tracked instead of showing its last state forever.
+    for (const id of states.keys()) {
+      if (!liveIds.has(id)) states.delete(id);
+    }
+
+    await WatchdogService._sendAlerts(alerts);
   }
 
   /** Current state list, for the /watchdog route and portal UI. */
@@ -269,39 +303,36 @@ export default class WatchdogService {
     WatchdogService.deps = defaultDeps;
   }
 
-  private static async _transitionDown(
+  /** Apply a down observation; returns the alert line to send, if any. */
+  private static _transitionDown(
     state: WatchdogState,
     nowMs: number,
     reason: string,
     options: { immediate?: boolean } = {},
-  ): Promise<void> {
+  ): string | null {
     const { deps } = WatchdogService;
 
     if (state.unhealthySinceMs === null) state.unhealthySinceMs = nowMs;
     state.status = "down";
     state.lastReason = reason;
 
-    if (state.alertedDown) return; // already paged for this episode
+    if (state.alertedDown) return null; // already paged for this episode
 
     const confirmedMs = nowMs - state.unhealthySinceMs;
-    if (!options.immediate && confirmedMs < deps.confirmDownMs) return;
+    if (!options.immediate && confirmedMs < deps.confirmDownMs) return null;
 
     const inCooldown =
       state.lastDownAlertAtMs !== null &&
       nowMs - state.lastDownAlertAtMs < deps.alertCooldownMs;
-    if (inCooldown) return;
+    if (inCooldown) return null;
 
     state.alertedDown = true;
     state.lastDownAlertAtMs = nowMs;
-    await WatchdogService._safeAlert(
-      `🔴 **${state.name}** is DOWN — ${reason}`,
-    );
+    return `🔴 **${state.name}** is DOWN — ${reason}`;
   }
 
-  private static async _transitionUp(
-    state: WatchdogState,
-    nowMs: number,
-  ): Promise<void> {
+  /** Apply an up observation; returns the recovery line to send, if any. */
+  private static _transitionUp(state: WatchdogState, nowMs: number): string | null {
     const wasAlerted = state.alertedDown;
     const downForMs =
       state.unhealthySinceMs !== null ? nowMs - state.unhealthySinceMs : 0;
@@ -312,21 +343,20 @@ export default class WatchdogService {
 
     // Recovery only pages when the outage itself did — a blip that never
     // alerted recovers silently.
-    if (wasAlerted) {
-      await WatchdogService._safeAlert(
-        `🟢 **${state.name}** recovered after ${formatDuration(downForMs)}`,
-      );
-    }
+    return wasAlerted ? `🟢 **${state.name}** recovered after ${formatDuration(downForMs)}` : null;
   }
 
-  private static async _safeAlert(message: string): Promise<void> {
-    try {
-      await WatchdogService.deps.sendAlert(message);
-      logger.warn(`[Watchdog] ${message}`);
-    } catch (error: unknown) {
-      logger.error(
-        `[Watchdog] Failed to send alert (${getErrorMessage(error)}): ${message}`,
-      );
+  /** Send a pass's alert lines as few webhook posts as fit; failures are logged, never thrown. */
+  private static async _sendAlerts(lines: Array<string | null>): Promise<void> {
+    for (const message of packAlertMessages(lines.filter((line): line is string => line !== null))) {
+      try {
+        await WatchdogService.deps.sendAlert(message);
+        logger.warn(`[Watchdog] ${message}`);
+      } catch (error: unknown) {
+        logger.error(
+          `[Watchdog] Failed to send alert (${getErrorMessage(error)}): ${message}`,
+        );
+      }
     }
   }
 }

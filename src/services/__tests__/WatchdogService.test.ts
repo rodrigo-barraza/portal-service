@@ -5,7 +5,7 @@
 // pull failures, blips that must NOT page, and flap cooldown.
 
 import { describe, it, expect, beforeEach } from "vitest";
-import WatchdogService from "../WatchdogService.ts";
+import WatchdogService, { packAlertMessages } from "../WatchdogService.ts";
 
 const MINUTE = 60_000;
 const T0 = 1_000_000_000;
@@ -191,5 +191,61 @@ describe("pull targets", () => {
     expect(alerts).toHaveLength(1);
     expect(alerts[0]).toContain("MongoDB");
     expect(WatchdogService.getState("infra:mongodb")?.status).toBe("down");
+  });
+});
+
+describe("host-wide outages", () => {
+  it("sends one message for every target that went down in the same pass", async () => {
+    const pullTargets: PullTarget[] = Array.from({ length: 30 }, (_, index) => ({
+      id: `service-${index}`,
+      name: `Service ${index}`,
+      kind: "service" as const,
+      healthy: false,
+      reason: "Timeout",
+    }));
+    const { alerts } = setup({ pullTargets });
+
+    await WatchdogService.evaluate(T0);
+    await WatchdogService.evaluate(T0 + 2 * MINUTE);
+
+    // One webhook post, not thirty (Discord allows 5 per 2 seconds)
+    expect(alerts).toHaveLength(1);
+    for (const target of pullTargets) {
+      expect(alerts[0]).toContain(`**${target.name}**`);
+    }
+
+    for (const target of pullTargets) target.healthy = true;
+    await WatchdogService.evaluate(T0 + 5 * MINUTE);
+    expect(alerts).toHaveLength(2);
+    expect(alerts[1].split("\n")).toHaveLength(30);
+  });
+});
+
+describe("registry changes", () => {
+  it("forgets targets that left the registry", async () => {
+    const pullTargets: PullTarget[] = [
+      { id: "old-service", name: "Old", kind: "service", healthy: false, reason: "HTTP 502" },
+    ];
+    setup({ pullTargets });
+    await WatchdogService.evaluate(T0);
+    expect(WatchdogService.getState("old-service")?.status).toBe("down");
+
+    pullTargets.length = 0;
+    await WatchdogService.evaluate(T0 + MINUTE);
+    expect(WatchdogService.getState("old-service")).toBeNull();
+    expect(WatchdogService.getStates()).toEqual([]);
+  });
+});
+
+describe("packAlertMessages", () => {
+  it("fills messages up to the limit and splits beyond it", () => {
+    expect(packAlertMessages(["a", "b", "c"], 10)).toEqual(["a\nb\nc"]);
+    expect(packAlertMessages(["aaaa", "bbbb", "cccc"], 9)).toEqual(["aaaa\nbbbb", "cccc"]);
+  });
+
+  it("clips a single overlong line", () => {
+    const [message] = packAlertMessages(["x".repeat(50)], 10);
+    expect(message).toHaveLength(10);
+    expect(message.endsWith("…")).toBe(true);
   });
 });

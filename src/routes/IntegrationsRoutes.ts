@@ -1,6 +1,8 @@
 // ─── Integrations Route ─────────────────────────────────────
 
+import { createHash } from "node:crypto";
 import { Router, type Request, type Response } from "express";
+import type { IntegrationCategory, IntegrationDef, IntegrationStatus } from "../types.ts";
 
 const router = Router();
 
@@ -10,9 +12,8 @@ const router = Router();
 //   provider   — human-readable provider name
 //   category   — grouping for the UI
 //   docs       — link to the provider dashboard / docs
-//   icon       — optional emoji or icon hint for the frontend
 
-const INTEGRATIONS = [
+const INTEGRATIONS: IntegrationDef[] = [
   // ── AI / LLM ───────────────────────────────────────────────
   { envKey: "OPENAI_API_KEY",       provider: "OpenAI",       category: "AI / LLM",         docs: "https://platform.openai.com/api-keys" },
   { envKey: "ANTHROPIC_API_KEY",    provider: "Anthropic",    category: "AI / LLM",         docs: "https://console.anthropic.com/settings/keys" },
@@ -75,49 +76,51 @@ const INTEGRATIONS = [
   { envKey: "BRIGHTDATA_CUSTOMER_ID",provider: "Bright Data",  category: "Proxy",           docs: "https://brightdata.com" },
 ];
 
-function maskValue(value: string | undefined | null) {
-  if (!value || value.length === 0) return null;
-  if (value.length <= 12) return `${"•".repeat(value.length)}`;
-  return `${value.slice(0, 4)}${"•".repeat(Math.min(value.length - 8, 20))}${value.slice(-4)}`;
+const FINGERPRINT_HEX_LENGTH = 8;
+
+/**
+ * A short, non-reversible identifier for a configured key: the first
+ * 8 hex chars of its SHA-256. Enough to tell keys apart or confirm a
+ * rotation landed; reveals nothing of the key (the old preview exposed
+ * its first and last four characters on a public API).
+ */
+export function keyFingerprint(value: string | undefined): string | null {
+  if (!value) return null;
+  return createHash("sha256").update(value).digest("hex").slice(0, FINGERPRINT_HEX_LENGTH);
+}
+
+export function integrationStatuses(environment: NodeJS.ProcessEnv = process.env): IntegrationStatus[] {
+  return INTEGRATIONS.map((definition) => {
+    const value = environment[definition.envKey];
+    return {
+      ...definition,
+      configured: Boolean(value),
+      fingerprint: keyFingerprint(value),
+    };
+  });
+}
+
+export function groupByCategory(integrations: IntegrationStatus[]): IntegrationCategory[] {
+  const categories = new Map<string, IntegrationCategory>();
+  for (const integration of integrations) {
+    let category = categories.get(integration.category);
+    if (!category) {
+      category = { category: integration.category, integrations: [], configuredCount: 0, totalCount: 0 };
+      categories.set(integration.category, category);
+    }
+    category.integrations.push(integration);
+    category.totalCount++;
+    if (integration.configured) category.configuredCount++;
+  }
+  return [...categories.values()];
 }
 
 router.get("/", (_req: Request, res: Response) => {
-  const integrations = INTEGRATIONS.map((def: { envKey: string; provider: string; category: string; docs: string }) => {
-    const rawValue = process.env[def.envKey] || "";
-    const configured = rawValue.length > 0;
-
-    return {
-      envKey: def.envKey,
-      provider: def.provider,
-      category: def.category,
-      docs: def.docs,
-      configured,
-      maskedKey: maskValue(rawValue),
-    };
-  });
-
-  // Group by category
-  const categories: Record<string, { category: string; integrations: Record<string, unknown>[]; configuredCount: number; totalCount: number }> = {};
-  for (const item of integrations) {
-    if (!categories[item.category]) {
-      categories[item.category] = {
-        category: item.category,
-        integrations: [],
-        configuredCount: 0,
-        totalCount: 0,
-      };
-    }
-    categories[item.category].integrations.push(item);
-    categories[item.category].totalCount++;
-    if (item.configured) categories[item.category].configuredCount++;
-  }
-
-  const totalConfigured = integrations.filter((i: { configured: boolean }) => i.configured).length;
-
+  const integrations = integrationStatuses();
   res.json({
     totalCount: integrations.length,
-    configuredCount: totalConfigured,
-    categories: Object.values(categories),
+    configuredCount: integrations.filter((integration) => integration.configured).length,
+    categories: groupByCategory(integrations),
   });
 });
 
