@@ -1,184 +1,151 @@
-import { Router, type Request, type Response, type NextFunction } from "express";
-import logger from "../utils/logger.ts";
+import { Router, type Request, type Response } from "express";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { createApiClient } from "@rodrigo-barraza/utilities-library/http";
+import { HttpError } from "@rodrigo-barraza/utilities-library/service";
 import { AUTH_HEADERS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { SESSIONS_SERVICE_URL, SESSIONS_STATS_API_SECRET } from "../config.ts";
+import logger from "../utils/logger.ts";
+import { routeParam, singleValuedQuery } from "../utils/http.ts";
 
 /**
  * SessionAnalyticsRoutes — Proxy layer for sessions-service stats API.
  *
- * Forwards all session analytics requests from portal-client through
+ * Forwards session analytics requests from portal-client through
  * portal-service to sessions-service, attaching the shared stats secret.
  * sessions-service is publicly reachable (api.sessions.rod.dev), so its
- * /stats/* routes reject requests without the secret.
+ * /stats/* routes reject requests without the secret. Only the fixed
+ * paths below are proxied; path parameters are URL-encoded.
  */
 
 const router = Router();
 
-const SESSIONS_STATS_BASE = `${SESSIONS_SERVICE_URL}/stats`;
-
-const sessionsClient = createApiClient(SESSIONS_STATS_BASE, {
-  headers: {
-    "Content-Type": "application/json",
-    ...(SESSIONS_STATS_API_SECRET ? { [AUTH_HEADERS.apiSecret]: SESSIONS_STATS_API_SECRET } : {}),
-  },
-  timeoutMilliseconds: 15_000,
-});
+const sessionsClient = SESSIONS_SERVICE_URL
+  ? createApiClient(`${SESSIONS_SERVICE_URL}/stats`, {
+      headers: {
+        ...(SESSIONS_STATS_API_SECRET
+          ? { [AUTH_HEADERS.apiSecret]: SESSIONS_STATS_API_SECRET }
+          : {}),
+      },
+      timeoutMilliseconds: 15_000,
+    })
+  : null;
 
 /**
- * Generic proxy helper — forwards GET requests to sessions-service.
+ * The message of a sessions-service error body, whatever its envelope —
+ * it answers `{ error: true, message }` (401/503), `{ error: "…" }`, or a
+ * bare `{ message }`.
  */
-async function proxy(
-  sessionsPath: string,
-  query: Record<string, string>,
-  res: Response,
-  next: NextFunction,
-) {
-  try {
-    if (!SESSIONS_SERVICE_URL) {
-      return res.status(503).json({
-        error: true,
-        message: "Sessions service URL not configured",
-      });
-    }
-
-    const queryString = new URLSearchParams(query).toString();
-    const path = `${sessionsPath}${queryString ? `?${queryString}` : ""}`;
-
-    // requestRaw: upstream status and body pass through verbatim (no throw
-    // on non-2xx), preserving the proxy's exact response semantics.
-    const response = await sessionsClient.requestRaw(path, { method: "GET" });
-
-    let data: unknown;
-    try {
-      data = await response.json();
-    } catch {
-      // Upstream returned non-JSON (e.g. an HTML error page)
-      return res.status(502).json({
-        error: true,
-        message: `Sessions service returned a non-JSON response (${response.status})`,
-      });
-    }
-    return res.status(response.status).json(data);
-  } catch (error: unknown) {
-    logger.error(`[SessionAnalytics] Proxy error: ${getErrorMessage(error)}`);
-    next(error);
-  }
+export function upstreamErrorMessage(body: unknown, status: number): string {
+  const candidate = body as { error?: unknown; message?: unknown } | null;
+  if (typeof candidate?.error === "string" && candidate.error)
+    return candidate.error;
+  if (typeof candidate?.message === "string" && candidate.message)
+    return candidate.message;
+  return `Sessions service error (${status})`;
 }
 
-// ─── GET /session-analytics/projects ──────────────────────────
+/**
+ * Forward a GET to sessions-service. 2xx bodies pass through verbatim;
+ * errors keep the upstream status but are re-enveloped as
+ * `{ error: "<message>" }` like every other portal error.
+ */
+async function proxy(
+  res: Response,
+  sessionsPath: string,
+  query: Record<string, string> = {},
+) {
+  if (!sessionsClient) {
+    throw new HttpError("Sessions service URL not configured", 503);
+  }
 
-router.get("/projects", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/projects", req.query as Record<string, string>, res, next);
-});
+  const queryString = new URLSearchParams(query).toString();
+  let response: globalThis.Response;
+  try {
+    // requestRaw: no throw on non-2xx, so upstream statuses pass through.
+    response = await sessionsClient.requestRaw(
+      `${sessionsPath}${queryString ? `?${queryString}` : ""}`,
+      {
+        method: "GET",
+      },
+    );
+  } catch (error: unknown) {
+    logger.error(
+      `[SessionAnalytics] ${sessionsPath} unreachable: ${getErrorMessage(error)}`,
+    );
+    throw new HttpError("Sessions service unreachable", 502);
+  }
 
-// ─── GET /session-analytics/overview ──────────────────────────
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    // Upstream returned non-JSON (e.g. a proxy's HTML error page)
+    throw new HttpError(
+      `Sessions service returned a non-JSON response (${response.status})`,
+      502,
+    );
+  }
 
-router.get("/overview", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/overview", req.query as Record<string, string>, res, next);
-});
+  if (!response.ok) {
+    res
+      .status(response.status)
+      .json({ error: upstreamErrorMessage(data, response.status) });
+    return;
+  }
+  res.status(response.status).json(data);
+}
 
-// ─── GET /session-analytics/sessions ──────────────────────────
+// Straight pass-throughs: GET /session-analytics/<path>?… → sessions /stats/<path>?…
+const PASSTHROUGH_PATHS = [
+  "/projects",
+  "/overview",
+  "/sessions",
+  "/pages",
+  "/referrers",
+  "/geo",
+  "/devices",
+  "/timeseries",
+  "/live",
+  "/events",
+  "/events/feed",
+  "/cross-client",
+  // Normalized cursor/click/scroll density grid for one page path + viewport band
+  "/heatmap",
+  "/visitors",
+  "/ips",
+];
 
-router.get("/sessions", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/sessions", req.query as Record<string, string>, res, next);
-});
-
-// ─── GET /session-analytics/pages ─────────────────────────────
-
-router.get("/pages", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/pages", req.query as Record<string, string>, res, next);
-});
-
-// ─── GET /session-analytics/referrers ─────────────────────────
-
-router.get("/referrers", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/referrers", req.query as Record<string, string>, res, next);
-});
-
-// ─── GET /session-analytics/geo ───────────────────────────────
-
-router.get("/geo", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/geo", req.query as Record<string, string>, res, next);
-});
-
-// ─── GET /session-analytics/devices ───────────────────────────
-
-router.get("/devices", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/devices", req.query as Record<string, string>, res, next);
-});
-
-// ─── GET /session-analytics/timeseries ────────────────────────
-
-router.get("/timeseries", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/timeseries", req.query as Record<string, string>, res, next);
-});
-
-// ─── GET /session-analytics/live ──────────────────────────────
-
-router.get("/live", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/live", req.query as Record<string, string>, res, next);
-});
-
-// ─── GET /session-analytics/events ────────────────────────────
-
-router.get("/events", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/events", req.query as Record<string, string>, res, next);
-});
-
-// ─── GET /session-analytics/events/feed ───────────────────────
-
-router.get("/events/feed", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/events/feed", req.query as Record<string, string>, res, next);
-});
-
-// ─── GET /session-analytics/cross-client ──────────────────────
-
-router.get("/cross-client", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/cross-client", req.query as Record<string, string>, res, next);
-});
+for (const path of PASSTHROUGH_PATHS) {
+  router.get(path, (req: Request, res: Response) =>
+    proxy(res, path, singleValuedQuery(req)),
+  );
+}
 
 // ─── GET /session-analytics/session/:sessionId ────────────────
 
-router.get("/session/:sessionId", (req: Request, res: Response, next: NextFunction) => {
-  const sessionId = String(req.params.sessionId);
-  proxy(`/session/${encodeURIComponent(sessionId)}`, {}, res, next);
-});
+router.get("/session/:sessionId", (req: Request, res: Response) =>
+  proxy(res, `/session/${encodeURIComponent(routeParam(req, "sessionId"))}`),
+);
 
 // ─── GET /session-analytics/session/:sessionId/replay ─────────
 // Full ordered rrweb event stream for one session (playback). The extra path
 // segment means it never collides with /session/:sessionId above.
 
-router.get("/session/:sessionId/replay", (req: Request, res: Response, next: NextFunction) => {
-  const sessionId = String(req.params.sessionId);
-  proxy(`/session/${encodeURIComponent(sessionId)}/replay`, {}, res, next);
-});
-
-// ─── GET /session-analytics/heatmap ───────────────────────────
-// Normalized cursor/click/scroll density grid for one page path + viewport band.
-
-router.get("/heatmap", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/heatmap", req.query as Record<string, string>, res, next);
-});
-
-// ─── GET /session-analytics/visitors ──────────────────────────
-
-router.get("/visitors", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/visitors", req.query as Record<string, string>, res, next);
-});
-
-// ─── GET /session-analytics/ips ───────────────────────────────
-
-router.get("/ips", (req: Request, res: Response, next: NextFunction) => {
-  proxy("/ips", req.query as Record<string, string>, res, next);
-});
+router.get("/session/:sessionId/replay", (req: Request, res: Response) =>
+  proxy(
+    res,
+    `/session/${encodeURIComponent(routeParam(req, "sessionId"))}/replay`,
+  ),
+);
 
 // ─── GET /session-analytics/ip/:ip ────────────────────────────
 
-router.get("/ip/:ip", (req: Request, res: Response, next: NextFunction) => {
-  const ip = String(req.params.ip);
-  proxy(`/ip/${encodeURIComponent(ip)}`, req.query as Record<string, string>, res, next);
-});
+router.get("/ip/:ip", (req: Request, res: Response) =>
+  proxy(
+    res,
+    `/ip/${encodeURIComponent(routeParam(req, "ip"))}`,
+    singleValuedQuery(req),
+  ),
+);
 
 export default router;

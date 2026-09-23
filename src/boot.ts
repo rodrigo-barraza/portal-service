@@ -1,12 +1,12 @@
-import type { VaultRegistry } from "./types.ts";
 // ─── Boot Sequence ──────────────────────────────────────────
+// Secrets must be in process.env before config.ts is evaluated, so
+// everything past step 1 is imported dynamically.
 
-import { createVaultClient } from "@rodrigo-barraza/utilities-library/vault";
 import { createLogger } from "@rodrigo-barraza/utilities-library/node";
+import type { VaultRegistry } from "./types.ts";
+import { vault, fetchVaultRegistry } from "./vault.ts";
 
 const bootLogger = createLogger("portal");
-
-const vault = createVaultClient();
 
 // ── 1. Fetch secrets → process.env ────────────────────────────
 const secrets = await vault.fetch();
@@ -18,33 +18,34 @@ for (const [key, value] of Object.entries(secrets)) {
 }
 
 // ── 2. Fetch registry → initialize config ─────────────────────
-// Vault may not be fully ready yet (Docker Compose boot race),
-// so retry the registry fetch a few times before falling back.
+// Vault may not be fully ready yet (Docker Compose boot race), so retry
+// the registry fetch a few times; index.ts keeps retrying in the
+// background if it is still empty.
 const REGISTRY_RETRIES = 5;
 const REGISTRY_RETRY_DELAY_MS = 2_000;
+
+const { applyRegistry, hasProjects } =
+  await import("./services/RegistryRefreshService.ts");
 
 let registry: VaultRegistry | null = null;
 
 for (let attempt = 1; attempt <= REGISTRY_RETRIES; attempt++) {
-  vault.clearRegistryCache();
-  registry = await vault.fetchRegistry() as unknown as VaultRegistry;
-
-  if (registry?.projects?.length > 0) break;
+  registry = await fetchVaultRegistry();
+  if (hasProjects(registry)) break;
 
   if (attempt < REGISTRY_RETRIES) {
-    bootLogger.warn(`Registry empty (attempt ${attempt}/${REGISTRY_RETRIES}) — retrying in ${REGISTRY_RETRY_DELAY_MS}ms…`);
-    await new Promise((r) => setTimeout(r, REGISTRY_RETRY_DELAY_MS));
+    bootLogger.warn(
+      `Registry empty (attempt ${attempt}/${REGISTRY_RETRIES}) — retrying in ${REGISTRY_RETRY_DELAY_MS}ms…`,
+    );
+    await new Promise((resolve) =>
+      setTimeout(resolve, REGISTRY_RETRY_DELAY_MS),
+    );
   }
 }
 
-const { initializeRegistry } = await import("./config.ts");
-if (registry) {
-  initializeRegistry(registry);
+if (hasProjects(registry)) {
+  applyRegistry(registry);
 }
-
-// Export vault client so index.ts can schedule a deferred re-fetch
-// if the registry was empty at boot time.
-export { vault };
 
 // ── 3. Start the server ───────────────────────────────────────
 await import("./index.ts");

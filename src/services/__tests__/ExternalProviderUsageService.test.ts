@@ -8,13 +8,16 @@ import ExternalProviderUsageService, {
   __internal,
 } from "../ExternalProviderUsageService.ts";
 
-const { prettifyHostname, resolveHostProvider, hostsForProviderKey } = __internal;
+const { prettifyHostname, resolveHostProvider, hostsForProviderKey } =
+  __internal;
 
 describe("prettifyHostname", () => {
   it("strips prefixes and TLD noise", () => {
     expect(prettifyHostname("api.open-meteo.com")).toBe("Open Meteo");
     expect(prettifyHostname("www.eia.gov")).toBe("Eia");
-    expect(prettifyHostname("hacker-news.firebaseio.com")).toBe("Hacker News Firebaseio");
+    expect(prettifyHostname("hacker-news.firebaseio.com")).toBe(
+      "Hacker News Firebaseio",
+    );
   });
 });
 
@@ -28,7 +31,9 @@ describe("resolveHostProvider", () => {
   });
 
   it("collapses sibling hosts onto one provider key", () => {
-    expect(resolveHostProvider("accounts.spotify.com").key).toBe("api.spotify.com");
+    expect(resolveHostProvider("accounts.spotify.com").key).toBe(
+      "api.spotify.com",
+    );
     expect(resolveHostProvider("oauth.reddit.com").key).toBe("reddit.com");
   });
 
@@ -50,18 +55,51 @@ describe("hostsForProviderKey", () => {
   });
 
   it("returns the identifier itself for unmapped hosts", () => {
-    expect(hostsForProviderKey("api.some-new-thing.io")).toEqual(["api.some-new-thing.io"]);
+    expect(hostsForProviderKey("api.some-new-thing.io")).toEqual([
+      "api.some-new-thing.io",
+    ]);
   });
 });
 
 describe("identifier validation", () => {
   it("accepts hostnames and llm-prefixed providers, rejects injection shapes", () => {
-    expect(ExternalProviderUsageService.isValidServiceIdentifier("places.googleapis.com")).toBe(true);
-    expect(ExternalProviderUsageService.isValidServiceIdentifier("llm:openai")).toBe(true);
-    expect(ExternalProviderUsageService.isValidServiceIdentifier("api.ebay.com")).toBe(true);
-    expect(ExternalProviderUsageService.isValidServiceIdentifier('bad"filter')).toBe(false);
-    expect(ExternalProviderUsageService.isValidServiceIdentifier("")).toBe(false);
-    expect(ExternalProviderUsageService.isLlmIdentifier("llm:moonshot")).toBe(true);
-    expect(ExternalProviderUsageService.isLlmIdentifier("api.ebay.com")).toBe(false);
+    expect(
+      ExternalProviderUsageService.isValidServiceIdentifier(
+        "places.googleapis.com",
+      ),
+    ).toBe(true);
+    expect(
+      ExternalProviderUsageService.isValidServiceIdentifier("llm:openai"),
+    ).toBe(true);
+    expect(
+      ExternalProviderUsageService.isValidServiceIdentifier("api.ebay.com"),
+    ).toBe(true);
+    expect(
+      ExternalProviderUsageService.isValidServiceIdentifier('bad"filter'),
+    ).toBe(false);
+    expect(ExternalProviderUsageService.isValidServiceIdentifier("")).toBe(
+      false,
+    );
+    expect(ExternalProviderUsageService.isLlmIdentifier("llm:moonshot")).toBe(
+      true,
+    );
+    expect(ExternalProviderUsageService.isLlmIdentifier("api.ebay.com")).toBe(
+      false,
+    );
+  });
+});
+
+describe("resolveLlmProvider", () => {
+  const { resolveLlmProvider } = __internal;
+
+  it("uses curated metadata for known providers", () => {
+    expect(resolveLlmProvider("openai").displayName).toBe("OpenAI API");
+  });
+
+  it("derives one fallback name for unknown providers — the card and its time series agree", () => {
+    const fallback = resolveLlmProvider("some-new-provider");
+    expect(fallback.displayName).toBe("some-new-provider API");
+    expect(fallback.displayName).not.toContain("llm:");
+    expect(fallback.category).toBe("AI / LLM");
   });
 });

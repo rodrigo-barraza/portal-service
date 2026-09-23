@@ -14,7 +14,7 @@
   },
   "ignorePatterns": [
     "node_modules/",
-    "dist/",
+    "coverage/",
     ".claude/"
   ],
   "rules": {
@@ -132,23 +132,6 @@
         "no-with": "off",
         "prefer-rest-params": "error",
         "prefer-spread": "error"
-      }
-    },
-    {
-      "files": [
-        "tests/**/*.ts",
-        "tests/**/*.js"
-      ],
-      "globals": {
-        "describe": "readonly",
-        "it": "readonly",
-        "test": "readonly",
-        "expect": "readonly",
-        "vi": "readonly",
-        "beforeEach": "readonly",
-        "afterEach": "readonly",
-        "beforeAll": "readonly",
-        "afterAll": "readonly"
       }
     }
   ]

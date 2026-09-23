@@ -37,6 +37,7 @@ describe("EcosystemResolver", () => {
         dockerProject: null,
         deployTier: 1,
         essential: false,
+        analyticsPropertyId: null,
         dependsOn: [],
       };
 
@@ -58,6 +59,7 @@ describe("EcosystemResolver", () => {
         dockerProject: null,
         deployTier: 1,
         essential: false,
+        analyticsPropertyId: null,
         dependsOn: [],
       };
 
@@ -83,7 +85,7 @@ describe("EcosystemResolver", () => {
       const resolvedId = EcosystemResolver.resolveEcosystemId(
         "@rodrigo-barraza/utilities-library",
         "1.0.0",
-        mockEcosystemOwners
+        mockEcosystemOwners,
       );
       expect(resolvedId).toBe("utilities-library");
     });
@@ -92,7 +94,7 @@ describe("EcosystemResolver", () => {
       const resolvedId = EcosystemResolver.resolveEcosystemId(
         "service-library",
         "github:rodrigo-barraza/service-library",
-        mockEcosystemOwners
+        mockEcosystemOwners,
       );
       expect(resolvedId).toBe("service-library");
     });
@@ -101,16 +103,55 @@ describe("EcosystemResolver", () => {
       const resolvedId = EcosystemResolver.resolveEcosystemId(
         "service-library",
         "https://github.com/rodrigo-barraza/service-library.git",
-        mockEcosystemOwners
+        mockEcosystemOwners,
       );
       expect(resolvedId).toBe("service-library");
+    });
+
+    it("should strip a pinned #ref and accept git+ssh URLs", () => {
+      expect(
+        EcosystemResolver.resolveEcosystemId(
+          "@x/utilities",
+          "github:rodrigo-barraza/utilities-library#eb72517",
+          mockEcosystemOwners,
+        ),
+      ).toBe("utilities-library");
+      expect(
+        EcosystemResolver.resolveEcosystemId(
+          "lib",
+          "git+ssh://git@github.com:rodrigo-barraza/service-library.git#main",
+          mockEcosystemOwners,
+        ),
+      ).toBe("service-library");
+    });
+
+    it("should treat the owner literally, not as a regex", () => {
+      const dottedOwner = {
+        owners: new Set(["a.b"]),
+        scopePrefixes: new Set<string>(),
+        projectOwners: new Map<string, string>(),
+      };
+      expect(
+        EcosystemResolver.resolveEcosystemId(
+          "repo",
+          "github:axb/repo",
+          dottedOwner,
+        ),
+      ).toBeNull();
+      expect(
+        EcosystemResolver.resolveEcosystemId(
+          "repo",
+          "github:a.b/repo",
+          dottedOwner,
+        ),
+      ).toBe("repo");
     });
 
     it("should resolve ecosystem ID from local file links", () => {
       const resolvedId = EcosystemResolver.resolveEcosystemId(
         "local-pkg",
         "file:../local-pkg",
-        mockEcosystemOwners
+        mockEcosystemOwners,
       );
       expect(resolvedId).toBe("local-pkg");
     });
@@ -119,7 +160,7 @@ describe("EcosystemResolver", () => {
       const resolvedId = EcosystemResolver.resolveEcosystemId(
         "lodash",
         "^4.17.21",
-        mockEcosystemOwners
+        mockEcosystemOwners,
       );
       expect(resolvedId).toBeNull();
     });

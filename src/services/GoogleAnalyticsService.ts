@@ -1,568 +1,567 @@
-import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import { createTtlCache } from "@rodrigo-barraza/utilities-library/cache";
-import { BetaAnalyticsDataClient } from "@google-analytics/data";
+import { BetaAnalyticsDataClient, protos } from "@google-analytics/data";
 import logger from "../utils/logger.ts";
 import {
   GOOGLE_ANALYTICS_CREDENTIALS,
   ANALYTICS_PROPERTIES,
 } from "../config.ts";
+import type { AnalyticsProperty } from "../types.ts";
+import { createDedupedTtlCache } from "../utils/cache.ts";
+import { parseServiceAccountCredentials } from "../utils/googleCredentials.ts";
 import { GoogleAnalyticsDateHelper } from "./google-analytics/GoogleAnalyticsDateHelper.ts";
 
-interface GoogleAnalyticsResponseRow {
-  dimensionValues?: { value?: string | null }[] | null;
-  metricValues?: { value?: string | null }[] | null;
+type AnalyticsResponse = protos.google.analytics.data.v1beta.IRunReportResponse;
+type AnalyticsRow = protos.google.analytics.data.v1beta.IRow;
+type TransformedRow = Record<string, string | number>;
+
+interface ReportSpec {
+  /** GA dimension names, renamed positionally to `dimensionKeys`. */
+  dimensions: string[];
+  dimensionKeys: string[];
+  /** GA metric names, renamed positionally to `metricKeys`. */
+  metrics: string[];
+  metricKeys: string[];
+  /** Sort descending by this GA metric. */
+  orderByMetric?: string;
+  limit?: number;
 }
 
-interface GoogleAnalyticsResponse {
-  rows?: GoogleAnalyticsResponseRow[] | null;
-}
-
-interface TransformedGoogleAnalyticsRow {
-  [key: string]: string | number;
-}
-
-interface TransformedOverviewMetricPeriod {
-  sessions: number;
-  pageviews: number;
-  activeUsers: number;
-  totalUsers: number;
-  newUsers: number;
-  bounceRate: number;
-  avgSessionDuration: number;
-  engagedSessions: number;
-  engagementRate: number;
-}
-
-// Stale-while-revalidate, delete-on-background-failure — matches the
-// previous hand-rolled cached() semantics exactly.
-const analyticsCache = createTtlCache({ staleWhileRevalidate: true });
+// Stale-while-revalidate, and concurrent callers for one report share a
+// fetch (a dashboard load fires ~11 reports at once, twice with the
+// property listing's realtime badges).
+const analyticsCache = createDedupedTtlCache({ staleWhileRevalidate: true });
 
 const REALTIME_TTL = 15_000;
 const REPORT_TTL = 60_000;
+const DEFAULT_PERIOD = "30d";
 
-function getProperties() {
-  return ANALYTICS_PROPERTIES;
-}
-
+/** Positional GA values → named keys; *Rate / *Duration metrics stay fractional. */
 function formatRows(
-  response: GoogleAnalyticsResponse | undefined | null,
-  dimensionNames: string[],
-  metricNames: string[]
-): TransformedGoogleAnalyticsRow[] {
+  response: AnalyticsResponse | null | undefined,
+  dimensionKeys: string[],
+  metricKeys: string[],
+): TransformedRow[] {
   if (!response?.rows) return [];
 
-  return response.rows.map((row: GoogleAnalyticsResponseRow) => {
-    const entry: TransformedGoogleAnalyticsRow = {};
-    dimensionNames.forEach((name: string, index: number) => {
-      entry[name] = row.dimensionValues?.[index]?.value || "";
+  return response.rows.map((row: AnalyticsRow) => {
+    const entry: TransformedRow = {};
+    dimensionKeys.forEach((key, index) => {
+      entry[key] = row.dimensionValues?.[index]?.value || "";
     });
-    metricNames.forEach((name: string, index: number) => {
+    metricKeys.forEach((key, index) => {
       const raw = row.metricValues?.[index]?.value || "0";
-      entry[name] = name.includes("Rate") || name.includes("Duration")
-        ? parseFloat(raw)
-        : parseInt(raw, 10);
+      entry[key] =
+        key.includes("Rate") || key.includes("Duration")
+          ? Number.parseFloat(raw)
+          : Number.parseInt(raw, 10);
     });
     return entry;
   });
 }
 
+const OVERVIEW_METRICS = [
+  "sessions",
+  "screenPageViews",
+  "activeUsers",
+  "totalUsers",
+  "newUsers",
+  "bounceRate",
+  "averageSessionDuration",
+  "engagedSessions",
+  "engagementRate",
+];
+
+/**
+ * The row GA tagged with this `dateRange` name (a multi-range report adds
+ * that dimension). Without the header, fall back to request order.
+ */
+export function findDateRangeRow(
+  response: AnalyticsResponse | null | undefined,
+  rangeName: string,
+  requestIndex: number,
+): AnalyticsRow | undefined {
+  const dateRangeIndex =
+    response?.dimensionHeaders?.findIndex(
+      (header) => header.name === "dateRange",
+    ) ?? -1;
+  if (dateRangeIndex < 0) return response?.rows?.[requestIndex] ?? undefined;
+  return response?.rows?.find(
+    (row) => row.dimensionValues?.[dateRangeIndex]?.value === rangeName,
+  );
+}
+
+/** OVERVIEW_METRICS values (in request order) → named numbers; a missing row reads as zeros. */
+export function parseOverviewRow(row: AnalyticsRow | undefined) {
+  const values = row?.metricValues || [];
+  const integer = (index: number) =>
+    Number.parseInt(values[index]?.value || "0", 10);
+  const decimal = (index: number) =>
+    Number.parseFloat(values[index]?.value || "0");
+  return {
+    sessions: integer(0),
+    pageviews: integer(1),
+    activeUsers: integer(2),
+    totalUsers: integer(3),
+    newUsers: integer(4),
+    bounceRate: decimal(5),
+    avgSessionDuration: decimal(6),
+    engagedSessions: integer(7),
+    engagementRate: decimal(8),
+  };
+}
+
+function relativeDelta(currentValue: number, previousValue: number): number {
+  if (!previousValue) return currentValue > 0 ? 1 : 0;
+  return (currentValue - previousValue) / Math.abs(previousValue);
+}
+
 export default class GoogleAnalyticsService {
   public static client: BetaAnalyticsDataClient | null = null;
 
-  public static _getClient() {
+  public static _getClient(): BetaAnalyticsDataClient {
     if (GoogleAnalyticsService.client) return GoogleAnalyticsService.client;
 
-    if (!GOOGLE_ANALYTICS_CREDENTIALS) {
-      throw new Error("GOOGLE_ANALYTICS_CREDENTIALS is not set");
-    }
+    const credentials = parseServiceAccountCredentials(
+      GOOGLE_ANALYTICS_CREDENTIALS,
+    );
+    GoogleAnalyticsService.client = new BetaAnalyticsDataClient({
+      credentials: {
+        client_email: credentials.client_email,
+        private_key: credentials.private_key,
+      },
+      projectId: credentials.project_id,
+    });
 
-    try {
-      const decoded = Buffer.from(GOOGLE_ANALYTICS_CREDENTIALS, "base64").toString("utf-8");
-      const credentials = JSON.parse(decoded);
-
-      GoogleAnalyticsService.client = new BetaAnalyticsDataClient({
-        credentials: {
-          client_email: credentials.client_email,
-          private_key: credentials.private_key,
-        },
-        projectId: credentials.project_id,
-      });
-
-      logger.success("[GoogleAnalytics] Client initialized");
-      return GoogleAnalyticsService.client;
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      throw new Error(`Failed to initialize GA client: ${errorMessage}`, { cause: error });
-    }
+    logger.success("[GoogleAnalytics] Client initialized");
+    return GoogleAnalyticsService.client;
   }
 
-  public static listProperties() {
-    return getProperties();
+  /** Release the gRPC channel (shutdown). */
+  public static async close(): Promise<void> {
+    const client = GoogleAnalyticsService.client;
+    GoogleAnalyticsService.client = null;
+    await client?.close();
+  }
+
+  public static listProperties(): AnalyticsProperty[] {
+    return ANALYTICS_PROPERTIES;
+  }
+
+  /**
+   * One report response per (report, property, period), cached with its
+   * fetch time — `fetchedAt` says how old the numbers are.
+   */
+  private static cachedReport<Body extends object>(
+    report: string,
+    propertyId: string,
+    period: string,
+    build: () => Promise<Body>,
+  ): Promise<Body & { period: string; fetchedAt: string }> {
+    return analyticsCache.get(
+      `${report}:${propertyId}:${period}`,
+      REPORT_TTL,
+      async () => ({
+        ...(await build()),
+        period,
+        fetchedAt: new Date().toISOString(),
+      }),
+    );
+  }
+
+  /** A single-date-range report, its rows renamed per `spec`. */
+  private static async runReport(
+    propertyId: string,
+    period: string,
+    spec: ReportSpec,
+  ): Promise<TransformedRow[]> {
+    const [response] = await GoogleAnalyticsService._getClient().runReport({
+      property: `properties/${propertyId}`,
+      dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
+      dimensions: spec.dimensions.map((name) => ({ name })),
+      metrics: spec.metrics.map((name) => ({ name })),
+      ...(spec.orderByMetric
+        ? {
+            orderBys: [
+              { metric: { metricName: spec.orderByMetric }, desc: true },
+            ],
+          }
+        : {}),
+      ...(spec.limit ? { limit: spec.limit } : {}),
+    });
+    return formatRows(response, spec.dimensionKeys, spec.metricKeys);
   }
 
   public static async getRealtimeReport(propertyId: string) {
-    const key = `realtime:${propertyId}`;
-    return analyticsCache.get(key, REALTIME_TTL, async () => {
-      const analyticsClient = GoogleAnalyticsService._getClient();
+    return analyticsCache.get(
+      `realtime:${propertyId}`,
+      REALTIME_TTL,
+      async () => {
+        const [response] =
+          await GoogleAnalyticsService._getClient().runRealtimeReport({
+            property: `properties/${propertyId}`,
+            // Realtime has no pagePath dimension — unifiedScreenName (page
+            // title / app screen) is the closest; it is served as `pagePath`.
+            dimensions: [{ name: "unifiedScreenName" }],
+            metrics: [{ name: "activeUsers" }],
+            // GA de-duplicates the TOTAL row; summing per-screen rows counted
+            // a visitor once for every screen they touched in the window.
+            metricAggregations: [
+              protos.google.analytics.data.v1beta.MetricAggregation.TOTAL,
+            ],
+            orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+            limit: 10,
+          });
 
-      const [response] = await analyticsClient.runRealtimeReport({
-        property: `properties/${propertyId}`,
-        dimensions: [{ name: "unifiedScreenName" }],
-        metrics: [{ name: "activeUsers" }],
-      });
+        const topPages = formatRows(response, ["pagePath"], ["activeUsers"]);
+        const reportedTotal = Number.parseInt(
+          response?.totals?.[0]?.metricValues?.[0]?.value ?? "",
+          10,
+        );
+        const activeUsers = Number.isFinite(reportedTotal)
+          ? reportedTotal
+          : topPages.reduce(
+              (sum, page) => sum + Number(page.activeUsers || 0),
+              0,
+            );
 
-      const pages = formatRows(response, ["pagePath"], ["activeUsers"]);
-      const totalActive = pages.reduce((sum: number, page: TransformedGoogleAnalyticsRow) => {
-        const users = page.activeUsers;
-        return sum + (typeof users === "number" ? users : 0);
-      }, 0);
-
-      return {
-        activeUsers: totalActive,
-        topPages: pages
-          .sort((firstRow: TransformedGoogleAnalyticsRow, secondRow: TransformedGoogleAnalyticsRow) => {
-            const aUsers = typeof firstRow.activeUsers === "number" ? firstRow.activeUsers : 0;
-            const bUsers = typeof secondRow.activeUsers === "number" ? secondRow.activeUsers : 0;
-            return bUsers - aUsers;
-          })
-          .slice(0, 10),
-        fetchedAt: new Date().toISOString(),
-      };
-    });
+        return { activeUsers, topPages, fetchedAt: new Date().toISOString() };
+      },
+    );
   }
 
-  public static async getOverviewReport(propertyId: string, period: string = "30d") {
-    const key = `overview:${propertyId}:${period}`;
-    return analyticsCache.get(key, REPORT_TTL, async () => {
-      const analyticsClient = GoogleAnalyticsService._getClient();
+  public static async getOverviewReport(
+    propertyId: string,
+    period: string = DEFAULT_PERIOD,
+  ) {
+    return analyticsCache.get(
+      `overview:${propertyId}:${period}`,
+      REPORT_TTL,
+      async () => {
+        const [response] = await GoogleAnalyticsService._getClient().runReport({
+          property: `properties/${propertyId}`,
+          // Named ranges: GA tags each row with a `dateRange` dimension, row
+          // order is unspecified, and a range with no data has no row at all
+          // — positional rows[0]/rows[1] could report last period as this one.
+          dateRanges: [
+            {
+              ...GoogleAnalyticsDateHelper.periodToDateRange(period),
+              name: "current",
+            },
+            {
+              ...GoogleAnalyticsDateHelper.previousPeriodRange(period),
+              name: "previous",
+            },
+          ],
+          metrics: OVERVIEW_METRICS.map((name) => ({ name })),
+        });
 
-      const metricNames = [
-        "sessions", "screenPageViews", "activeUsers", "totalUsers",
-        "newUsers", "bounceRate", "averageSessionDuration",
-        "engagedSessions", "engagementRate",
-      ];
+        const current = parseOverviewRow(
+          findDateRangeRow(response, "current", 0),
+        );
+        const previous = parseOverviewRow(
+          findDateRangeRow(response, "previous", 1),
+        );
 
-      const [response] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [
-          GoogleAnalyticsDateHelper.periodToDateRange(period),
-          GoogleAnalyticsDateHelper.previousPeriodRange(period),
-        ],
-        metrics: metricNames.map((name) => ({ name })),
-      });
-
-      const parseRow = (row: GoogleAnalyticsResponseRow | undefined): TransformedOverviewMetricPeriod => {
-        const metricValues = row?.metricValues || [];
         return {
-          sessions: parseInt(metricValues[0]?.value || "0", 10),
-          pageviews: parseInt(metricValues[1]?.value || "0", 10),
-          activeUsers: parseInt(metricValues[2]?.value || "0", 10),
-          totalUsers: parseInt(metricValues[3]?.value || "0", 10),
-          newUsers: parseInt(metricValues[4]?.value || "0", 10),
-          bounceRate: parseFloat(metricValues[5]?.value || "0"),
-          avgSessionDuration: parseFloat(metricValues[6]?.value || "0"),
-          engagedSessions: parseInt(metricValues[7]?.value || "0", 10),
-          engagementRate: parseFloat(metricValues[8]?.value || "0"),
+          ...current,
+          previous,
+          deltas: {
+            sessions: relativeDelta(current.sessions, previous.sessions),
+            pageviews: relativeDelta(current.pageviews, previous.pageviews),
+            totalUsers: relativeDelta(current.totalUsers, previous.totalUsers),
+            avgSessionDuration: relativeDelta(
+              current.avgSessionDuration,
+              previous.avgSessionDuration,
+            ),
+            engagementRate: relativeDelta(
+              current.engagementRate,
+              previous.engagementRate,
+            ),
+          },
+          period,
+          fetchedAt: new Date().toISOString(),
         };
-      };
-
-      const current = parseRow(response?.rows?.[0]);
-      const previous = parseRow(response?.rows?.[1]);
-
-      const delta = (currentValue: number, previousValue: number) => {
-        if (!previousValue || previousValue === 0) return currentValue > 0 ? 1 : 0;
-        return (currentValue - previousValue) / Math.abs(previousValue);
-      };
-
-      return {
-        ...current,
-        previous,
-        deltas: {
-          sessions: delta(current.sessions, previous.sessions),
-          pageviews: delta(current.pageviews, previous.pageviews),
-          totalUsers: delta(current.totalUsers, previous.totalUsers),
-          avgSessionDuration: delta(current.avgSessionDuration, previous.avgSessionDuration),
-          engagementRate: delta(current.engagementRate, previous.engagementRate),
-        },
-        period,
-        fetchedAt: new Date().toISOString(),
-      };
-    });
+      },
+    );
   }
 
-  public static async getTopPages(propertyId: string, period: string = "30d") {
-    const key = `pages:${propertyId}:${period}`;
-    return analyticsCache.get(key, REPORT_TTL, async () => {
-      const analyticsClient = GoogleAnalyticsService._getClient();
-
-      const [response] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [
-          { name: "pagePath" },
-          { name: "pageTitle" },
-        ],
-        metrics: [
-          { name: "screenPageViews" },
-          { name: "activeUsers" },
-          { name: "averageSessionDuration" },
-          { name: "bounceRate" },
-        ],
-        orderBys: [
-          { metric: { metricName: "screenPageViews" }, desc: true },
-        ],
-        limit: 20,
-      });
-
-      return {
-        pages: formatRows(
-          response,
-          ["pagePath", "pageTitle"],
-          ["pageviews", "users", "avgDuration", "bounceRate"],
-        ),
-        period,
-        fetchedAt: new Date().toISOString(),
-      };
-    });
+  public static getTopPages(
+    propertyId: string,
+    period: string = DEFAULT_PERIOD,
+  ) {
+    return GoogleAnalyticsService.cachedReport(
+      "pages",
+      propertyId,
+      period,
+      async () => ({
+        pages: await GoogleAnalyticsService.runReport(propertyId, period, {
+          dimensions: ["pagePath", "pageTitle"],
+          dimensionKeys: ["pagePath", "pageTitle"],
+          metrics: [
+            "screenPageViews",
+            "activeUsers",
+            "averageSessionDuration",
+            "bounceRate",
+          ],
+          metricKeys: ["pageviews", "users", "avgDuration", "bounceRate"],
+          orderByMetric: "screenPageViews",
+          limit: 20,
+        }),
+      }),
+    );
   }
 
-  public static async getTrafficSources(propertyId: string, period: string = "30d") {
-    const key = `sources:${propertyId}:${period}`;
-    return analyticsCache.get(key, REPORT_TTL, async () => {
-      const analyticsClient = GoogleAnalyticsService._getClient();
-
-      const [response] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [
-          { name: "sessionSource" },
-          { name: "sessionMedium" },
-        ],
-        metrics: [
-          { name: "sessions" },
-          { name: "activeUsers" },
-          { name: "engagementRate" },
-        ],
-        orderBys: [
-          { metric: { metricName: "sessions" }, desc: true },
-        ],
-        limit: 15,
-      });
-
-      return {
-        sources: formatRows(
-          response,
-          ["source", "medium"],
-          ["sessions", "users", "engagementRate"],
-        ),
-        period,
-        fetchedAt: new Date().toISOString(),
-      };
-    });
+  public static getTrafficSources(
+    propertyId: string,
+    period: string = DEFAULT_PERIOD,
+  ) {
+    return GoogleAnalyticsService.cachedReport(
+      "sources",
+      propertyId,
+      period,
+      async () => ({
+        sources: await GoogleAnalyticsService.runReport(propertyId, period, {
+          dimensions: ["sessionSource", "sessionMedium"],
+          dimensionKeys: ["source", "medium"],
+          metrics: ["sessions", "activeUsers", "engagementRate"],
+          metricKeys: ["sessions", "users", "engagementRate"],
+          orderByMetric: "sessions",
+          limit: 15,
+        }),
+      }),
+    );
   }
 
-  public static async getGeography(propertyId: string, period: string = "30d") {
-    const key = `geo:${propertyId}:${period}`;
-    return analyticsCache.get(key, REPORT_TTL, async () => {
-      const analyticsClient = GoogleAnalyticsService._getClient();
-
-      const [response] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [
-          { name: "country" },
-          { name: "city" },
-        ],
-        metrics: [
-          { name: "activeUsers" },
-          { name: "sessions" },
-        ],
-        orderBys: [
-          { metric: { metricName: "activeUsers" }, desc: true },
-        ],
-        limit: 20,
-      });
-
-      return {
-        locations: formatRows(
-          response,
-          ["country", "city"],
-          ["users", "sessions"],
-        ),
-        period,
-        fetchedAt: new Date().toISOString(),
-      };
-    });
+  public static getGeography(
+    propertyId: string,
+    period: string = DEFAULT_PERIOD,
+  ) {
+    return GoogleAnalyticsService.cachedReport(
+      "geo",
+      propertyId,
+      period,
+      async () => ({
+        locations: await GoogleAnalyticsService.runReport(propertyId, period, {
+          dimensions: ["country", "city"],
+          dimensionKeys: ["country", "city"],
+          metrics: ["activeUsers", "sessions"],
+          metricKeys: ["users", "sessions"],
+          orderByMetric: "activeUsers",
+          limit: 20,
+        }),
+      }),
+    );
   }
 
-  public static async getDevices(propertyId: string, period: string = "30d") {
-    const key = `devices:${propertyId}:${period}`;
-    return analyticsCache.get(key, REPORT_TTL, async () => {
-      const analyticsClient = GoogleAnalyticsService._getClient();
+  public static getDevices(
+    propertyId: string,
+    period: string = DEFAULT_PERIOD,
+  ) {
+    return GoogleAnalyticsService.cachedReport(
+      "devices",
+      propertyId,
+      period,
+      async () => {
+        // Four independent reports — run them in parallel
+        const [categories, browsers, operatingSystems, screenResolutions] =
+          await Promise.all([
+            GoogleAnalyticsService.runReport(propertyId, period, {
+              dimensions: ["deviceCategory"],
+              dimensionKeys: ["category"],
+              metrics: ["activeUsers", "sessions"],
+              metricKeys: ["users", "sessions"],
+              orderByMetric: "sessions",
+            }),
+            GoogleAnalyticsService.runReport(propertyId, period, {
+              dimensions: ["browser"],
+              dimensionKeys: ["browser"],
+              metrics: ["activeUsers", "sessions"],
+              metricKeys: ["users", "sessions"],
+              orderByMetric: "sessions",
+              limit: 10,
+            }),
+            GoogleAnalyticsService.runReport(propertyId, period, {
+              dimensions: ["operatingSystem"],
+              dimensionKeys: ["os"],
+              metrics: ["activeUsers", "sessions"],
+              metricKeys: ["users", "sessions"],
+              orderByMetric: "sessions",
+              limit: 10,
+            }),
+            GoogleAnalyticsService.runReport(propertyId, period, {
+              dimensions: ["screenResolution"],
+              dimensionKeys: ["resolution"],
+              metrics: ["sessions"],
+              metricKeys: ["sessions"],
+              orderByMetric: "sessions",
+              limit: 8,
+            }),
+          ]);
 
-      // Four independent reports — run them in parallel
-      const dateRanges = [GoogleAnalyticsDateHelper.periodToDateRange(period)];
-      const [[catResponse], [browserResponse], [osResponse], [resResponse]] =
-        await Promise.all([
-          analyticsClient.runReport({
-            property: `properties/${propertyId}`,
-            dateRanges,
-            dimensions: [{ name: "deviceCategory" }],
-            metrics: [
-              { name: "activeUsers" },
-              { name: "sessions" },
-            ],
-            orderBys: [
-              { metric: { metricName: "sessions" }, desc: true },
-            ],
-          }),
-          analyticsClient.runReport({
-            property: `properties/${propertyId}`,
-            dateRanges,
-            dimensions: [{ name: "browser" }],
-            metrics: [
-              { name: "activeUsers" },
-              { name: "sessions" },
-            ],
-            orderBys: [
-              { metric: { metricName: "sessions" }, desc: true },
-            ],
-            limit: 10,
-          }),
-          analyticsClient.runReport({
-            property: `properties/${propertyId}`,
-            dateRanges,
-            dimensions: [{ name: "operatingSystem" }],
-            metrics: [
-              { name: "activeUsers" },
-              { name: "sessions" },
-            ],
-            orderBys: [
-              { metric: { metricName: "sessions" }, desc: true },
-            ],
-            limit: 10,
-          }),
-          analyticsClient.runReport({
-            property: `properties/${propertyId}`,
-            dateRanges,
-            dimensions: [{ name: "screenResolution" }],
-            metrics: [
-              { name: "sessions" },
-            ],
-            orderBys: [
-              { metric: { metricName: "sessions" }, desc: true },
-            ],
-            limit: 8,
-          }),
-        ]);
-
-      return {
-        categories: formatRows(catResponse, ["category"], ["users", "sessions"]),
-        browsers: formatRows(browserResponse, ["browser"], ["users", "sessions"]),
-        operatingSystems: formatRows(osResponse, ["os"], ["users", "sessions"]),
-        screenResolutions: formatRows(resResponse, ["resolution"], ["sessions"]),
-        period,
-        fetchedAt: new Date().toISOString(),
-      };
-    });
+        return { categories, browsers, operatingSystems, screenResolutions };
+      },
+    );
   }
 
-  public static async getTimeSeries(propertyId: string, period: string = "30d") {
-    const key = `timeseries:${propertyId}:${period}`;
-    return analyticsCache.get(key, REPORT_TTL, async () => {
-      const analyticsClient = GoogleAnalyticsService._getClient();
+  public static async getTimeSeries(
+    propertyId: string,
+    period: string = DEFAULT_PERIOD,
+  ) {
+    return analyticsCache.get(
+      `timeseries:${propertyId}:${period}`,
+      REPORT_TTL,
+      async () => {
+        const [response] = await GoogleAnalyticsService._getClient().runReport({
+          property: `properties/${propertyId}`,
+          dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
+          dimensions: [{ name: "date" }],
+          metrics: [
+            { name: "screenPageViews" },
+            { name: "activeUsers" },
+            { name: "sessions" },
+          ],
+          orderBys: [{ dimension: { dimensionName: "date" }, desc: false }],
+        });
 
-      const [response] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [{ name: "date" }],
-        metrics: [
-          { name: "screenPageViews" },
-          { name: "activeUsers" },
-          { name: "sessions" },
-        ],
-        orderBys: [
-          { dimension: { dimensionName: "date" }, desc: false },
-        ],
-      });
-
-      const rows = formatRows(
-        response,
-        ["date"],
-        ["pageviews", "users", "sessions"],
-      );
-
-      return {
-        series: rows.map((row: TransformedGoogleAnalyticsRow) => ({
-          ...row,
-          date: String(row.date).replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"),
-        })),
-        period,
-        fetchedAt: new Date().toISOString(),
-      };
-    });
+        return {
+          series: formatRows(
+            response,
+            ["date"],
+            ["pageviews", "users", "sessions"],
+          ).map((row) => ({
+            ...row,
+            date: String(row.date).replace(
+              /^(\d{4})(\d{2})(\d{2})$/,
+              "$1-$2-$3",
+            ),
+          })),
+          period,
+          fetchedAt: new Date().toISOString(),
+        };
+      },
+    );
   }
 
-  public static async getChannelGrouping(propertyId: string, period: string = "30d") {
-    const key = `channels:${propertyId}:${period}`;
-    return analyticsCache.get(key, REPORT_TTL, async () => {
-      const analyticsClient = GoogleAnalyticsService._getClient();
-
-      const [response] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [{ name: "sessionDefaultChannelGroup" }],
-        metrics: [
-          { name: "sessions" },
-          { name: "totalUsers" },
-          { name: "newUsers" },
-          { name: "engagementRate" },
-        ],
-        orderBys: [
-          { metric: { metricName: "sessions" }, desc: true },
-        ],
-        limit: 12,
-      });
-
-      return {
-        channels: formatRows(
-          response,
-          ["channel"],
-          ["sessions", "totalUsers", "newUsers", "engagementRate"],
-        ),
-        period,
-        fetchedAt: new Date().toISOString(),
-      };
-    });
+  public static getChannelGrouping(
+    propertyId: string,
+    period: string = DEFAULT_PERIOD,
+  ) {
+    return GoogleAnalyticsService.cachedReport(
+      "channels",
+      propertyId,
+      period,
+      async () => ({
+        channels: await GoogleAnalyticsService.runReport(propertyId, period, {
+          dimensions: ["sessionDefaultChannelGroup"],
+          dimensionKeys: ["channel"],
+          metrics: ["sessions", "totalUsers", "newUsers", "engagementRate"],
+          metricKeys: ["sessions", "totalUsers", "newUsers", "engagementRate"],
+          orderByMetric: "sessions",
+          limit: 12,
+        }),
+      }),
+    );
   }
 
-  public static async getLandingPages(propertyId: string, period: string = "30d") {
-    const key = `landing:${propertyId}:${period}`;
-    return analyticsCache.get(key, REPORT_TTL, async () => {
-      const analyticsClient = GoogleAnalyticsService._getClient();
-
-      const [response] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [{ name: "landingPagePlusQueryString" }],
-        metrics: [
-          { name: "sessions" },
-          { name: "totalUsers" },
-          { name: "bounceRate" },
-          { name: "averageSessionDuration" },
-          { name: "engagedSessions" },
-        ],
-        orderBys: [
-          { metric: { metricName: "sessions" }, desc: true },
-        ],
-        limit: 20,
-      });
-
-      return {
-        pages: formatRows(
-          response,
-          ["landingPage"],
-          ["sessions", "users", "bounceRate", "avgDuration", "engagedSessions"],
-        ),
-        period,
-        fetchedAt: new Date().toISOString(),
-      };
-    });
+  public static getLandingPages(
+    propertyId: string,
+    period: string = DEFAULT_PERIOD,
+  ) {
+    return GoogleAnalyticsService.cachedReport(
+      "landing",
+      propertyId,
+      period,
+      async () => ({
+        pages: await GoogleAnalyticsService.runReport(propertyId, period, {
+          dimensions: ["landingPagePlusQueryString"],
+          dimensionKeys: ["landingPage"],
+          metrics: [
+            "sessions",
+            "totalUsers",
+            "bounceRate",
+            "averageSessionDuration",
+            "engagedSessions",
+          ],
+          metricKeys: [
+            "sessions",
+            "users",
+            "bounceRate",
+            "avgDuration",
+            "engagedSessions",
+          ],
+          orderByMetric: "sessions",
+          limit: 20,
+        }),
+      }),
+    );
   }
 
-  public static async getHourlyHeatmap(propertyId: string, period: string = "30d") {
-    const key = `heatmap:${propertyId}:${period}`;
-    return analyticsCache.get(key, REPORT_TTL, async () => {
-      const analyticsClient = GoogleAnalyticsService._getClient();
-
-      const [response] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [
-          { name: "dayOfWeekName" },
-          { name: "hour" },
-        ],
-        metrics: [
-          { name: "activeUsers" },
-        ],
-      });
-
-      const rows = formatRows(
-        response,
-        ["day", "hour"],
-        ["users"],
-      );
-
-      return {
-        cells: rows.map((row: TransformedGoogleAnalyticsRow) => ({
-          ...row,
-          hour: parseInt(String(row.hour), 10),
-        })),
-        period,
-        fetchedAt: new Date().toISOString(),
-      };
-    });
+  public static getHourlyHeatmap(
+    propertyId: string,
+    period: string = DEFAULT_PERIOD,
+  ) {
+    return GoogleAnalyticsService.cachedReport(
+      "heatmap",
+      propertyId,
+      period,
+      async () => {
+        const rows = await GoogleAnalyticsService.runReport(
+          propertyId,
+          period,
+          {
+            dimensions: ["dayOfWeekName", "hour"],
+            dimensionKeys: ["day", "hour"],
+            metrics: ["activeUsers"],
+            metricKeys: ["users"],
+          },
+        );
+        return {
+          cells: rows.map((row) => ({
+            ...row,
+            hour: Number.parseInt(String(row.hour), 10),
+          })),
+        };
+      },
+    );
   }
 
-  public static async getNewVsReturning(propertyId: string, period: string = "30d") {
-    const key = `retention:${propertyId}:${period}`;
-    return analyticsCache.get(key, REPORT_TTL, async () => {
-      const analyticsClient = GoogleAnalyticsService._getClient();
-
-      const [response] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [{ name: "newVsReturning" }],
-        metrics: [
-          { name: "totalUsers" },
-          { name: "sessions" },
-          { name: "engagementRate" },
-        ],
-        orderBys: [
-          { metric: { metricName: "totalUsers" }, desc: true },
-        ],
-      });
-
-      return {
-        segments: formatRows(
-          response,
-          ["segment"],
-          ["users", "sessions", "engagementRate"],
-        ),
-        period,
-        fetchedAt: new Date().toISOString(),
-      };
-    });
+  public static getNewVsReturning(
+    propertyId: string,
+    period: string = DEFAULT_PERIOD,
+  ) {
+    return GoogleAnalyticsService.cachedReport(
+      "retention",
+      propertyId,
+      period,
+      async () => ({
+        segments: await GoogleAnalyticsService.runReport(propertyId, period, {
+          dimensions: ["newVsReturning"],
+          dimensionKeys: ["segment"],
+          metrics: ["totalUsers", "sessions", "engagementRate"],
+          metricKeys: ["users", "sessions", "engagementRate"],
+          orderByMetric: "totalUsers",
+        }),
+      }),
+    );
   }
 
-  public static async getTopEvents(propertyId: string, period: string = "30d") {
-    const key = `events:${propertyId}:${period}`;
-    return analyticsCache.get(key, REPORT_TTL, async () => {
-      const analyticsClient = GoogleAnalyticsService._getClient();
-
-      const [response] = await analyticsClient.runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [GoogleAnalyticsDateHelper.periodToDateRange(period)],
-        dimensions: [{ name: "eventName" }],
-        metrics: [
-          { name: "eventCount" },
-          { name: "totalUsers" },
-        ],
-        orderBys: [
-          { metric: { metricName: "eventCount" }, desc: true },
-        ],
-        limit: 15,
-      });
-
-      return {
-        events: formatRows(
-          response,
-          ["eventName"],
-          ["eventCount", "users"],
-        ),
-        period,
-        fetchedAt: new Date().toISOString(),
-      };
-    });
+  public static getTopEvents(
+    propertyId: string,
+    period: string = DEFAULT_PERIOD,
+  ) {
+    return GoogleAnalyticsService.cachedReport(
+      "events",
+      propertyId,
+      period,
+      async () => ({
+        events: await GoogleAnalyticsService.runReport(propertyId, period, {
+          dimensions: ["eventName"],
+          dimensionKeys: ["eventName"],
+          metrics: ["eventCount", "totalUsers"],
+          metricKeys: ["eventCount", "users"],
+          orderByMetric: "eventCount",
+          limit: 15,
+        }),
+      }),
+    );
   }
 }

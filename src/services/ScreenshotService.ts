@@ -32,37 +32,62 @@ const BROWSER_IDLE_CLOSE_MS = 5 * 60 * 1000;
 const cache = new Map<string, ScreenshotEntry>();
 const inflight = new Map<string, Promise<ScreenshotEntry>>();
 
-let browser: Browser | null = null;
+// The launch promise, not the browser: two captures run concurrently, and
+// both finding "no browser" used to launch two Chromiums — the first one
+// orphaned (never closed) when the second overwrote the reference.
+let browserPromise: Promise<Browser> | null = null;
 let idleCloseTimer: NodeJS.Timeout | null = null;
 let activeCaptures = 0;
 const captureQueue: Array<() => void> = [];
 
-async function getBrowser() {
-  if (browser && browser.isConnected()) return browser;
+function launchBrowser(): Promise<Browser> {
+  return chromium
+    .launch({
+      headless: true,
+      // In Docker, system Chromium is used instead of Playwright's bundled browser
+      ...(PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH && {
+        executablePath: PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+      }),
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+      ],
+    })
+    .then((launched) => {
+      logger.info("[Screenshot] Chromium launched");
+      return launched;
+    });
+}
 
-  browser = await chromium.launch({
-    headless: true,
-    // In Docker, system Chromium is used instead of Playwright's bundled browser
-    ...(PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH && {
-      executablePath: PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
-    }),
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-    ],
-  });
-  logger.info("[Screenshot] Chromium launched");
-  return browser;
+function getBrowser(): Promise<Browser> {
+  if (!browserPromise) {
+    const launching = launchBrowser();
+    browserPromise = launching;
+    // A failed launch or a crashed browser is relaunched on next use — but
+    // only if it is still the current one (an idle-closed browser's late
+    // "disconnected" must not orphan its replacement).
+    const forget = () => {
+      if (browserPromise === launching) browserPromise = null;
+    };
+    launching.then((launched) => launched.on("disconnected", forget), forget);
+  }
+  return browserPromise;
+}
+
+async function closeBrowser(): Promise<void> {
+  const closing = browserPromise;
+  browserPromise = null;
+  if (closing) {
+    await closing.then((launched) => launched.close()).catch(() => {});
+  }
 }
 
 function scheduleIdleClose() {
   if (idleCloseTimer) clearTimeout(idleCloseTimer);
   idleCloseTimer = setTimeout(() => {
     if (activeCaptures > 0) return;
-    const closing = browser;
-    browser = null;
-    closing?.close().catch(() => {});
+    void closeBrowser();
     logger.info("[Screenshot] Chromium closed after idle period");
   }, BROWSER_IDLE_CLOSE_MS);
   idleCloseTimer.unref?.();
@@ -83,6 +108,12 @@ function releaseCaptureSlot() {
 }
 
 export default class ScreenshotService {
+  /** Close Chromium (shutdown). */
+  static async shutdown(): Promise<void> {
+    if (idleCloseTimer) clearTimeout(idleCloseTimer);
+    await closeBrowser();
+  }
+
   /**
    * Only registry-known domains may be captured — the domain arrives
    * from a URL parameter, and this is what stops the endpoint from
@@ -132,7 +163,9 @@ export default class ScreenshotService {
     const startedAt = Date.now();
 
     try {
-      const context = await (await getBrowser()).newContext({
+      const context = await (
+        await getBrowser()
+      ).newContext({
         viewport: VIEWPORT,
         deviceScaleFactor: 1,
         reducedMotion: "reduce",

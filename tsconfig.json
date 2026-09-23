@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2025",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "noEmit": true,
@@ -14,14 +14,14 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "lib": [
-      "ES2022"
+      "ES2025"
     ]
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "vitest.config.ts"
   ],
   "exclude": [
-    "node_modules",
-    "tests"
+    "node_modules"
   ]
 }

@@ -25,24 +25,24 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@google-analytics/data": "^5.2.2",
-    "@google-cloud/monitoring": "^4.1.0",
+    "@google-analytics/data": "^7.1.0",
+    "@google-cloud/monitoring": "^6.1.0",
     "@rodrigo-barraza/utilities-library": "github:rodrigo-barraza/utilities-library",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "minio": "^8.0.7",
-    "mongodb": "^7.2.0",
-    "playwright": "^1.61.1"
+    "mongodb": "^7.6.0",
+    "playwright": "^1.63.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/node": "^25.9.0",
-    "@vitest/coverage-v8": "^4.1.9",
+    "@types/node": "^26.6.2",
+    "@vitest/coverage-v8": "^5.0.1",
     "oxlint": "^1.85.0",
-    "prettier": "^3.8.3",
+    "prettier": "^3.9.8",
     "typescript": "next",
-    "vitest": "^4.1.5"
+    "vitest": "^5.0.1"
   },
   "packageManager": "pnpm@11.8.0"
 }

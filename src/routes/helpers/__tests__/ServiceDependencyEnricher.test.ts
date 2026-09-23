@@ -7,7 +7,10 @@ describe("ServiceDependencyEnricher", () => {
       {
         id: "web-client",
         name: "Web Client",
-        dependsOn: ["api-service", { id: "database-service", criticality: "required" }],
+        dependsOn: [
+          "api-service",
+          { id: "database-service", criticality: "required" },
+        ],
       },
       {
         id: "api-service",
@@ -23,17 +26,28 @@ describe("ServiceDependencyEnricher", () => {
       },
     ];
 
-    const result = ServiceDependencyEnricher.enrich(servicesList, infrastructureList);
+    const result = ServiceDependencyEnricher.enrich(
+      servicesList,
+      infrastructureList,
+    );
 
     // Assert web-client dependencies mapped correctly
     expect(result.services[0].dependsOn).toEqual([
       { id: "api-service", name: "API Service", criticality: "required" },
-      { id: "database-service", name: "Database Service", criticality: "required" },
+      {
+        id: "database-service",
+        name: "Database Service",
+        criticality: "required",
+      },
     ]);
 
     // Assert api-service dependencies mapped correctly
     expect(result.services[1].dependsOn).toEqual([
-      { id: "database-service", name: "Database Service", criticality: "essential" },
+      {
+        id: "database-service",
+        name: "Database Service",
+        criticality: "essential",
+      },
     ]);
 
     // Assert dependedOnBy mapping on database-service is constructed
@@ -49,14 +63,40 @@ describe("ServiceDependencyEnricher", () => {
   });
 
   it("should handle empty dependencies list gracefully", () => {
-    const servicesList = [
-      { id: "lone-service", name: "Lone Service" },
-    ];
-    const infrastructureList = [] as Record<string, unknown>[];
-
-    const result = ServiceDependencyEnricher.enrich(servicesList, infrastructureList);
+    const servicesList = [{ id: "lone-service", name: "Lone Service" }];
+    const result = ServiceDependencyEnricher.enrich(servicesList, []);
 
     expect(result.services[0].dependsOn).toEqual([]);
     expect(result.services[0].dependedOnBy).toEqual([]);
+  });
+
+  it("keeps edge provenance and never mutates its inputs", () => {
+    const servicesList = [
+      {
+        id: "notes-service",
+        name: "Notes Service",
+        dependsOn: [
+          { id: "mongodb", criticality: "required", source: "derived" },
+        ],
+      },
+    ];
+    const infrastructureList = [{ id: "mongodb", name: "MongoDB" }];
+    const snapshot = structuredClone({ servicesList, infrastructureList });
+
+    const result = ServiceDependencyEnricher.enrich(
+      servicesList,
+      infrastructureList,
+    );
+
+    expect(result.services[0].dependsOn).toEqual([
+      {
+        id: "mongodb",
+        name: "MongoDB",
+        criticality: "required",
+        source: "derived",
+      },
+    ]);
+    expect({ servicesList, infrastructureList }).toEqual(snapshot);
+    expect(result.infrastructure[0]).not.toBe(infrastructureList[0]);
   });
 });

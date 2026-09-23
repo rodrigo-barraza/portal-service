@@ -3,7 +3,7 @@ import type { ContainerStats, NetworkInterfaceStats } from "../../types.ts";
 export class DockerStatsParser {
   public static buildStoppedSkeleton(
     containerDetails: Record<string, unknown>,
-    deviceId: string
+    deviceId: string,
   ): ContainerStats {
     const containerName = (
       (containerDetails.Names as string[] | undefined)?.[0] || "unknown"
@@ -30,7 +30,8 @@ export class DockerStatsParser {
       rw: (mountEntry.RW as boolean) ?? true,
     }));
 
-    const labelsMapped = (containerDetails.Labels as Record<string, string>) || {};
+    const labelsMapped =
+      (containerDetails.Labels as Record<string, string>) || {};
 
     return {
       id: (containerDetails.Id as string).substring(0, 12),
@@ -77,10 +78,12 @@ export class DockerStatsParser {
     containerDetails: Record<string, unknown>,
     rawStats: Record<string, unknown>,
     deviceId: string,
-    previousCpuState: { cpuTotal: number; systemTotal: number } | undefined
+    previousCpuState: { cpuTotal: number; systemTotal: number } | undefined,
   ): ContainerStats {
-    const rawCpuStats = rawStats.cpu_stats as Record<string, unknown> | undefined;
-    const rawCpuUsage = rawCpuStats?.cpu_usage as Record<string, unknown> | undefined;
+    const rawCpuStats = rawStats.cpu_stats as
+      Record<string, unknown> | undefined;
+    const rawCpuUsage = rawCpuStats?.cpu_usage as
+      Record<string, unknown> | undefined;
 
     const currentCpuTotal = (rawCpuUsage?.total_usage as number) || 0;
     const currentSystemTotal = (rawCpuStats?.system_cpu_usage as number) || 0;
@@ -98,8 +101,10 @@ export class DockerStatsParser {
       }
     }
 
-    const rawMemoryStats = rawStats.memory_stats as Record<string, unknown> | undefined;
-    const rawMemoryStatsDetails = rawMemoryStats?.stats as Record<string, unknown> | undefined;
+    const rawMemoryStats = rawStats.memory_stats as
+      Record<string, unknown> | undefined;
+    const rawMemoryStatsDetails = rawMemoryStats?.stats as
+      Record<string, unknown> | undefined;
 
     const memoryUsageRaw = (rawMemoryStats?.usage as number) || 0;
     const memoryCacheRaw =
@@ -108,7 +113,8 @@ export class DockerStatsParser {
       0;
     const memoryActualUsed = memoryUsageRaw - memoryCacheRaw;
     const memoryLimitRaw = (rawMemoryStats?.limit as number) || 0;
-    const memoryPercentUsed = memoryLimitRaw > 0 ? (memoryActualUsed / memoryLimitRaw) * 100 : 0;
+    const memoryPercentUsed =
+      memoryLimitRaw > 0 ? (memoryActualUsed / memoryLimitRaw) * 100 : 0;
 
     let netRx = 0;
     let netTx = 0;
@@ -120,9 +126,12 @@ export class DockerStatsParser {
     let netTxErrors = 0;
     const networkInterfacesMapped: Record<string, NetworkInterfaceStats> = {};
 
-    const networksData = rawStats.networks as Record<string, Record<string, number>> | undefined;
+    const networksData = rawStats.networks as
+      Record<string, Record<string, number>> | undefined;
     if (networksData) {
-      for (const [interfaceName, networkMetrics] of Object.entries(networksData)) {
+      for (const [interfaceName, networkMetrics] of Object.entries(
+        networksData,
+      )) {
         const rxBytes = networkMetrics.rx_bytes || 0;
         const txBytes = networkMetrics.tx_bytes || 0;
         const rxPackets = networkMetrics.rx_packets || 0;
@@ -156,10 +165,10 @@ export class DockerStatsParser {
 
     let blockReadBytes = 0;
     let blockWriteBytes = 0;
-    const rawBlockIoStats = rawStats.blkio_stats as Record<string, unknown> | undefined;
+    const rawBlockIoStats = rawStats.blkio_stats as
+      Record<string, unknown> | undefined;
     const rawBlockIoEntries = rawBlockIoStats?.io_service_bytes_recursive as
-      | Array<{ op: string; value: number }>
-      | undefined;
+      Array<{ op: string; value: number }> | undefined;
 
     if (rawBlockIoEntries) {
       for (const blockEntry of rawBlockIoEntries) {
@@ -172,7 +181,8 @@ export class DockerStatsParser {
       }
     }
 
-    const rawPidsStats = rawStats.pids_stats as Record<string, unknown> | undefined;
+    const rawPidsStats = rawStats.pids_stats as
+      Record<string, unknown> | undefined;
     const pidsCount = (rawPidsStats?.current as number) || 0;
 
     const memoryDetailsMapped = {
@@ -186,7 +196,8 @@ export class DockerStatsParser {
       pgmajfault: (rawMemoryStatsDetails?.pgmajfault as number) || 0,
     };
 
-    const rawThrottlingData = rawCpuStats?.throttling_data as Record<string, number> | undefined;
+    const rawThrottlingData = rawCpuStats?.throttling_data as
+      Record<string, number> | undefined;
     const cpuThrottlingMapped = {
       periods: rawThrottlingData?.periods || 0,
       throttledPeriods: rawThrottlingData?.throttled_periods || 0,
@@ -214,7 +225,8 @@ export class DockerStatsParser {
       rw: (mountEntry.RW as boolean) ?? true,
     }));
 
-    const labelsMapped = (containerDetails.Labels as Record<string, string>) || {};
+    const labelsMapped =
+      (containerDetails.Labels as Record<string, string>) || {};
     const containerName = (
       (containerDetails.Names as string[] | undefined)?.[0] || "unknown"
     ).replace(/^\//, "");

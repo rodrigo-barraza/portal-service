@@ -1,7 +1,11 @@
 node_modules/
 dist/
+coverage/
 .env
 .vscode/settings.json
+
+# Agent worktrees (see the workspace CLAUDE.md)
+.claude/worktrees/
 
 *:Zone.Identifier
 

@@ -72,23 +72,30 @@ function base64url(input: Buffer | string) {
 }
 
 export default class MinioService {
-  static client: Client | null = null;
+  // The client promise, not the client: concurrent first callers (a page
+  // load fires the bucket stream and /stats/storage together) share one.
+  static clientPromise: Promise<Client> | null = null;
 
-  static async _getClient() {
-    if (MinioService.client) return MinioService.client;
-
+  static _getClient(): Promise<Client> {
     if (!MINIO_ENDPOINT) {
-      throw new Error("No MINIO_ENDPOINT configured");
+      return Promise.reject(new Error("No MINIO_ENDPOINT configured"));
     }
 
-    MinioService.client = await createMinioClient({
+    MinioService.clientPromise ??= createMinioClient({
       endpoint: MINIO_ENDPOINT,
       accessKey: MINIO_ACCESS_KEY || "",
       secretKey: MINIO_SECRET_KEY || "",
-    });
-
-    logger.info(`[MinioService] Client initialized → ${MINIO_ENDPOINT}`);
-    return MinioService.client;
+    }).then(
+      (client) => {
+        logger.info(`[MinioService] Client initialized → ${MINIO_ENDPOINT}`);
+        return client;
+      },
+      (error: unknown) => {
+        MinioService.clientPromise = null; // let the next call retry
+        throw error;
+      },
+    );
+    return MinioService.clientPromise;
   }
 
   // ── Bucket usage stats (metrics-first, scan fallback) ────────
@@ -148,7 +155,10 @@ export default class MinioService {
   }
 
   /** Fetch per-bucket usage from MinIO's metrics endpoint, or null on any failure. */
-  static async _fetchUsageFromMetrics(): Promise<Map<string, BucketUsage> | null> {
+  static async _fetchUsageFromMetrics(): Promise<Map<
+    string,
+    BucketUsage
+  > | null> {
     if (!MINIO_ENDPOINT) return null;
     const token = MinioService._generatePrometheusToken();
     if (!token) return null;
@@ -164,7 +174,9 @@ export default class MinioService {
         const usage = MinioService._parseBucketMetrics(await response.text());
         if (usage.size > 0) return usage;
       } catch (error: unknown) {
-        logger.warn(`[MinioService] Metrics fetch failed (${path}): ${getErrorMessage(error)}`);
+        logger.warn(
+          `[MinioService] Metrics fetch failed (${path}): ${getErrorMessage(error)}`,
+        );
       }
     }
 
@@ -188,7 +200,9 @@ export default class MinioService {
         stream.on("error", reject);
       });
     } catch (error: unknown) {
-      logger.warn(`[MinioService] Failed to count objects in ${bucketName}: ${getErrorMessage(error)}`);
+      logger.warn(
+        `[MinioService] Failed to count objects in ${bucketName}: ${getErrorMessage(error)}`,
+      );
     }
 
     return { objectCount, totalSize };
@@ -204,11 +218,18 @@ export default class MinioService {
     const queue = [...bucketNames];
     const ready: Array<{ name: string; usage: BucketUsage }> = [];
     let notify: (() => void) | null = null;
+    // Set when the consumer stops early (client disconnect): workers
+    // finish their current bucket but take no new ones.
+    let abandoned = false;
 
     const workers = Array.from(
       { length: Math.min(SCAN_CONCURRENCY, queue.length) },
       async () => {
-        for (let name = queue.shift(); name !== undefined; name = queue.shift()) {
+        for (
+          let name = queue.shift();
+          name !== undefined && !abandoned;
+          name = queue.shift()
+        ) {
           const usage = await MinioService._countBucket(name);
           ready.push({ name, usage });
           notify?.();
@@ -217,19 +238,27 @@ export default class MinioService {
     );
 
     let allDone = false;
-    Promise.all(workers).then(() => {
+    // _countBucket never throws, but a worker failing must still end the
+    // loop below instead of leaving it waiting forever.
+    void Promise.allSettled(workers).then(() => {
       allDone = true;
       notify?.();
     });
 
-    while (true) {
-      if (ready.length > 0) {
-        yield ready.shift()!;
-        continue;
+    try {
+      while (true) {
+        if (ready.length > 0) {
+          yield ready.shift()!;
+          continue;
+        }
+        if (allDone) break;
+        await new Promise<void>((resolve) => {
+          notify = resolve;
+        });
+        notify = null;
       }
-      if (allDone) break;
-      await new Promise<void>((resolve) => { notify = resolve; });
-      notify = null;
+    } finally {
+      abandoned = true;
     }
   }
 
@@ -256,19 +285,29 @@ export default class MinioService {
       const startedAt = Date.now();
       const fromMetrics = await MinioService._fetchUsageFromMetrics();
       if (fromMetrics) {
-        statsSnapshot = { usage: fromMetrics, source: "metrics", collectedAt: Date.now() };
-        logger.info(`[MinioService] Bucket usage via metrics — ${fromMetrics.size} buckets in ${Date.now() - startedAt}ms`);
+        statsSnapshot = {
+          usage: fromMetrics,
+          source: "metrics",
+          collectedAt: Date.now(),
+        };
+        logger.info(
+          `[MinioService] Bucket usage via metrics — ${fromMetrics.size} buckets in ${Date.now() - startedAt}ms`,
+        );
         return statsSnapshot;
       }
 
       const minioClient = await MinioService._getClient();
-      const names = (await minioClient.listBuckets()).map((bucket) => bucket.name);
+      const names = (await minioClient.listBuckets()).map(
+        (bucket) => bucket.name,
+      );
       const usage = new Map<string, BucketUsage>();
       for await (const result of MinioService._scanUsageIncremental(names)) {
         usage.set(result.name, result.usage);
       }
       statsSnapshot = { usage, source: "scan", collectedAt: Date.now() };
-      logger.info(`[MinioService] Bucket usage via full scan — ${names.length} buckets in ${Date.now() - startedAt}ms`);
+      logger.info(
+        `[MinioService] Bucket usage via full scan — ${names.length} buckets in ${Date.now() - startedAt}ms`,
+      );
       return statsSnapshot;
     })().finally(() => {
       statsRefreshInflight = null;
@@ -314,9 +353,15 @@ export default class MinioService {
     };
 
     const bucketDates = new Map(
-      rawBuckets.map((bucket) => [bucket.name, bucket.creationDate?.toISOString() || null]),
+      rawBuckets.map((bucket) => [
+        bucket.name,
+        bucket.creationDate?.toISOString() || null,
+      ]),
     );
-    const bucketEvent = (name: string, usage: BucketUsage): BucketStreamServerEvent => ({
+    const bucketEvent = (
+      name: string,
+      usage: BucketUsage,
+    ): BucketStreamServerEvent => ({
       type: "bucket",
       bucket: {
         name,
@@ -329,17 +374,32 @@ export default class MinioService {
     // Fast path: cached or metrics-derived usage answers every bucket at once
     if (statsSnapshot && snapshotIsFresh(statsSnapshot)) {
       for (const bucket of rawBuckets) {
-        yield bucketEvent(bucket.name, statsSnapshot.usage.get(bucket.name) || { objectCount: 0, totalSize: 0 });
+        yield bucketEvent(
+          bucket.name,
+          statsSnapshot.usage.get(bucket.name) || {
+            objectCount: 0,
+            totalSize: 0,
+          },
+        );
       }
       return;
     }
 
     const fromMetrics = await MinioService._fetchUsageFromMetrics();
     if (fromMetrics) {
-      statsSnapshot = { usage: fromMetrics, source: "metrics", collectedAt: Date.now() };
-      logger.info(`[MinioService] Bucket usage via metrics — ${fromMetrics.size} buckets`);
+      statsSnapshot = {
+        usage: fromMetrics,
+        source: "metrics",
+        collectedAt: Date.now(),
+      };
+      logger.info(
+        `[MinioService] Bucket usage via metrics — ${fromMetrics.size} buckets`,
+      );
       for (const bucket of rawBuckets) {
-        yield bucketEvent(bucket.name, fromMetrics.get(bucket.name) || { objectCount: 0, totalSize: 0 });
+        yield bucketEvent(
+          bucket.name,
+          fromMetrics.get(bucket.name) || { objectCount: 0, totalSize: 0 },
+        );
       }
       return;
     }
@@ -350,7 +410,10 @@ export default class MinioService {
     if (statsRefreshInflight) {
       const snapshot = await statsRefreshInflight;
       for (const bucket of rawBuckets) {
-        yield bucketEvent(bucket.name, snapshot.usage.get(bucket.name) || { objectCount: 0, totalSize: 0 });
+        yield bucketEvent(
+          bucket.name,
+          snapshot.usage.get(bucket.name) || { objectCount: 0, totalSize: 0 },
+        );
       }
       return;
     }
@@ -377,46 +440,50 @@ export default class MinioService {
       statsSnapshot = { usage, source: "scan", collectedAt: Date.now() };
     } finally {
       settle(
-        completed
-          ? statsSnapshot!
-          : { usage, source: "scan", collectedAt: 0 }, // stale-on-arrival: never served as fresh
+        completed ? statsSnapshot! : { usage, source: "scan", collectedAt: 0 }, // stale-on-arrival: never served as fresh
       );
       statsRefreshInflight = null;
     }
   }
 
-  static async listObjects(bucketName: string, prefix: string = "", recursive: boolean = false) {
+  static async listObjects(
+    bucketName: string,
+    prefix: string = "",
+    recursive: boolean = false,
+  ) {
     const minioClient = await MinioService._getClient();
 
-    return new Promise<{ objects: MinioObjectEntry[], prefixes: string[] }>((resolve, reject) => {
-      const objects: MinioObjectEntry[] = [];
-      const prefixes = new Set<string>();
+    return new Promise<{ objects: MinioObjectEntry[]; prefixes: string[] }>(
+      (resolve, reject) => {
+        const objects: MinioObjectEntry[] = [];
+        const prefixes = new Set<string>();
 
-      const stream = minioClient.listObjectsV2(bucketName, prefix, recursive);
+        const stream = minioClient.listObjectsV2(bucketName, prefix, recursive);
 
-      stream.on("data", (item) => {
-        if (item.prefix) {
-          // Virtual directory
-          prefixes.add(item.prefix);
-        } else {
-          objects.push({
-            name: item.name || "",
-            size: item.size,
-            lastModified: item.lastModified?.toISOString() || null,
-            etag: item.etag || null,
-          });
-        }
-      });
-
-      stream.on("end", () => {
-        resolve({
-          objects,
-          prefixes: [...prefixes].sort(),
+        stream.on("data", (item) => {
+          if (item.prefix) {
+            // Virtual directory
+            prefixes.add(item.prefix);
+          } else {
+            objects.push({
+              name: item.name || "",
+              size: item.size,
+              lastModified: item.lastModified?.toISOString() || null,
+              etag: item.etag || null,
+            });
+          }
         });
-      });
 
-      stream.on("error", reject);
-    });
+        stream.on("end", () => {
+          resolve({
+            objects,
+            prefixes: [...prefixes].sort(),
+          });
+        });
+
+        stream.on("error", reject);
+      },
+    );
   }
 
   static async statObject(bucketName: string, objectName: string) {
@@ -429,7 +496,12 @@ export default class MinioService {
     return minioClient.getObject(bucketName, objectName);
   }
 
-  static async getPartialObject(bucketName: string, objectName: string, offset: number, length: number) {
+  static async getPartialObject(
+    bucketName: string,
+    objectName: string,
+    offset: number,
+    length: number,
+  ) {
     const minioClient = await MinioService._getClient();
     return minioClient.getPartialObject(bucketName, objectName, offset, length);
   }
@@ -442,7 +514,11 @@ export default class MinioService {
   static async searchObjects(
     query: string,
     { bucket, limit = 200 }: { bucket?: string; limit?: number } = {},
-  ): Promise<{ results: Array<MinioObjectEntry & { bucket: string }>; totalScanned: number; truncated: boolean }> {
+  ): Promise<{
+    results: Array<MinioObjectEntry & { bucket: string }>;
+    totalScanned: number;
+    truncated: boolean;
+  }> {
     const minioClient = await MinioService._getClient();
     const normalizedQuery = query.toLowerCase();
     const results: Array<MinioObjectEntry & { bucket: string }> = [];
@@ -451,7 +527,9 @@ export default class MinioService {
 
     const bucketsToSearch = bucket
       ? [{ name: bucket }]
-      : (await minioClient.listBuckets()).map((bucketItem) => ({ name: bucketItem.name }));
+      : (await minioClient.listBuckets()).map((bucketItem) => ({
+          name: bucketItem.name,
+        }));
 
     for (const targetBucket of bucketsToSearch) {
       if (truncated) break;

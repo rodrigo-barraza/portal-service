@@ -43,7 +43,10 @@ describe("ScreenshotService._capture", () => {
     const captureSpy = vi
       .spyOn(ScreenshotService, "_captureUncached")
       .mockImplementation(
-        () => new Promise((resolve) => { resolveCapture = resolve; }),
+        () =>
+          new Promise((resolve) => {
+            resolveCapture = resolve;
+          }),
       );
 
     const first = ScreenshotService._capture("prism.example.com");
@@ -72,5 +75,45 @@ describe("ScreenshotService._capture", () => {
 
     expect(captureSpy).toHaveBeenCalledTimes(2);
     captureSpy.mockRestore();
+  });
+});
+
+describe("ScreenshotService browser lifecycle", () => {
+  it("launches one Chromium for concurrent first captures", async () => {
+    const { chromium } = await import("playwright");
+    const page = {
+      goto: vi.fn(async () => null),
+      waitForLoadState: vi.fn(async () => undefined),
+      waitForTimeout: vi.fn(async () => undefined),
+      screenshot: vi.fn(async () => Buffer.from("jpeg")),
+    };
+    const context = {
+      newPage: vi.fn(async () => page),
+      close: vi.fn(async () => undefined),
+    };
+    const browser = {
+      newContext: vi.fn(async () => context),
+      close: vi.fn(async () => undefined),
+      on: vi.fn(),
+    };
+    let finishLaunch!: () => void;
+    const launch = vi.mocked(chromium.launch).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishLaunch = () => resolve(browser as never);
+        }) as never,
+    );
+
+    const first = ScreenshotService._captureUncached("prism.example.com");
+    const second = ScreenshotService._captureUncached("portal.example.com");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    finishLaunch();
+    await Promise.all([first, second]);
+
+    expect(launch).toHaveBeenCalledTimes(1);
+    expect(browser.newContext).toHaveBeenCalledTimes(2);
+
+    await ScreenshotService.shutdown();
+    expect(browser.close).toHaveBeenCalledTimes(1);
   });
 });

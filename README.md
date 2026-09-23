@@ -1,141 +1,70 @@
-# Portal — Infrastructure Observability API
+# Portal Service — Infrastructure Observability API
 
-Backend-for-frontend (BFF) aggregator for the developer portal dashboard. Federates data from Prism, Tools API, and other services to provide unified health monitoring, log streaming, usage statistics, device topology, and API integration auditing across the entire ecosystem.
+Backend-for-frontend (BFF) for the developer portal. Federates the fleet's health, Docker container stats and logs, object storage, web analytics (GA4 + first-party sessions), external-API usage, and repository metadata behind one API — and turns the health polling into Discord alerts (watchdog).
 
-**Port:** `4001` · **Runtime:** Node.js (TypeScript) · **Framework:** Express 5 · **DB:** MongoDB
+**Port:** `4001` · **Runtime:** Node.js 26, TypeScript run directly via type stripping (`node src/boot.ts`) · **Framework:** Express 5 · **DB:** MongoDB
+
+Consumers: `portal-client` (the dashboard) and `tools-service` (`PortalFetcher`, for agent tools).
 
 ## Architecture
 
-### Directory Structure
-
 ```
-portal-service/
-├── src/
-│   ├── middleware/          # Request logging
-│   ├── routes/              # Express route handlers (6 routes)
-│   ├── services/            # Registry, infrastructure, stats aggregation
-│   ├── utils/               # Logger, error handler
-│   └── wrappers/            # MongoDB connection wrapper
-├── tests/                   # Vitest test suites
-└── package.json
+src/
+├── boot.ts          # vault secrets → process.env, registry → config, then index.ts
+├── index.ts         # Express app, timers, graceful shutdown
+├── config.ts        # env + registry hydration (PROJECTS / INFRASTRUCTURE / DEVICES)
+├── vault.ts         # the process's vault client
+├── routes/          # one router per mount; helpers/ holds pure request logic
+├── services/        # registry health, Docker, MinIO, GA, Cloud Monitoring, watchdog…
+├── utils/           # errors, request helpers, deduped TTL cache, logger
+└── wrappers/        # Docker Engine API, GitHub, Mongo
 ```
 
-### Core Services
-
-| Service | Purpose |
-|---|---|
-| **ServiceRegistryService** | Periodic health checks for all registered services (60s interval), cached status |
-| **InfrastructureRegistryService** | Health monitoring for backing stores (MongoDB, MinIO) |
-| **StatsAggregatorService** | Cached usage stats from Prism admin API (30s TTL) |
-
-### Boot Sequence
-
-1. Fetches secrets + project registry from Vault via `@rodrigo-barraza/utilities-library/vault`
-2. Builds `SERVICES`, `INFRASTRUCTURE`, and `DEVICES` maps from the registry
-3. Runs initial health check of all services and infrastructure
-4. Starts periodic health checks every 60 seconds
-5. If registry was empty at boot (Vault not ready), retries every 10s for up to 5 minutes
+- **Registry** comes from vault at boot, is re-fetched every 5 minutes (any change to projects, infrastructure or devices hot-reloads), and on `POST /services/reload`.
+- **Health**: every project and infrastructure entry is probed every 60 s. Concurrent callers share one round; a healthy service must fail two consecutive rounds to show as down.
+- **Watchdog**: a 30 s pass turns sustained health transitions and push-heartbeat silence into Discord alerts — one message per pass, however many targets changed. State is in memory; a restart re-pages still-down services after the confirm window (deliberate).
+- **Errors** are always `{ "error": "<message>" }`. Unexpected 5xx errors answer `"Internal server error"`, and their detail stays in the log.
 
 ## API Endpoints
 
-### Services
-
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/services` | Health status of all services + infrastructure. `?refresh=true` forces fresh check |
-| `POST` | `/services/check` | Trigger a fresh health check |
-| `POST` | `/services/:id/restart` | Restart a containerized service via Docker Engine API |
-| `POST` | `/services/:id/stop` | Stop a containerized service |
-| `POST` | `/services/:id/start` | Start a containerized service |
+| `GET` | `/`, `/health` | Service info / liveness |
+| `GET` | `/services` | Health of all services + infrastructure (`?refresh=true` re-probes), with dependency edges and watchdog state |
+| `POST` | `/services/check` | Re-probe everything (same body as `?refresh=true`) |
+| `POST` | `/services/reload` | Re-fetch the vault registry |
+| `POST` | `/services/:id/restart` · `stop` · `start` | Lifecycle action on a registry project's container |
+| `GET` / `POST` | `/services/:id/rollback-status` · `/services/:id/rollback` | Swap `:latest` ↔ `:previous` and recreate the container |
+| `GET` | `/services/sizes` · `/services/languages` · `/services/analysis` | GitHub repo size, Linguist languages, detected import/API edges |
+| `POST` | `/containers/:name/restart` · `stop` · `start` `?device=` | Lifecycle action on any container by name |
+| `GET` | `/containers/previews/:domain` | Cached screenshot of a registered client domain |
+| `GET` | `/devices` | Hosts with their services, infrastructure and live hardware specs |
+| `GET` | `/stats/containers` · `/stats/containers/history` · `/stats/containers/metrics` | Live Docker stats, 5 s ring buffer, persisted 30 s samples (7-day TTL) |
+| `GET` | `/stats/system` · `/stats/storage` | Docker disk usage · MinIO bucket totals |
+| `POST` | `/stats/invalidate` | Drop the Docker stats caches |
+| `GET` | `/logs` · `/logs/:container` | Loggable containers · SSE log stream (`?tail&follow=1&level&search&since&device`) |
+| `GET` | `/integrations` | Configured third-party keys (configured flag + 8-hex SHA-256 fingerprint only) |
+| `GET` / `DELETE` | `/object-store/…` | Buckets (+ SSE stream), objects, stat, download (Range), search, delete |
+| `GET` | `/google-analytics/…` | GA4 reports per registry property |
+| `GET` | `/session-analytics/…` | Proxy to sessions-service `/stats/*` |
+| `GET` | `/external-apis` · `/external-apis/timeseries` | Third-party API usage (Cloud Monitoring + prism + tools-service) |
+| `POST` / `GET` | `/watchdog/heartbeat/:token/:projectId[/fail]` · `/watchdog` | Healthchecks.io-compatible push heartbeat · watchdog state |
 
-### Devices
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/devices` | Device topology — all hosts with their services and health status |
-
-### Stats
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/stats` | Aggregated usage overview from Prism |
-| `GET` | `/stats/breakdown` | Request breakdown by period (`?period=24h\|7d\|30d`) |
-| `GET` | `/stats/projects` | Per-project usage stats |
-| `POST` | `/stats/invalidate` | Force-clear the stats cache |
-
-### Logs
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/logs` | List services that support log streaming |
-| `GET` | `/logs/:id` | Stream container logs via SSE (`?tail=200&follow=1`) |
-
-### Integrations
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/integrations` | Configured API integrations grouped by category, with masked keys |
-
-### System
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/health` | Health check |
-| `GET` | `/` | Service info with endpoint listing |
+Auth on the destructive endpoints is deliberately deferred for now.
 
 ## Docker Integration
 
-Container lifecycle operations (restart, stop, start) and log streaming are performed via the **Docker Engine API** over the mounted Unix socket (`/var/run/docker.sock`). The socket must be mounted into the container for these features to work.
+Container lifecycle, stats and logs go through the **Docker Engine API**: the mounted socket (`/var/run/docker.sock`) on the NAS and `tcp://` endpoints for remote hosts, both taken from the registry's `devices`.
 
-## Prerequisites
-
-- **Node.js** v20+ (TypeScript)
-- **MongoDB** — service snapshot persistence
-- **Vault Service** — registry and secrets at boot
-- **Docker socket mount** — for container management and log streaming
-
-## Tech Stack
-
-| Dependency | Purpose |
-|---|---|
-| Express 5 | HTTP framework |
-| MongoDB | Database driver |
-| MinIO | S3-compatible storage client |
-| Vitest | Testing framework |
-
-## Setup
+## Development
 
 ```bash
-# 1. Install dependencies
-npm install
-
-# 2. Configure secrets
-cp secrets.example.ts secrets.ts
-# Edit secrets.ts with your MongoDB URI, Vault credentials, etc.
-
-# 3. Start the server
-npm run dev        # Development (auto-reload with nodemon)
-npm start          # Production
+pnpm install
+pnpm dev             # node --watch src/boot.ts (needs vault reachable, or the env it would provide)
+pnpm typecheck       # tsc --noEmit
+pnpm lint            # oxlint
+pnpm test            # vitest
+pnpm deploy          # build + deploy to the NAS via ../deploy-kit
 ```
 
-## Scripts
-
-```bash
-npm run start         # Start server
-npm run dev           # Start with auto-reload (nodemon)
-npm run lint          # Run oxlint (.oxlintrc.json)
-npm run lint:fix      # Auto-fix lint issues
-npm run format        # Format with Prettier
-npm run format:check  # Check formatting
-npm test              # Run tests (Vitest)
-npm run test:watch    # Run tests in watch mode
-npm run deploy        # Deploy to production
-npm run deploy:dry    # Validate deployment without deploying
-```
-
-## Deploy
-
-```bash
-npm run deploy          # Full deploy to Synology NAS
-npm run deploy:dry      # Validate without deploying
-```
+Every host, port and URL comes from vault (`vault-service/projects.json`). Nothing is hardcoded here.

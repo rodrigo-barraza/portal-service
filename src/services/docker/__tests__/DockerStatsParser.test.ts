@@ -11,17 +11,27 @@ describe("DockerStatsParser", () => {
     Created: 1680000000,
     Command: "node src/index.ts",
     Ports: [
-      { IP: "0.0.0.0", PrivatePort: 3000, PublicPort: 3000, Type: "tcp" }
+      { IP: "0.0.0.0", PrivatePort: 3000, PublicPort: 3000, Type: "tcp" },
     ],
     Mounts: [
-      { Type: "bind", Name: "", Source: "/host/path", Destination: "/container/path", Mode: "rw", RW: true }
+      {
+        Type: "bind",
+        Name: "",
+        Source: "/host/path",
+        Destination: "/container/path",
+        Mode: "rw",
+        RW: true,
+      },
     ],
-    Labels: { "com.docker.compose.project": "my-project" }
+    Labels: { "com.docker.compose.project": "my-project" },
   };
 
   describe("buildStoppedSkeleton", () => {
     it("should build a valid stopped skeleton from container details", () => {
-      const result = DockerStatsParser.buildStoppedSkeleton(mockContainerDetails, "my-device-id");
+      const result = DockerStatsParser.buildStoppedSkeleton(
+        mockContainerDetails,
+        "my-device-id",
+      );
 
       expect(result.id).toBe("abcdefabcdef");
       expect(result.name).toBe("my-awesome-container");
@@ -32,13 +42,22 @@ describe("DockerStatsParser", () => {
       expect(result.command).toBe("node src/index.ts");
       expect(result.device).toBe("my-device-id");
       expect(result.ports).toEqual([
-        { ip: "0.0.0.0", privatePort: 3000, publicPort: 3000, type: "tcp" }
+        { ip: "0.0.0.0", privatePort: 3000, publicPort: 3000, type: "tcp" },
       ]);
       expect(result.mounts).toEqual([
-        { type: "bind", name: "", source: "/host/path", destination: "/container/path", mode: "rw", rw: true }
+        {
+          type: "bind",
+          name: "",
+          source: "/host/path",
+          destination: "/container/path",
+          mode: "rw",
+          rw: true,
+        },
       ]);
-      expect(result.labels).toEqual({ "com.docker.compose.project": "my-project" });
-      
+      expect(result.labels).toEqual({
+        "com.docker.compose.project": "my-project",
+      });
+
       // Verification of zeroed metrics
       expect(result.cpu.percent).toBe(0);
       expect(result.memory.used).toBe(0);
@@ -53,15 +72,15 @@ describe("DockerStatsParser", () => {
         cpu_stats: {
           cpu_usage: {
             total_usage: 500000000,
-            percpu_usage: [250000000, 250000000]
+            percpu_usage: [250000000, 250000000],
           },
           system_cpu_usage: 10000000000,
           online_cpus: 2,
           throttling_data: {
             periods: 10,
             throttled_periods: 2,
-            throttled_time: 2000
-          }
+            throttled_time: 2000,
+          },
         },
         memory_stats: {
           usage: 150000000,
@@ -70,8 +89,8 @@ describe("DockerStatsParser", () => {
           stats: {
             cache: 50000000,
             rss: 100000000,
-            swap: 0
-          }
+            swap: 0,
+          },
         },
         networks: {
           eth0: {
@@ -82,7 +101,7 @@ describe("DockerStatsParser", () => {
             rx_dropped: 0,
             tx_dropped: 0,
             rx_errors: 0,
-            tx_errors: 0
+            tx_errors: 0,
           },
           eth1: {
             rx_bytes: 500,
@@ -92,30 +111,30 @@ describe("DockerStatsParser", () => {
             rx_dropped: 0,
             tx_dropped: 0,
             rx_errors: 0,
-            tx_errors: 0
-          }
+            tx_errors: 0,
+          },
         },
         blkio_stats: {
           io_service_bytes_recursive: [
             { op: "read", value: 10000 },
-            { op: "write", value: 20000 }
-          ]
+            { op: "write", value: 20000 },
+          ],
         },
         pids_stats: {
-          current: 12
-        }
+          current: 12,
+        },
       };
 
       const mockPreviousCpuState = {
         cpuTotal: 400000000,
-        systemTotal: 9000000000
+        systemTotal: 9000000000,
       };
 
       const result = DockerStatsParser.parseStats(
         mockContainerDetails,
         mockRawStats,
         "my-device-id",
-        mockPreviousCpuState
+        mockPreviousCpuState,
       );
 
       // CPU calculations:
@@ -146,7 +165,7 @@ describe("DockerStatsParser", () => {
         rxDropped: 0,
         txDropped: 0,
         rxErrors: 0,
-        txErrors: 0
+        txErrors: 0,
       });
 
       // Block IO parsing:
@@ -160,7 +179,7 @@ describe("DockerStatsParser", () => {
       expect(result.cpuThrottling).toEqual({
         periods: 10,
         throttledPeriods: 2,
-        throttledTimeNs: 2000
+        throttledTimeNs: 2000,
       });
     });
   });

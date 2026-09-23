@@ -1,210 +1,76 @@
-import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Container Actions Route ────────────────────────────────
-// Direct Docker container control by name + device.
-// Used for containers that may not have a PROJECTS registry entry.
+// Direct Docker container control by name + device, for containers that
+// may not have a PROJECTS registry entry; plus cached site previews.
 
-import { Router, type Request, type Response, type NextFunction } from "express";
-import DockerStatsService from "../services/DockerStatsService.ts";
+import { Router, type Request, type Response } from "express";
+import { HttpError } from "@rodrigo-barraza/utilities-library/service";
 import ServiceRegistryService from "../services/ServiceRegistryService.ts";
 import ScreenshotService from "../services/ScreenshotService.ts";
-import { DEVICES } from "../config.ts";
-import logger from "../utils/logger.ts";
-import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import {
+  CONTAINER_ACTIONS,
+  VALID_CONTAINER_NAME_PATTERN,
+  resolveDockerDevice,
+  runContainerAction,
+} from "../services/docker/ContainerActions.ts";
+import { queryParam, routeParam } from "../utils/http.ts";
 
 const router = Router();
 
 // Hostnames only — no ports, paths, or userinfo sneaking into the URL
 // ScreenshotService navigates to.
-const VALID_DOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
-
-// Docker container names: alphanumeric start, then [a-zA-Z0-9_.-].
-// Rejecting anything else prevents path/query injection into the Docker
-// Engine API (e.g. a %2F-encoded name rewriting the request path).
-const VALID_CONTAINER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
-
-function resolveDevice(deviceId: string) {
-  const device = DEVICES[deviceId];
-  if (!device || !device.dockerApi) return null;
-  return { id: deviceId, device };
-}
-
-function tryParseDockerError(body: string) {
-  try {
-    return JSON.parse(body).message;
-  } catch {
-    return null;
-  }
-}
+const VALID_DOMAIN_PATTERN =
+  /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
 
 // Cached site thumbnail for a registered client domain — the static
 // preview shown on the /containers card view instead of a live iframe.
-router.get("/previews/:domain", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const domain = String(req.params.domain);
+router.get("/previews/:domain", async (req: Request, res: Response) => {
+  const domain = routeParam(req, "domain");
 
-    if (!VALID_DOMAIN_PATTERN.test(domain)) {
-      return res.status(400).json({ error: "Invalid domain" });
-    }
-
-    if (!ScreenshotService.isAllowedDomain(domain)) {
-      return res.status(404).json({ error: `Unknown domain: ${domain}` });
-    }
-
-    const screenshot = await ScreenshotService.getScreenshot(domain);
-
-    res
-      .type(screenshot.contentType)
-      .setHeader("Cache-Control", "public, max-age=300")
-      .setHeader("X-Captured-At", new Date(screenshot.capturedAt).toISOString())
-      .send(screenshot.buffer);
-  } catch (error: unknown) {
-    logger.error(`[Container:Preview] Failed for ${req.params.domain}: ${getErrorMessage(error)}`);
-    next(error);
+  if (!VALID_DOMAIN_PATTERN.test(domain)) {
+    throw new HttpError("Invalid domain", 400);
   }
-}, "Containers_Preview"));
+  if (!ScreenshotService.isAllowedDomain(domain)) {
+    throw new HttpError(`Unknown domain: ${domain}`, 404);
+  }
 
-router.post("/:name/restart", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { name } = req.params;
-    const deviceId = typeof req.query.device === "string" ? req.query.device : undefined;
+  const screenshot = await ScreenshotService.getScreenshot(domain);
 
-    if (!VALID_CONTAINER_NAME_PATTERN.test(String(name))) {
-      return res.status(400).json({ error: "Invalid container name" });
+  res
+    .type(screenshot.contentType)
+    .setHeader("Cache-Control", "public, max-age=300")
+    .setHeader("X-Captured-At", new Date(screenshot.capturedAt).toISOString())
+    .send(screenshot.buffer);
+});
+
+for (const action of CONTAINER_ACTIONS) {
+  router.post(`/:name/${action}`, async (req: Request, res: Response) => {
+    const name = routeParam(req, "name");
+    const deviceId = queryParam(req, "device");
+
+    if (!VALID_CONTAINER_NAME_PATTERN.test(name)) {
+      throw new HttpError("Invalid container name", 400);
     }
-
     if (!deviceId) {
-      return res.status(400).json({ error: "Missing required query parameter: device" });
+      throw new HttpError("Missing required query parameter: device", 400);
     }
 
-    const target = resolveDevice(deviceId);
+    const target = resolveDockerDevice(deviceId);
     if (!target) {
-      return res.status(400).json({ error: `No Docker API configured for device: ${deviceId}` });
+      throw new HttpError(
+        `No Docker API configured for device: ${deviceId}`,
+        400,
+      );
     }
 
-    logger.info(`[Container:Restart] ${name} → ${target.id}:/containers/${name}/restart`);
-
-    const result = await DockerStatsService.dockerRequest(
-      target.device, "POST", `/containers/${name}/restart?t=10`,
+    const message = await runContainerAction(
+      target.device,
+      name,
+      action,
+      `${target.id}/${name}`,
     );
-
-    if (result.statusCode === 204) {
-      logger.success(`[Container:Restart] ${name} restarted successfully`);
-
-      setTimeout(() => {
-        ServiceRegistryService.checkAll().catch(() => {});
-      }, 3000);
-
-      res.json({
-        success: true,
-        container: name,
-        device: target.id,
-        message: "Container restarted",
-      });
-    } else {
-      const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
-      logger.error(`[Container:Restart] Failed for ${name}: ${message}`);
-      res.status(502).json({ error: message });
-    }
-  } catch (error: unknown) {
-    logger.error(`[Container:Restart] Failed: ${getErrorMessage(error)}`);
-    next(error);
-  }
-}, "Containers_Restart"));
-
-router.post("/:name/stop", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { name } = req.params;
-    const deviceId = typeof req.query.device === "string" ? req.query.device : undefined;
-
-    if (!VALID_CONTAINER_NAME_PATTERN.test(String(name))) {
-      return res.status(400).json({ error: "Invalid container name" });
-    }
-
-    if (!deviceId) {
-      return res.status(400).json({ error: "Missing required query parameter: device" });
-    }
-
-    const target = resolveDevice(deviceId);
-    if (!target) {
-      return res.status(400).json({ error: `No Docker API configured for device: ${deviceId}` });
-    }
-
-    logger.info(`[Container:Stop] ${name} → ${target.id}:/containers/${name}/stop`);
-
-    const result = await DockerStatsService.dockerRequest(
-      target.device, "POST", `/containers/${name}/stop?t=10`,
-    );
-
-    if (result.statusCode === 204 || result.statusCode === 304) {
-      logger.success(`[Container:Stop] ${name} stopped successfully`);
-
-      setTimeout(() => {
-        ServiceRegistryService.checkAll().catch(() => {});
-      }, 3000);
-
-      res.json({
-        success: true,
-        container: name,
-        device: target.id,
-        message: result.statusCode === 304 ? "Container already stopped" : "Container stopped",
-      });
-    } else {
-      const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
-      logger.error(`[Container:Stop] Failed for ${name}: ${message}`);
-      res.status(502).json({ error: message });
-    }
-  } catch (error: unknown) {
-    logger.error(`[Container:Stop] Failed: ${getErrorMessage(error)}`);
-    next(error);
-  }
-}, "Containers_Stop"));
-
-router.post("/:name/start", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { name } = req.params;
-    const deviceId = typeof req.query.device === "string" ? req.query.device : undefined;
-
-    if (!VALID_CONTAINER_NAME_PATTERN.test(String(name))) {
-      return res.status(400).json({ error: "Invalid container name" });
-    }
-
-    if (!deviceId) {
-      return res.status(400).json({ error: "Missing required query parameter: device" });
-    }
-
-    const target = resolveDevice(deviceId);
-    if (!target) {
-      return res.status(400).json({ error: `No Docker API configured for device: ${deviceId}` });
-    }
-
-    logger.info(`[Container:Start] ${name} → ${target.id}:/containers/${name}/start`);
-
-    const result = await DockerStatsService.dockerRequest(
-      target.device, "POST", `/containers/${name}/start`,
-    );
-
-    if (result.statusCode === 204 || result.statusCode === 304) {
-      logger.success(`[Container:Start] ${name} started successfully`);
-
-      setTimeout(() => {
-        ServiceRegistryService.checkAll().catch(() => {});
-      }, 3000);
-
-      res.json({
-        success: true,
-        container: name,
-        device: target.id,
-        message: result.statusCode === 304 ? "Container already running" : "Container started",
-      });
-    } else {
-      const message = tryParseDockerError(result.body) || `Docker API error: ${result.statusCode}`;
-      logger.error(`[Container:Start] Failed for ${name}: ${message}`);
-      res.status(502).json({ error: message });
-    }
-  } catch (error: unknown) {
-    logger.error(`[Container:Start] Failed: ${getErrorMessage(error)}`);
-    next(error);
-  }
-}, "Containers_Start"));
+    ServiceRegistryService.scheduleRecheck();
+    res.json({ success: true, container: name, device: target.id, message });
+  });
+}
 
 export default router;
