@@ -46,7 +46,7 @@ src/
 | `GET` | `/integrations` | Configured third-party keys (configured flag + 8-hex SHA-256 fingerprint only) |
 | `GET` / `DELETE` | `/object-store/…` | Buckets (+ SSE stream), objects, stat, download (Range), search, delete |
 | `GET` | `/google-analytics/…` | GA4 reports per registry property |
-| `GET` | `/session-analytics/…` | Proxy to sessions-service `/stats/*` |
+| `GET` | `/session-analytics/{projects,report,live,sessions,heatmap}`, `/session-analytics/sessions/:id[/replay]` | Proxy to sessions-service `/stats/*` (adds the stats secret) |
 | `GET` | `/external-apis` · `/external-apis/timeseries` | Third-party API usage (Cloud Monitoring + prism + tools-service) |
 | `POST` / `GET` | `/watchdog/heartbeat/:token/:projectId[/fail]` · `/watchdog` | Healthchecks.io-compatible push heartbeat · watchdog state |
 
