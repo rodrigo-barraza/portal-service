@@ -1,27 +1,32 @@
 # ============================================================
-# Portal — Multi-stage Dockerfile
+# Portal Service — Multi-stage Dockerfile
 # ============================================================
-# API BFF aggregator — Express server that federates
-# data from all Sun services. Uses boot.js to fetch secrets
-# from Vault at startup.
+# Express BFF aggregator that federates data from every service in
+# the fleet. TypeScript runs directly on Node's type stripping
+# (node src/boot.ts); boot.ts pulls secrets from Vault at startup.
 # ============================================================
 
 # ── Stage 1: Install dependencies ─────────────────────────────
 FROM node:26-alpine AS deps
 WORKDIR /app
-RUN npm install -g pnpm
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Pin to package.json's packageManager and disable pnpm's
+# self-provisioning — otherwise pnpm re-fetches itself into the
+# cache-mounted store's .tmp and fails with an ENOENT rename on
+# lock.yaml (same as portal-client).
+ENV npm_config_manage_package_manager_versions=false
+RUN npm install -g pnpm@11.8.0
+# utilities-library is a git-hosted dependency (codeload HTTPS tarball —
+# no SSH agent needed)
 RUN apk add --no-cache git
-RUN --mount=type=ssh \
-    --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
-# ── Stage 2: Build TypeScript ─────────────────────────────────
+# ── Stage 2: Typecheck, then prune to production deps ─────────
 FROM deps AS build
 WORKDIR /app
 COPY . .
 RUN pnpm run typecheck
-# Prune devDependencies for the runtime image
 RUN pnpm prune --prod
 
 # ── Stage 3: Runtime ──────────────────────────────────────────
@@ -35,7 +40,7 @@ RUN apk add --no-cache chromium font-noto font-noto-emoji
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
-# Copy production node_modules and compiled dist
+# Production node_modules + the TypeScript sources Node runs directly
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/src ./src
 COPY --from=build /app/package.json ./package.json

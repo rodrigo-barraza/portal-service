@@ -1,5 +1,7 @@
 node_modules
 dist
+coverage
+.claude
 .git
 .gitignore
 .gitattributes
@@ -13,6 +15,6 @@ docker-compose.yml
 Dockerfile
 .oxlintrc.json
 vitest.config.*
-tests
+**/__tests__
 *.md
 *.tsbuildinfo
