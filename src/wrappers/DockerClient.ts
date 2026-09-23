@@ -1,17 +1,41 @@
-import http from "http";
-import type { DeviceEntry, DockerActionResponse, DockerTransport } from "../types.ts";
+// ─── Docker Engine API Client ───────────────────────────────
+// Minimal HTTP client over the Engine API — unix socket (local NAS) or
+// tcp:// (remote hosts). Every request carries a timeout; a response
+// that dies mid-body rejects instead of leaving the promise pending.
+
+import http from "node:http";
+import type { DeviceEntry } from "../types.ts";
+
+export interface DockerResponse {
+  statusCode: number;
+  body: string;
+}
+
+interface DockerTransport {
+  socketPath?: string;
+  hostname?: string;
+  port?: number;
+  path: string;
+}
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_GET_TIMEOUT_MS = 8_000;
+const DEFAULT_DOCKER_TCP_PORT = 2375;
+
+/** Docker mux stream type for stdout (1) and stderr (2). */
+const STDOUT_STREAM = 1;
 
 export class DockerClient {
   public static parseTransport(dockerApiUrl: string, requestPath: string): DockerTransport {
     if (dockerApiUrl.startsWith("unix://")) {
-      return { socketPath: dockerApiUrl.slice(7), path: requestPath };
+      return { socketPath: dockerApiUrl.slice("unix://".length), path: requestPath };
     }
 
     if (dockerApiUrl.startsWith("tcp://")) {
       const parsedUrl = new URL(dockerApiUrl.replace("tcp://", "http://"));
       return {
         hostname: parsedUrl.hostname,
-        port: parseInt(parsedUrl.port, 10) || 2375,
+        port: Number.parseInt(parsedUrl.port, 10) || DEFAULT_DOCKER_TCP_PORT,
         path: requestPath,
       };
     }
@@ -19,108 +43,91 @@ export class DockerClient {
     throw new Error(`Unsupported Docker API protocol: ${dockerApiUrl}`);
   }
 
+  /**
+   * One Engine API round trip. Resolves with the status and body for any
+   * HTTP status — callers decide which codes mean success (204, 304…).
+   */
   public static dockerRequest(
     deviceEntry: DeviceEntry,
     httpMethod: string,
     requestPath: string,
-    options: { timeout?: number; body?: unknown } = {}
-  ): Promise<DockerActionResponse> {
-    const timeoutMilliseconds = options.timeout ?? 30000;
-    const requestBody =
-      options.body === undefined ? null : JSON.stringify(options.body);
+    options: { timeout?: number; body?: unknown } = {},
+  ): Promise<DockerResponse> {
+    const timeoutMilliseconds = options.timeout ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    const requestBody = options.body === undefined ? null : JSON.stringify(options.body);
 
-    return new Promise<DockerActionResponse>((resolve, reject) => {
+    return new Promise<DockerResponse>((resolve, reject) => {
       if (!deviceEntry.dockerApi) {
-        return reject(new Error("No Docker API endpoint configured for this device"));
+        reject(new Error("No Docker API endpoint configured for this device"));
+        return;
       }
-
-      const transportOptions = this.parseTransport(deviceEntry.dockerApi, requestPath);
 
       const clientRequest = http.request(
         {
-          ...transportOptions,
+          ...DockerClient.parseTransport(deviceEntry.dockerApi, requestPath),
           method: httpMethod,
           headers: {
-            "Content-Type": "application/json",
+            Accept: "application/json",
             ...(requestBody !== null
-              ? { "Content-Length": Buffer.byteLength(requestBody) }
+              ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(requestBody) }
               : {}),
           },
         },
         (clientResponse: http.IncomingMessage) => {
-          let responseBody = "";
-          clientResponse.on("data", (chunk: Buffer) => {
-            responseBody += chunk;
-          });
+          // Collect bytes and decode once — decoding per chunk corrupts a
+          // multi-byte character split across chunk boundaries.
+          const chunks: Buffer[] = [];
+          clientResponse.on("data", (chunk: Buffer) => chunks.push(chunk));
           clientResponse.on("end", () => {
             resolve({
               statusCode: clientResponse.statusCode ?? 0,
-              body: responseBody,
+              body: Buffer.concat(chunks).toString("utf8"),
             });
           });
-        }
+          // A socket reset mid-body errors the response, not the request.
+          clientResponse.on("error", reject);
+        },
       );
 
       clientRequest.setTimeout(timeoutMilliseconds, () => {
         clientRequest.destroy(new Error(`Docker API timeout after ${timeoutMilliseconds}ms`));
       });
-
       clientRequest.on("error", reject);
       if (requestBody !== null) clientRequest.write(requestBody);
       clientRequest.end();
     });
   }
 
-  public static dockerGet(
+  /** GET that resolves with the body of a 2xx response and rejects otherwise. */
+  public static async dockerGet(
     deviceEntry: DeviceEntry,
     requestPath: string,
-    timeoutMilliseconds: number = 8000
+    timeoutMilliseconds: number = DEFAULT_GET_TIMEOUT_MS,
   ): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
-      if (!deviceEntry.dockerApi) {
-        return reject(new Error("No Docker API endpoint configured for this device"));
-      }
-
-      const transportOptions = this.parseTransport(deviceEntry.dockerApi, requestPath);
-
-      const clientRequest = http.request(
-        {
-          ...transportOptions,
-          method: "GET",
-          headers: { Accept: "application/json" },
-        },
-        (clientResponse: http.IncomingMessage) => {
-          let responseBody = "";
-          clientResponse.on("data", (chunk: Buffer) => {
-            responseBody += chunk;
-          });
-          clientResponse.on("end", () => {
-            if (
-              clientResponse.statusCode &&
-              clientResponse.statusCode >= 200 &&
-              clientResponse.statusCode < 300
-            ) {
-              resolve(responseBody);
-            } else {
-              reject(
-                new Error(
-                  `Docker API GET returned status ${clientResponse.statusCode}: ${responseBody.substring(0, 200)}`
-                )
-              );
-            }
-          });
-        }
-      );
-
-      clientRequest.setTimeout(timeoutMilliseconds, () => {
-        clientRequest.destroy(new Error(`Docker API timeout after ${timeoutMilliseconds}ms`));
-      });
-
-      clientRequest.on("error", reject);
-      clientRequest.end();
+    const response = await DockerClient.dockerRequest(deviceEntry, "GET", requestPath, {
+      timeout: timeoutMilliseconds,
     });
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw new Error(
+        `Docker API GET returned status ${response.statusCode}: ${response.body.substring(0, 200)}`,
+      );
+    }
+    return response.body;
   }
 
+  /** dockerGet + JSON.parse. */
+  public static async dockerGetJson<T>(
+    deviceEntry: DeviceEntry,
+    requestPath: string,
+    timeoutMilliseconds?: number,
+  ): Promise<T> {
+    return JSON.parse(await DockerClient.dockerGet(deviceEntry, requestPath, timeoutMilliseconds)) as T;
+  }
+
+  /**
+   * Open a container log stream. Non-TTY containers multiplex stdout and
+   * stderr into 8-byte-header frames; TTY containers stream raw bytes.
+   */
   public static streamLogs(
     deviceEntry: DeviceEntry,
     containerName: string,
@@ -128,34 +135,34 @@ export class DockerClient {
     isTty: boolean,
     onData: (chunk: Buffer, streamType: number) => void,
     onEnd: () => void,
-    onError: (error: Error) => void
+    onError: (error: Error) => void,
   ): http.ClientRequest {
     if (!deviceEntry.dockerApi) {
       throw new Error("No Docker API endpoint configured for this device");
     }
 
     const searchParameters = new URLSearchParams(queryParameters);
-    const requestPath = `/containers/${containerName}/logs?${searchParameters.toString()}`;
-    const transportOptions = this.parseTransport(deviceEntry.dockerApi, requestPath);
+    const requestPath = `/containers/${encodeURIComponent(containerName)}/logs?${searchParameters.toString()}`;
 
     const clientRequest = http.request(
       {
-        ...transportOptions,
+        ...DockerClient.parseTransport(deviceEntry.dockerApi, requestPath),
         method: "GET",
       },
       (clientResponse: http.IncomingMessage) => {
+        clientResponse.on("error", onError);
+
         if (clientResponse.statusCode !== 200) {
-          let errorResponseBody = "";
-          clientResponse.on("data", (chunk: Buffer) => {
-            errorResponseBody += chunk;
-          });
+          const errorChunks: Buffer[] = [];
+          clientResponse.on("data", (chunk: Buffer) => errorChunks.push(chunk));
           clientResponse.on("end", () => {
+            let message = `Docker API error: ${clientResponse.statusCode}`;
             try {
-              const parsedError = JSON.parse(errorResponseBody);
-              onError(new Error(parsedError.message || `Docker API error: ${clientResponse.statusCode}`));
+              message = JSON.parse(Buffer.concat(errorChunks).toString("utf8")).message || message;
             } catch {
-              onError(new Error(`Docker API error: ${clientResponse.statusCode}`));
+              // Non-JSON error body — keep the status-code message
             }
+            onError(new Error(message));
             onEnd();
           });
           return;
@@ -164,18 +171,15 @@ export class DockerClient {
         // TTY containers stream raw bytes with no mux framing — parsing the
         // 8-byte headers there reads garbage frame sizes and buffers forever.
         if (isTty) {
-          clientResponse.on("data", (chunk: Buffer) => {
-            onData(chunk, 1); // everything is stdout on a TTY
-          });
+          clientResponse.on("data", (chunk: Buffer) => onData(chunk, STDOUT_STREAM));
           clientResponse.on("end", onEnd);
-          clientResponse.on("error", onError);
           return;
         }
 
-        let dataBuffer = Buffer.alloc(0);
+        let dataBuffer: Buffer = Buffer.alloc(0);
 
         clientResponse.on("data", (chunk: Buffer) => {
-          dataBuffer = Buffer.concat([dataBuffer, chunk]);
+          dataBuffer = dataBuffer.length === 0 ? chunk : Buffer.concat([dataBuffer, chunk]);
 
           while (dataBuffer.length >= 8) {
             const streamType = dataBuffer.readUInt8(0);
@@ -186,16 +190,13 @@ export class DockerClient {
               break; // Frame is incomplete, wait for more data
             }
 
-            const framePayload = dataBuffer.subarray(8, totalFrameSize);
+            onData(dataBuffer.subarray(8, totalFrameSize), streamType);
             dataBuffer = dataBuffer.subarray(totalFrameSize);
-
-            onData(framePayload, streamType);
           }
         });
 
         clientResponse.on("end", onEnd);
-        clientResponse.on("error", onError);
-      }
+      },
     );
 
     clientRequest.on("error", onError);

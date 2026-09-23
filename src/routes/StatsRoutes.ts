@@ -1,101 +1,52 @@
-import type { BucketInfo } from "../types.ts";
-import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 // ─── Stats Route ────────────────────────────────────────────
+// Docker container stats (live, ring-buffer history, persisted metrics),
+// Docker host disk usage, and object-store totals.
 
-import { Router, type Request, type Response, type NextFunction } from "express";
-import StatsAggregatorService from "../services/StatsAggregatorService.ts";
+import { Router, type Request, type Response } from "express";
 import DockerStatsService from "../services/DockerStatsService.ts";
 import MinioService from "../services/MinioService.ts";
 import ContainerMetricsService from "../services/ContainerMetricsService.ts";
+import { queryParam } from "../utils/http.ts";
 
 const router = Router();
 
-router.get("/", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const data = await StatsAggregatorService.getOverview();
-    res.json(data);
-  } catch (error: unknown) {
-    next(error);
-  }
-}, "Stats_Overview"));
-
-router.get("/breakdown", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const data = await StatsAggregatorService.getRequestBreakdown({
-      period: typeof req.query.period === "string" ? req.query.period : undefined,
-    });
-    res.json(data);
-  } catch (error: unknown) {
-    next(error);
-  }
-}, "Stats_Breakdown"));
-
-router.get("/projects", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const data = await StatsAggregatorService.getProjectStats();
-    res.json(data);
-  } catch (error: unknown) {
-    next(error);
-  }
-}, "Stats_Projects"));
-
-router.get("/containers", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const deviceId = (typeof req.query.device === "string" ? req.query.device : undefined) || undefined;
-    const data = await DockerStatsService.getAll(deviceId);
-    res.json({ containers: data, fetchedAt: new Date().toISOString() });
-  } catch (error: unknown) {
-    next(error);
-  }
-}, "Stats_Containers"));
+router.get("/containers", async (req: Request, res: Response) => {
+  const containers = await DockerStatsService.getAll(queryParam(req, "device"));
+  res.json({ containers, fetchedAt: new Date().toISOString() });
+});
 
 router.get("/containers/history", (req: Request, res: Response) => {
-  const deviceId = (typeof req.query.device === "string" ? req.query.device : undefined) || undefined;
-  const history = DockerStatsService.getHistory(deviceId);
-  // Compute total sample count across all devices
-  const samples = Object.values(history).reduce((sum: number, buf: unknown[]) => sum + buf.length, 0);
+  const history = DockerStatsService.getHistory(queryParam(req, "device"));
+  const samples = Object.values(history).reduce((sum, buffer) => sum + buffer.length, 0);
   res.json({ history, samples });
 });
 
-router.get("/containers/metrics", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const data = await ContainerMetricsService.getHistory({
-      container: (typeof req.query.container === "string" ? req.query.container : undefined) || undefined,
-      device: (typeof req.query.device === "string" ? req.query.device : undefined) || undefined,
-      range: typeof req.query.range === "string" ? req.query.range : "1h",
-      limit: req.query.limit ? parseInt(typeof req.query.limit === "string" ? req.query.limit : "", 10) : 120,
-    });
-    res.json(data);
-  } catch (error: unknown) {
-    next(error);
-  }
-}, "Stats_ContainerMetrics"));
+router.get("/containers/metrics", async (req: Request, res: Response) => {
+  const limit = queryParam(req, "limit");
+  res.json(
+    await ContainerMetricsService.getHistory({
+      container: queryParam(req, "container"),
+      device: queryParam(req, "device"),
+      range: queryParam(req, "range") ?? "1h",
+      limit: limit ? Number.parseInt(limit, 10) : undefined,
+    }),
+  );
+});
 
 router.post("/invalidate", (_req: Request, res: Response) => {
-  StatsAggregatorService.invalidate();
-  DockerStatsService.invalidate(undefined);
+  DockerStatsService.invalidate();
   res.json({ ok: true });
 });
 
-router.get("/system", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const deviceId = (typeof req.query.device === "string" ? req.query.device : undefined) || undefined;
-    const data = await DockerStatsService.getSystemInfo(deviceId);
-    res.json(data);
-  } catch (error: unknown) {
-    next(error);
-  }
-}, "Stats_System"));
+router.get("/system", async (req: Request, res: Response) => {
+  res.json(await DockerStatsService.getSystemInfo(queryParam(req, "device")));
+});
 
-router.get("/storage", asyncHandler(async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const buckets = await MinioService.listBuckets();
-    const totalObjects = buckets.reduce((sum: number, b: BucketInfo) => sum + b.objectCount, 0);
-    const totalSize = buckets.reduce((sum: number, b: BucketInfo) => sum + b.totalSize, 0);
-    res.json({ buckets, totalObjects, totalSize, fetchedAt: new Date().toISOString() });
-  } catch (error: unknown) {
-    next(error);
-  }
-}, "Stats_Storage"));
+router.get("/storage", async (_req: Request, res: Response) => {
+  const buckets = await MinioService.listBuckets();
+  const totalObjects = buckets.reduce((sum, bucket) => sum + bucket.objectCount, 0);
+  const totalSize = buckets.reduce((sum, bucket) => sum + bucket.totalSize, 0);
+  res.json({ buckets, totalObjects, totalSize, fetchedAt: new Date().toISOString() });
+});
 
 export default router;

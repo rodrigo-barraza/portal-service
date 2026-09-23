@@ -2,12 +2,22 @@
 
 import { Router, type Request, type Response } from "express";
 import { DEVICES, PROJECTS, INFRASTRUCTURE } from "../config.ts";
+import type { DeviceSpecs } from "../types.ts";
 import ServiceRegistryService from "../services/ServiceRegistryService.ts";
 import InfrastructureRegistryService from "../services/InfrastructureRegistryService.ts";
 import DockerStatsService from "../services/DockerStatsService.ts";
-import type { ServiceStatus, InfraStatus, ProjectEntry, InfrastructureEntry, DeviceSpecs } from "../types.ts";
 
 const router = Router();
+
+function extractPort(url: string | null | undefined): number | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.port ? Number(parsed.port) : null;
+  } catch {
+    return null;
+  }
+}
 
 router.get("/", async (_req: Request, res: Response) => {
   // Live hardware specs from each device's Docker Engine — cached, and
@@ -19,21 +29,14 @@ router.get("/", async (_req: Request, res: Response) => {
     // Specs are best-effort decoration — the device list must never fail on them.
   }
 
-  // Build service → health lookup from the registry cache
-  const serviceStatuses = ServiceRegistryService.list();
-  const statusMap = new Map(serviceStatuses.map((s: ServiceStatus) => [s.id, s]));
+  const serviceStatusById = new Map(ServiceRegistryService.list().map((status) => [status.id, status]));
+  const infraStatusById = new Map(InfrastructureRegistryService.list().map((status) => [status.id, status]));
 
-  // Build infrastructure → health lookup
-  const infraStatuses = InfrastructureRegistryService.list();
-  const infraMap = new Map(infraStatuses.map((s: InfraStatus) => [s.id, s]));
-
-  // Group services and infrastructure by device
   const devices = Object.entries(DEVICES).map(([deviceId, device]) => {
-    // Application services on this device
     const hostedServices = Object.entries(PROJECTS)
-      .filter(([, service]) => (service as ProjectEntry).device === deviceId)
+      .filter(([, service]) => service.device === deviceId)
       .map(([serviceId, service]) => {
-        const status = statusMap.get(serviceId);
+        const status = serviceStatusById.get(serviceId);
         return {
           id: serviceId,
           name: service.name,
@@ -50,11 +53,10 @@ router.get("/", async (_req: Request, res: Response) => {
         };
       });
 
-    // Infrastructure backing stores on this device
     const hostedInfra = Object.entries(INFRASTRUCTURE)
-      .filter(([, infra]) => (infra as InfrastructureEntry).device === deviceId)
+      .filter(([, infra]) => infra.device === deviceId)
       .map(([infraId, infra]) => {
-        const status = infraMap.get(infraId);
+        const status = infraStatusById.get(infraId);
         return {
           id: infraId,
           name: infra.name,
@@ -73,16 +75,23 @@ router.get("/", async (_req: Request, res: Response) => {
         };
       });
 
-    const allItems = [...hostedServices, ...hostedInfra];
-    const healthyCount = allItems.filter((s: { healthy: boolean }) => s.healthy).length;
+    const hostedCount = hostedServices.length + hostedInfra.length;
+    const healthyCount = [...hostedServices, ...hostedInfra].filter((item) => item.healthy).length;
 
+    // Descriptive fields only — the Docker Engine endpoint (an
+    // unauthenticated tcp:// socket for remote hosts), docker binary path
+    // and SSH alias stay server-side; this API is public.
     return {
       id: deviceId,
-      ...device,
+      name: device.name,
+      type: device.type,
+      hostname: device.hostname,
+      os: device.os,
+      notes: device.notes,
       specs: specsByDevice[deviceId] ?? null,
       services: hostedServices,
       infrastructure: hostedInfra,
-      serviceCount: allItems.length,
+      serviceCount: hostedCount,
       healthyCount,
     };
   });
@@ -90,15 +99,4 @@ router.get("/", async (_req: Request, res: Response) => {
   res.json({ devices });
 });
 
-function extractPort(url: string | null | undefined) {
-  if (!url) return null;
-  try {
-    const parsed = new URL(url);
-    return parsed.port ? Number(parsed.port) : null;
-  } catch {
-    return null;
-  }
-}
-
 export default router;
-

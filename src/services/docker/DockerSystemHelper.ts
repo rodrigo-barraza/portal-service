@@ -1,12 +1,29 @@
-import { exec } from "child_process";
-import { promisify } from "util";
-import os from "os";
-
-const execAsync = promisify(exec);
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import os from "node:os";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { DeviceEntry, DeviceSpecs } from "../../types.ts";
 import { DockerClient } from "../../wrappers/DockerClient.ts";
+
+const execFileAsync = promisify(execFile);
+
+/** `df -B1 /` data line → byte totals (the last line; the first is the header). */
+export function parseDfOutput(dfOutput: string): { total: number; used: number; available: number; percent: number } | null {
+  const lastLine = dfOutput.trim().split("\n").pop() ?? "";
+  const parts = lastLine.trim().split(/\s+/);
+  if (parts.length < 5 || !parts.slice(1, 4).every((part) => /^\d+$/.test(part))) return null;
+
+  const total = Number.parseInt(parts[1], 10);
+  const used = Number.parseInt(parts[2], 10);
+  const available = Number.parseInt(parts[3], 10);
+  return {
+    total,
+    used,
+    available,
+    percent: total > 0 ? Math.round((used / total) * 10000) / 100 : 0,
+  };
+}
 
 export class DockerSystemHelper {
   /**
@@ -91,26 +108,9 @@ export class DockerSystemHelper {
     let hostDiskStats = null;
     if (deviceEntry.dockerApi?.startsWith("unix://")) {
       try {
-        // Async so a slow disk can't block the event loop for other requests
-        const { stdout: dfOutput } = await execAsync("df -B1 / | tail -1", {
-          encoding: "utf8",
-          timeout: 3000,
-        });
-        const dfOutputParts = dfOutput.trim().split(/\s+/);
-        if (dfOutputParts.length >= 5) {
-          const totalBytes = parseInt(dfOutputParts[1], 10) || 0;
-          const usedBytes = parseInt(dfOutputParts[2], 10) || 0;
-          const availableBytes = parseInt(dfOutputParts[3], 10) || 0;
-          const usagePercent =
-            totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 10000) / 100 : 0;
-
-          hostDiskStats = {
-            total: totalBytes,
-            used: usedBytes,
-            available: availableBytes,
-            percent: usagePercent,
-          };
-        }
+        // execFile, no shell; async so a slow disk can't block the event loop
+        const { stdout } = await execFileAsync("df", ["-B1", "/"], { encoding: "utf8", timeout: 3000 });
+        hostDiskStats = parseDfOutput(stdout);
       } catch (error: unknown) {
         logger.warn(
           `[DockerSystemHelper:${deviceId}] Host disk stats failed: ${getErrorMessage(error)}`
