@@ -32,8 +32,8 @@ const sessionsClient = SESSIONS_SERVICE_URL
 
 /**
  * The message of a sessions-service error body, whatever its envelope —
- * it answers `{ error: true, message }` (401/503), `{ error: "…" }`, or a
- * bare `{ message }`.
+ * `{ error: "…" }`, or the chassis' `{ error: true, message }` / bare
+ * `{ message }`.
  */
 export function upstreamErrorMessage(body: unknown, status: number): string {
   const candidate = body as { error?: unknown; message?: unknown } | null;
@@ -97,22 +97,16 @@ async function proxy(
 
 // Straight pass-throughs: GET /session-analytics/<path>?… → sessions /stats/<path>?…
 const PASSTHROUGH_PATHS = [
+  // Every tracked project with its period numbers and live count
   "/projects",
-  "/overview",
-  "/sessions",
-  "/pages",
-  "/referrers",
-  "/geo",
-  "/devices",
-  "/timeseries",
+  // One project's whole report: summary (+ previous period), series, breakdowns
+  "/report",
+  // Sessions active in the last 5 minutes and the pages they are on
   "/live",
-  "/events",
-  "/events/feed",
-  "/cross-client",
-  // Normalized cursor/click/scroll density grid for one page path + viewport band
+  // Filterable, paginated session list (the explorer)
+  "/sessions",
+  // Click / cursor density grid for one page path + viewport band
   "/heatmap",
-  "/visitors",
-  "/ips",
 ];
 
 for (const path of PASSTHROUGH_PATHS) {
@@ -121,30 +115,20 @@ for (const path of PASSTHROUGH_PATHS) {
   );
 }
 
-// ─── GET /session-analytics/session/:sessionId ────────────────
+// ─── GET /session-analytics/sessions/:sessionId ───────────────
+// One session: its pageviews (journey), events, and replay availability.
 
-router.get("/session/:sessionId", (req: Request, res: Response) =>
-  proxy(res, `/session/${encodeURIComponent(routeParam(req, "sessionId"))}`),
+router.get("/sessions/:sessionId", (req: Request, res: Response) =>
+  proxy(res, `/sessions/${encodeURIComponent(routeParam(req, "sessionId"))}`),
 );
 
-// ─── GET /session-analytics/session/:sessionId/replay ─────────
-// Full ordered rrweb event stream for one session (playback). The extra path
-// segment means it never collides with /session/:sessionId above.
+// ─── GET /session-analytics/sessions/:sessionId/replay ────────
+// The session's ordered rrweb event stream (bounded), for playback.
 
-router.get("/session/:sessionId/replay", (req: Request, res: Response) =>
+router.get("/sessions/:sessionId/replay", (req: Request, res: Response) =>
   proxy(
     res,
-    `/session/${encodeURIComponent(routeParam(req, "sessionId"))}/replay`,
-  ),
-);
-
-// ─── GET /session-analytics/ip/:ip ────────────────────────────
-
-router.get("/ip/:ip", (req: Request, res: Response) =>
-  proxy(
-    res,
-    `/ip/${encodeURIComponent(routeParam(req, "ip"))}`,
-    singleValuedQuery(req),
+    `/sessions/${encodeURIComponent(routeParam(req, "sessionId"))}/replay`,
   ),
 );
 
